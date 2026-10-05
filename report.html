@@ -26,10 +26,21 @@ async function show() {
   const d1 = $('#d1').value, d2 = $('#d2').value, my = ++seq;
   if (!d1 || !d2 || d1 > d2) { $('#out').innerHTML = '<p class="hint">Укажите период: дата «с» не позже даты «по».</p>'; return; }
   $('#rng').textContent = `Смена начинается в ${String(st).padStart(2, '0')}:00 и длится сутки.`;
-  const { data, error } = await sb.rpc('report_loads', { d1, d2 });
+  const [{ data, error }, { data: chg, error: e2 }] = await Promise.all([sb.rpc('report_loads', { d1, d2 }), sb.rpc('report_changes', { d1, d2 })]);
   if (my !== seq) return;
-  if (error) { $('#out').innerHTML = '<p class="err">Не удалось загрузить данные. Проверьте, что выполнен report.sql.</p>'; return; }
-  const r = calcReport(data, refs), wn = {}; refs.washTypes.forEach(w => wn[w.id] = w.name);
+  if (error || e2) { $('#out').innerHTML = '<p class="err">Не удалось загрузить данные. Проверьте, что выполнены report.sql и stage2.sql.</p>'; return; }
+  const r = calcReport(data || [], chg || [], refs), wn = {}, cn = {};
+  refs.washTypes.forEach(w => wn[w.id] = w.name); refs.chemicals.forEach(c => cn[c.id] = c.name);
+  const two = o => o ? [o.l != null ? f(o.l) + ' л' : '', o.kg != null ? f(o.kg) + ' кг' : ''].filter(Boolean).join('<br>') || '–' : '–';
+  const dif = c => {
+    if (c.diff == null) return '–';
+    const u = c.prim === 'l' ? 'л' : 'кг', cls = c.pct != null && c.pct > 10 ? ' class="bad"' : c.pct != null && c.pct < -10 ? ' class="good"' : '';
+    return `<span${cls}>${c.diff > 0 ? '+' : ''}${f(c.diff)} ${u}${c.pct == null ? '' : '<br>' + (c.pct > 0 ? '+' : '') + f(c.pct, 0) + '%'}</span>`;
+  };
+  const note = c => c.prim == null ? 'Задайте литры и кг в настройках'
+    : c.diff == null ? 'Задайте и литры, и кг в настройках'
+    : `замен: ${c.changes}${c.noLeft ? `, без остатка: ${c.noLeft}` : ''}`;
+  const chRows = (chg || []).slice().reverse().slice(0, 300);
   const rows = (data || []).slice().reverse().slice(0, 300);
   $('#out').innerHTML = `
     <div class="kpi"><div><b>${r.total}</b><span>стирок</span></div><div><b>${f(r.kg, 0)}</b><span>кг белья</span></div><div><b>${r.byPart.day}</b><span>день</span></div><div><b>${r.byPart.night}</b><span>ночь</span></div></div>
@@ -37,17 +48,18 @@ async function show() {
     <div class="box"><table class="tbl"><tr><th>Вид стирки</th><th>Стирок</th><th>Кг</th></tr>
       ${refs.washTypes.filter(w => r.byWash[w.id]).map(w => `<tr><td>${esc(w.name)}</td><td>${r.byWash[w.id].n}</td><td>${f(r.byWash[w.id].kg, 0)}</td></tr>`).join('') || '<tr><td colspan="3">За период стирок нет</td></tr>'}
     </table></div>
-    <h2>Теоретический расход химии</h2>
-    <p class="hint">Считается по рецептам из настроек: мл на литр воды × ${f(refs.water, 0)} л на стирку. Фактический расход и сравнение будут на следующем этапе.</p>
-    <div class="box"><table class="tbl"><tr><th>Химия</th><th>Литров</th><th>Бутылей</th></tr>
-      ${r.chem.filter(c => c.kind === 'main').map(c => `<tr><td>${esc(c.name)}</td><td>${f(c.liters)}</td><td>${c.bottles == null ? '–' : f(c.bottles, 2)}</td></tr>`).join('')}
+    <h2>Химия: теория и факт</h2>
+    <p class="hint">Теория: рецепт × ${f(refs.water, 0)} л воды на стирку. Факт: каждая замена бутыли = бутыль минус остаток. За один день факт «скачет», смотрите период от недели. Красным: перерасход больше 10%.</p>
+    <div class="box"><table class="tbl"><tr><th>Химия</th><th>Теория</th><th>Факт</th><th>Разница</th></tr>
+      ${r.chem.map(c => `<tr><td>${esc(c.name)}<br><small>${note(c)}</small></td><td>${two(c.theory)}</td><td>${two(c.actual)}</td><td>${dif(c)}</td></tr>`).join('')}
     </table></div>
-    ${r.chem.some(c => c.kind === 'extra') ? `<div class="box"><table class="tbl"><tr><th>Дополнительно</th><th>Единиц</th><th>Расход</th></tr>
-      ${r.chem.filter(c => c.kind === 'extra').map(c => `<tr><td>${esc(c.name)}</td><td>${f(c.units, 0)}</td><td>${f(c.amount, 0)}</td></tr>`).join('')}
-    </table></div>` : ''}
     <h2>Записи${(data || []).length > rows.length ? ` (последние ${rows.length})` : ''}</h2>
     <div class="box"><table class="tbl"><tr><th>Смена</th><th>Время</th><th>Машина</th><th>Вид</th><th>Кг</th></tr>
       ${rows.map(l => `<tr><td>${dmy(l.shift_date)} ${l.part === 'night' ? 'ночь' : 'день'}</td><td>${hhmm(l.ts)}</td><td>${l.machine}</td><td>${esc(wn[l.wash_type_id])}</td><td>${f(l.weight_kg)}</td></tr>`).join('') || '<tr><td colspan="5">Нет записей</td></tr>'}
+    </table></div>
+    <h2>Замены химии${(chg || []).length > chRows.length ? ` (последние ${chRows.length})` : ''}</h2>
+    <div class="box"><table class="tbl"><tr><th>Смена</th><th>Время</th><th>Химия</th><th>Остаток</th></tr>
+      ${chRows.map(x => `<tr><td>${dmy(x.shift_date)}</td><td>${hhmm(x.ts)}</td><td>${esc(cn[x.chemical_id])}</td><td>${x.leftover_kg != null ? f(x.leftover_kg) + ' кг' : x.leftover_l != null ? f(x.leftover_l) + ' л' : 'пусто'}</td></tr>`).join('') || '<tr><td colspan="4">Нет замен</td></tr>'}
     </table></div>`;
 }
 function setRange(a, b) { $('#d1').value = a; $('#d2').value = b; show(); }

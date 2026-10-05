@@ -64,20 +64,35 @@
   }
 
   async function laundryChem() {
-    const { data: ch } = await sb.from('chemicals').select('id,name').order('sort');
+    const { data: ch } = await sb.from('chemicals').select('id,name,bottle_l,bottle_kg').order('sort');
     app.innerHTML = head + `
       <h2 class="st">Какая химия закончилась</h2><div class="list" id="cg">${ch.map(x => `<button data-v="${x.id}">${x.name}</button>`).join('')}</div>
-      <label>Остаток на дне, л (необязательно)<input id="lf" type="number" min="0" step="0.1" inputmode="decimal"></label>
+      <label>Остаток на дне, кг<input id="lf" type="number" min="0" step="0.1" inputmode="decimal"></label>
+      <p class="hint" id="lh">Если бутыль пустая, оставьте поле пустым.</p>
       <button class="go" id="save" disabled>Бутыль заменена</button>
       <button class="ghost" id="undo" hidden>Отменить последнюю запись</button>`;
     let c = null; const show = undoBtn('chem_changes');
-    pick('#cg', v => { c = v; $('#save').disabled = false; });
+    const cur = () => ch.find(x => x.id === +c);
+    const hint = () => {
+      const x = cur(), v = $('#lf').value;
+      let t = 'Если бутыль пустая, оставьте поле пустым.';
+      if (x && !(+x.bottle_kg > 0)) t = 'Вес бутыли не задан в настройках, остаток не пересчитается в литры.';
+      else if (x && v !== '') {
+        if (+v > +x.bottle_kg) t = `Больше, чем в полной бутыли (${x.bottle_kg} кг). Проверьте.`;
+        else if (+x.bottle_l > 0) t = `≈ ${(Math.round(+v * x.bottle_l / x.bottle_kg * 100) / 100).toLocaleString('ru-RU')} л`;
+      }
+      $('#lh').textContent = t;
+    };
+    pick('#cg', v => { c = v; $('#save').disabled = false; hint(); });
+    $('#lf').oninput = hint;
     $('#save').onclick = async () => {
-      const lf = $('#lf').value;
-      const { data, error } = await sb.from('chem_changes').insert({ form_id: f.id, chemical_id: +c, leftover_l: lf === '' ? null : +lf }).select('id').single();
-      if (error) { toast('Не сохранено, нажмите ещё раз'); return; }
+      const lf = $('#lf').value, x = cur();
+      if (lf !== '' && x && +x.bottle_kg > 0 && +lf > +x.bottle_kg) { toast('Остаток больше полной бутыли'); return; }
+      $('#save').disabled = true;
+      const { data, error } = await sb.from('chem_changes').insert({ form_id: f.id, chemical_id: +c, leftover_kg: lf === '' ? null : +lf }).select('id').single();
+      if (error) { toast('Не сохранено, нажмите ещё раз'); $('#save').disabled = false; return; }
       show(data.id); toast('Записано');
-      c = null; unpick('#cg'); $('#lf').value = ''; $('#save').disabled = true;
+      c = null; unpick('#cg'); $('#lf').value = ''; hint();
     };
   }
 

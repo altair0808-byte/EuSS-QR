@@ -97,3 +97,6 @@ details{background:var(--card);border:1px solid var(--ln);border-radius:14px;pad
 .tbl td{padding:8px 6px;border-top:1px solid var(--ln)}
 .tbl th:not(:first-child),.tbl td:not(:first-child){text-align:right}
 .box:has(.tbl){overflow-x:auto;padding:8px 10px}
+
+.cb{padding:12px 0;border-top:1px solid var(--ln)}.cb:first-of-type{border-top:0}
+.tbl small{color:var(--mut)}.bad{color:#c0392b;font-weight:600}.good{color:#1e8449;font-weight:600}

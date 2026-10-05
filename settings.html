@@ -53,10 +53,14 @@ async function load() {
   chems = ch || []; wts = w || []; rec = rc || [];
   document.querySelectorAll('#gen [data-k]').forEach(i => { const r = (st || []).find(x => x.key === i.dataset.k); i.value = r ? r.value : ''; });
 
-  $('#chem').innerHTML = chems.map(c => c.kind === 'main'
-    ? `<label>${esc(c.name)}: объём бутыли, л<input type="number" min="0" step="0.5" data-c="${c.id}" data-f="bottle_l" value="${c.bottle_l ?? ''}"></label>`
-    : `<label>${esc(c.name)}: расход на единицу<input type="number" min="0" step="1" data-c="${c.id}" data-f="per_unit" value="${c.per_unit ?? ''}"></label>`
-  ).join('') + '<button class="go" id="sc">Сохранить</button>';
+  const nv = v => v ?? '';
+  $('#chem').innerHTML = '<p class="hint">1 штука (бутыль, пачка) = столько литров = столько кг. Остаток бригадир вводит в кг, система сама переведёт в литры.</p>' + chems.map(c =>
+    `<div class="cb" data-c="${c.id}"><b>${esc(c.name)}</b>
+      <div class="acc"><label>1 шт = литров<input type="number" min="0" step="0.1" inputmode="decimal" data-f="bottle_l" value="${nv(c.bottle_l)}"></label>
+      <label>1 шт = кг<input type="number" min="0" step="0.1" inputmode="decimal" data-f="bottle_kg" value="${nv(c.bottle_kg)}"></label></div>
+      ${c.kind === 'extra' ? `<div class="acc"><label>Расход на единицу<input type="number" min="0" step="1" inputmode="numeric" data-f="per_unit" value="${nv(c.per_unit)}"></label>
+      <label>Расход измеряется в<select data-f="per_unit_unit"><option value="ml"${c.per_unit_unit === 'g' ? '' : ' selected'}>мл</option><option value="g"${c.per_unit_unit === 'g' ? ' selected' : ''}>г</option></select></label></div>` : ''}
+    </div>`).join('') + '<button class="go" id="sc">Сохранить</button>';
 
   const mains = chems.filter(c => c.kind === 'main');
   $('#wt').innerHTML = wts.map(x => `<details class="box" data-w="${x.id}"><summary><b>${esc(x.name)}</b> <small>${x.minutes ?? '–'} мин</small></summary>
@@ -79,8 +83,10 @@ $('#sg').onclick = async () => {
 $('#chem').onclick = async e => {
   if (e.target.id !== 'sc') return;
   let err = null;
-  for (const i of document.querySelectorAll('#chem [data-c]')) {
-    const { error } = await sb.from('chemicals').update({ [i.dataset.f]: num(i.value) }).eq('id', i.dataset.c);
+  for (const d of document.querySelectorAll('#chem [data-c]')) {
+    const row = {};
+    d.querySelectorAll('[data-f]').forEach(i => { row[i.dataset.f] = i.dataset.f === 'per_unit_unit' ? i.value : num(i.value); });
+    const { error } = await sb.from('chemicals').update(row).eq('id', d.dataset.c);
     err = err || error;
   }
   done(err);
