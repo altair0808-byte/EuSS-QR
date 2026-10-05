@@ -1,7 +1,7 @@
 # Прачечная: QR-формы
 
 Файлы лежат в корне: `index.html`, `form.html`, `qr.html`, `app.js`, `config.js`, `style.css`, `supabase.sql`, `users.sql`, `admin.html`, `settings.html`, `admin-users.ts`.
-Дашборды, итоги и Excel подключаются следующим этапом.
+Этап 1 (готов): отчёт по сменам со счётом стирок и теоретическим расходом химии. Дальше: факт расхода и сравнение, ввод и правка админом, Excel в формате бланка.
 
 ## Запуск
 1. **Supabase**: создайте проект, откройте SQL Editor, вставьте `supabase.sql`, нажмите Run.
@@ -29,3 +29,5 @@ insert into form_access select id, (select id from forms where slug='laundry-loa
 7. **Суперадмин** на странице **Пользователи** может менять имя и пароль себе и сотрудникам. Для смены имён выполните обновлённый `users.sql` (добавлена политика `pe_upd`) и заново разверните `admin-users.ts`.
 8. **GitHub и Render**: загрузите файлы в репозиторий, на Render создайте Static Site, Build Command пустой, Publish Directory `.`
 9. **QR**: войдите как суперадмин, на главной нажмите QR у бланка и распечатайте.
+
+10. **Отчёт по сменам (этап 1)**: в SQL Editor выполните `report.sql` (после `supabase.sql` и `users.sql`). Страница `report.html` доступна бригадиру, админу и суперадмину, карточка «Отчёт по сменам» появляется на главной.

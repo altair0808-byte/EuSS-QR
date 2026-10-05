@@ -38,6 +38,7 @@ $('#out').onclick = async () => { await sb.auth.signOut(); location.href = 'inde
   $('#cards').innerHTML = (forms || []).map(f =>
     `<div class="card"><span class="nm">${f.name}</span><span>${sup || adm ? `<a href="qr.html?f=${f.slug}">QR</a> &nbsp; ` : ''}<a href="form.html?f=${f.slug}">Открыть</a></span></div>`
   ).join('') || '<p>Нет доступных бланков. Обратитесь к администратору.</p>';
+  if (sup || adm || (acc || []).some(a => a.role === 'foreman')) $('#cards').insertAdjacentHTML('beforeend', '<div class="card"><span class="nm">Отчёт по сменам</span><a href="report.html">Открыть</a></div>');
   if (sup) $('#cards').insertAdjacentHTML('beforeend', '<div class="card"><span class="nm">Пользователи</span><a href="admin.html">Открыть</a></div><div class="card"><span class="nm">Настройки</span><a href="settings.html">Открыть</a></div>');
   $('#hub').hidden = false;
 })();

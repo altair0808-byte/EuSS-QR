@@ -87,3 +87,13 @@ details{background:var(--card);border:1px solid var(--ln);border-radius:14px;pad
 .card{border-radius:16px}
 .card .nm{font-size:1.05rem}
 @media(prefers-reduced-motion:reduce){button{transition:none}button:active:not(:disabled){transform:none}}
+
+/* ---- отчёт ---- */
+.kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:14px}
+.kpi div{background:var(--card);border:1px solid var(--ln);border-radius:14px;padding:12px 8px;text-align:center;box-shadow:var(--sh)}
+.kpi b{display:block;font-size:1.5rem;color:var(--ac)}.kpi span{font-size:.8rem;color:var(--mut)}
+.tbl{width:100%;border-collapse:collapse;font-size:.92rem}
+.tbl th{text-align:left;color:var(--mut);font-weight:600;font-size:.8rem;padding:4px 6px}
+.tbl td{padding:8px 6px;border-top:1px solid var(--ln)}
+.tbl th:not(:first-child),.tbl td:not(:first-child){text-align:right}
+.box:has(.tbl){overflow-x:auto;padding:8px 10px}

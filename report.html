@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Отчёт по сменам</title><link rel="stylesheet" href="style.css"></head>
+<body><main class="wide">
+<header><h1>Отчёт по сменам</h1><a class="ghost" href="index.html">Бланки</a></header>
+<div class="box">
+  <div class="acc"><label>С даты смены<input type="date" id="d1"></label><label>По дату смены<input type="date" id="d2"></label></div>
+  <div class="row"><button class="mini" id="t">Сегодня</button><button class="mini" id="y">Вчера</button><button class="mini" id="w">7 дней</button></div>
+  <p class="hint" id="rng"></p>
+</div>
+<div id="out"><p class="hint">Загрузка…</p></div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script><script src="app.js"></script><script src="report-calc.js"></script>
+<script>
+const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const f = (n, d = 1) => (Math.round(n * 10 ** d) / 10 ** d).toLocaleString('ru-RU');
+let refs = null, tz = 5, st = 6, seq = 0;
+
+const shiftToday = () => new Date(Date.now() + (tz - st) * 3600e3).toISOString().slice(0, 10);
+const addDays = (d, n) => new Date(new Date(d + 'T00:00:00Z').getTime() + n * 864e5).toISOString().slice(0, 10);
+const hhmm = ts => new Date(new Date(ts).getTime() + tz * 3600e3).toISOString().slice(11, 16);
+const dmy = d => d.split('-').reverse().join('.');
+
+async function show() {
+  const d1 = $('#d1').value, d2 = $('#d2').value, my = ++seq;
+  if (!d1 || !d2 || d1 > d2) { $('#out').innerHTML = '<p class="hint">Укажите период: дата «с» не позже даты «по».</p>'; return; }
+  $('#rng').textContent = `Смена начинается в ${String(st).padStart(2, '0')}:00 и длится сутки.`;
+  const { data, error } = await sb.rpc('report_loads', { d1, d2 });
+  if (my !== seq) return;
+  if (error) { $('#out').innerHTML = '<p class="err">Не удалось загрузить данные. Проверьте, что выполнен report.sql.</p>'; return; }
+  const r = calcReport(data, refs), wn = {}; refs.washTypes.forEach(w => wn[w.id] = w.name);
+  const rows = (data || []).slice().reverse().slice(0, 300);
+  $('#out').innerHTML = `
+    <div class="kpi"><div><b>${r.total}</b><span>стирок</span></div><div><b>${f(r.kg, 0)}</b><span>кг белья</span></div><div><b>${r.byPart.day}</b><span>день</span></div><div><b>${r.byPart.night}</b><span>ночь</span></div></div>
+    <h2>Количество стирок по видам</h2>
+    <div class="box"><table class="tbl"><tr><th>Вид стирки</th><th>Стирок</th><th>Кг</th></tr>
+      ${refs.washTypes.filter(w => r.byWash[w.id]).map(w => `<tr><td>${esc(w.name)}</td><td>${r.byWash[w.id].n}</td><td>${f(r.byWash[w.id].kg, 0)}</td></tr>`).join('') || '<tr><td colspan="3">За период стирок нет</td></tr>'}
+    </table></div>
+    <h2>Теоретический расход химии</h2>
+    <p class="hint">Считается по рецептам из настроек: мл на литр воды × ${f(refs.water, 0)} л на стирку. Фактический расход и сравнение будут на следующем этапе.</p>
+    <div class="box"><table class="tbl"><tr><th>Химия</th><th>Литров</th><th>Бутылей</th></tr>
+      ${r.chem.filter(c => c.kind === 'main').map(c => `<tr><td>${esc(c.name)}</td><td>${f(c.liters)}</td><td>${c.bottles == null ? '–' : f(c.bottles, 2)}</td></tr>`).join('')}
+    </table></div>
+    ${r.chem.some(c => c.kind === 'extra') ? `<div class="box"><table class="tbl"><tr><th>Дополнительно</th><th>Единиц</th><th>Расход</th></tr>
+      ${r.chem.filter(c => c.kind === 'extra').map(c => `<tr><td>${esc(c.name)}</td><td>${f(c.units, 0)}</td><td>${f(c.amount, 0)}</td></tr>`).join('')}
+    </table></div>` : ''}
+    <h2>Записи${(data || []).length > rows.length ? ` (последние ${rows.length})` : ''}</h2>
+    <div class="box"><table class="tbl"><tr><th>Смена</th><th>Время</th><th>Машина</th><th>Вид</th><th>Кг</th></tr>
+      ${rows.map(l => `<tr><td>${dmy(l.shift_date)} ${l.part === 'night' ? 'ночь' : 'день'}</td><td>${hhmm(l.ts)}</td><td>${l.machine}</td><td>${esc(wn[l.wash_type_id])}</td><td>${f(l.weight_kg)}</td></tr>`).join('') || '<tr><td colspan="5">Нет записей</td></tr>'}
+    </table></div>`;
+}
+function setRange(a, b) { $('#d1').value = a; $('#d2').value = b; show(); }
+$('#d1').onchange = $('#d2').onchange = show;
+$('#t').onclick = () => setRange(shiftToday(), shiftToday());
+$('#y').onclick = () => setRange(addDays(shiftToday(), -1), addDays(shiftToday(), -1));
+$('#w').onclick = () => setRange(addDays(shiftToday(), -6), shiftToday());
+
+(async () => {
+  if (!await need()) return;
+  const { data: ok } = await sb.rpc('can_report');
+  if (!ok) { $('#out').innerHTML = '<p>Нет доступа к отчёту. Обратитесь к администратору.</p>'; return; }
+  const [s, c, w, r] = await Promise.all([
+    sb.from('settings').select('*'), sb.from('chemicals').select('*').order('sort'),
+    sb.from('wash_types').select('id,name').order('sort'), sb.from('recipes').select('*')
+  ]);
+  const g = k => { const x = (s.data || []).find(y => y.key === k); return x ? +x.value : null; };
+  tz = g('tz_offset') ?? 5; st = g('shift_start') ?? 6;
+  refs = { water: g('water_l') ?? 55, washTypes: w.data || [], chemicals: c.data || [], recipes: r.data || [] };
+  setRange(shiftToday(), shiftToday());
+})();
+</script></body></html>
