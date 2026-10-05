@@ -28,9 +28,20 @@ const Blank = (() => {
     const grid = TYPES.map(() => Array.from({ length: 12 }, () => [[], []]));
     const ex = TYPES.map(() => [0, 0, 0]);
     const lost = [], unknown = {};
+    const machineStats = {};
+    for (let machine = 1; machine <= 12; machine++) machineStats[machine] = { n: 0, kg: 0, chem: Array(S.mains.length).fill(0), exQty: Array(S.extras.length).fill(0), exTot: Array(S.extras.length).fill(0) };
     loads.slice().sort((a, b) => (a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0)).forEach(l => {
       const t = S.typeOf[l.wash_type_id];
       if (t === undefined) { const n = S.other[l.wash_type_id] || ('вид ' + l.wash_type_id); unknown[n] = (unknown[n] || 0) + 1; return; }
+      const ms = machineStats[+l.machine];
+      if (ms) {
+        ms.n++; ms.kg += +l.weight_kg || 0;
+        S.mains.forEach((c, i) => { ms.chem[i] += S.water * (S.rec[l.wash_type_id + ':' + c.id] || 0); });
+        Object.entries(l.extras || {}).forEach(([id, q]) => {
+          const i = S.extras.findIndex(c => String(c.id) === String(id));
+          if (i >= 0) { ms.exQty[i] += +q || 0; ms.exTot[i] += (+q || 0) * (+S.extras[i].per_unit || 0); }
+        });
+      }
       const cell = grid[t][l.machine - 1][l.part === 'night' ? 1 : 0];
       if (cell.length >= SLOTS) lost.push({ type: S.wt[t].name, machine: l.machine, part: l.part === 'night' ? 'ночь' : 'день' });
       else cell.push(+l.weight_kg || 0);
@@ -69,6 +80,7 @@ const Blank = (() => {
         if (i >= 0) { g.exQty[i] += +q || 0; g.exTot[i] += (+q || 0) * (+S.extras[i].per_unit || 0); }
       });
     });
+    Object.values(machineStats).forEach(g => { g.kg = r6(g.kg); g.chem = g.chem.map(r6); g.exTot = g.exTot.map(r6); });
     Object.values(groups).forEach(g => {
       g.kg = r6(g.kg); g.chem = g.chem.map(r6); g.exTot = g.exTot.map(r6);
     });
@@ -79,7 +91,7 @@ const Blank = (() => {
       exQty: groups['1_10'].exQty.map((v,i) => v + groups['11_12'].exQty[i]),
       exTot: groups['1_10'].exTot.map((v,i) => r6(v + groups['11_12'].exTot[i]))
     };
-    return { date, grid, types, total, groups, lost, unknown, mains: S.mains, extras: S.extras };
+    return { date, grid, types, total, groups, machineStats, lost, unknown, mains: S.mains, extras: S.extras };
   }
 
   // ---------- просмотр на странице ----------
@@ -201,7 +213,7 @@ const Blank = (() => {
   }
 
   // zip: JSZip с шаблоном; days: {номер дня: модель}; refs как в отчёте
-  async function fillWorkbook(zip, days, refs) {
+  async function fillWorkbook(zip, days, refs, changes = []) {
     const S = setup(refs);
     const wb = await zip.file('xl/workbook.xml').async('string');
     const rels = await zip.file('xl/_rels/workbook.xml.rels').async('string');
@@ -251,6 +263,85 @@ const Blank = (() => {
       const gp = path[sheet]; if (!gp) throw new Error('В шаблоне нет листа «' + sheet + '»');
       zip.file(gp, fillGroupSummary(await zip.file(gp).async('string'), days, key));
     }
+
+    function fillMachineSheet(xml, days, minMachine, maxMachine) {
+      let row = 2;
+      const sum = {};
+      for (let n = 1; n <= 31; n++) {
+        const m = days[n];
+        for (let machine = minMachine; machine <= maxMachine; machine++, row++) {
+          const g = m && m.machineStats ? m.machineStats[machine] : null;
+          xml = setCell(xml, 'A' + row, m ? serial(m.date) : '');
+          xml = setCell(xml, 'B' + row, minMachine === 1 ? '1-10' : '11-12');
+          xml = setCell(xml, 'C' + row, machine);
+          xml = setCell(xml, 'D' + row, g ? g.n : '');
+          xml = setCell(xml, 'E' + row, g ? g.kg : '');
+          for (let i = 0; i < 5; i++) xml = setCell(xml, LET(6 + i) + row, g && g.chem[i] ? g.chem[i] : '');
+          for (let i = 0; i < 3; i++) xml = setCell(xml, LET(11 + i) + row, g && g.exTot[i] ? g.exTot[i] : '');
+          if (g) {
+            if (!sum[machine]) sum[machine] = {n:0,kg:0,chem:Array(5).fill(0),ex:Array(3).fill(0)};
+            sum[machine].n += g.n; sum[machine].kg += g.kg;
+            for(let i=0;i<5;i++) sum[machine].chem[i] += g.chem[i] || 0;
+            for(let i=0;i<3;i++) sum[machine].ex[i] += g.exTot[i] || 0;
+          }
+        }
+      }
+      return xml;
+    }
+    for (const [sheet, a, b] of [['Машины 1-10',1,10],['Машины 11-12',11,12]]) {
+      const gp = path[sheet]; if (!gp) throw new Error('В шаблоне нет листа «' + sheet + '»');
+      zip.file(gp, fillMachineSheet(await zip.file(gp).async('string'), days, a, b));
+    }
+
+    function fillMachineSummary(xml, days) {
+      const sum = {};
+      for (let machine=1; machine<=12; machine++) sum[machine]={n:0,kg:0,chem:Array(5).fill(0),ex:Array(3).fill(0)};
+      for (let n=1;n<=31;n++) { const m=days[n]; if(!m||!m.machineStats) continue; for(let machine=1;machine<=12;machine++){ const g=m.machineStats[machine]; if(!g) continue; const z=sum[machine]; z.n+=g.n; z.kg+=g.kg; for(let i=0;i<5;i++)z.chem[i]+=g.chem[i]||0; for(let i=0;i<3;i++)z.ex[i]+=g.exTot[i]||0; } }
+      for(let machine=1;machine<=12;machine++){ const row=machine+1,z=sum[machine]; xml=setCell(xml,'A'+row,machine<=10?'1-10':'11-12'); xml=setCell(xml,'B'+row,machine); xml=setCell(xml,'C'+row,z.n); xml=setCell(xml,'D'+row,r6(z.kg)); xml=setCell(xml,'E'+row,z.n?r6(z.kg/z.n):''); for(let i=0;i<5;i++)xml=setCell(xml,LET(6+i)+row,r6(z.chem[i])); for(let i=0;i<3;i++)xml=setCell(xml,LET(11+i)+row,r6(z.ex[i])); }
+      return xml;
+    }
+    { const gp=path['Сводка по машинам']; if(!gp) throw new Error('В шаблоне нет листа «Сводка по машинам»'); zip.file(gp, fillMachineSummary(await zip.file(gp).async('string'), days)); }
+
+    function fillChemistryDetail(xml, days, refs, changes) {
+      const chemicals = (refs.chemicals || []).slice().sort(bySort);
+      const water = +refs.water || 55;
+      const rec = {}; (refs.recipes || []).forEach(r => rec[r.wash_type_id + ':' + r.chemical_id] = +r.ml_per_l || 0);
+      const groups = ['1_10','11_12'];
+      const daysList = Object.keys(days).map(Number).sort((a,b)=>a-b);
+      let row = 2;
+      const density = c => (+c.bottle_l > 0 && +c.bottle_kg > 0) ? (+c.bottle_kg / +c.bottle_l) : null;
+      const toL = (c, v, unit) => unit === 'l' ? v : (density(c) ? v / density(c) : null);
+      const toKg = (c, v, unit) => unit === 'kg' ? v : (density(c) ? v * density(c) : null);
+      for (const day of daysList) {
+        const m = days[day], date = m.date;
+        for (const group of groups) {
+          for (const c of chemicals) {
+            const theoryMain = c.kind === 'main' ? (m.groups[group].chem[chemicals.filter(x=>x.kind==='main').findIndex(x=>x.id===c.id)] || 0) / 1000 : 0;
+            const exIndex = c.kind === 'extra' ? m.extras.findIndex(x=>x.id===c.id) : -1;
+            const theoryExtraRaw = exIndex >= 0 ? (m.groups[group].exTot[exIndex] || 0) : 0;
+            const theoryUnit = c.kind === 'extra' && c.per_unit_unit === 'g' ? 'kg' : 'l';
+            const theory = c.kind === 'main' ? theoryMain : (theoryExtraRaw / 1000);
+            const prim = +c.bottle_l > 0 ? 'l' : (+c.bottle_kg > 0 ? 'kg' : null);
+            const mine = (changes || []).filter(x => x.shift_date === date && x.chemical_id === c.id && (x.machine_group || '1_10') === group);
+            let actual = 0, noLeft = 0;
+            mine.forEach(x => {
+              let left = prim === 'l' ? (x.leftover_l != null ? +x.leftover_l : x.leftover_kg != null ? toL(c,+x.leftover_kg,'kg') : null) : (x.leftover_kg != null ? +x.leftover_kg : x.leftover_l != null ? toKg(c,+x.leftover_l,'l') : null);
+              const size = prim === 'l' ? +c.bottle_l : +c.bottle_kg;
+              if (left == null || !isFinite(left)) { noLeft++; left = 0; }
+              actual += Math.max(0, Math.min(size, left) >= 0 ? size - Math.max(0,Math.min(size,left)) : 0);
+            });
+            const actualOut = prim ? r6(actual) : '';
+            const theoryOut = prim ? r6(prim==='l' ? theory : theory) : r6(theory);
+            const diff = prim && theoryOut ? r6(actualOut-theoryOut) : '';
+            const pct = prim && theoryOut ? r6((actualOut-theoryOut)/theoryOut*100) : '';
+            xml=setCell(xml,'A'+row,serial(date)); xml=setCell(xml,'B'+row,group); xml=setCell(xml,'C'+row,c.name); xml=setCell(xml,'D'+row,c.kind==='main'?'основная':'дополнительная');
+            xml=setCell(xml,'E'+row,theoryOut); xml=setCell(xml,'F'+row,actualOut); xml=setCell(xml,'G'+row,diff); xml=setCell(xml,'H'+row,pct); xml=setCell(xml,'I'+row,mine.length||''); xml=setCell(xml,'J'+row,noLeft||''); row++;
+          }
+        }
+      }
+      return xml;
+    }
+    { const gp=path['Химия по дозаторам']; if(!gp) throw new Error('В шаблоне нет листа «Химия по дозаторам»'); zip.file(gp, fillChemistryDetail(await zip.file(gp).async('string'), days, refs, changes)); }
     if (!/fullCalcOnLoad/.test(wb)) zip.file('xl/workbook.xml', wb.replace(/<calcPr\b([^>]*?)\/>/, '<calcPr$1 fullCalcOnLoad="1"/>'));
     return zip;
   }

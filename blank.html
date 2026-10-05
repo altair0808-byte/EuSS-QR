@@ -34,11 +34,7 @@ async function show() {
     const data = await loads(date, date);
     if (my !== seq) return;
     const m = Blank.build(data, refs, date);
-    const g = (title, x) => `<div class="box"><h2 style="margin-top:0">${title}</h2><div class="kpi">
-      <div><b>${x.n}</b><span>стирок</span></div><div><b>${Blank.fmt(x.kg,0)}</b><span>кг белья</span></div>
-      ${x.chem.map((v,i)=>`<div><b>${Blank.fmt(v,0)}</b><span>${Blank.esc(m.mains[i]?.name||'Химия')}</span></div>`).join('')}
-    </div><p class="hint">Доп. химия: ${x.exTot.map((v,i)=>`${Blank.esc(m.extras[i]?.name||'')} ${v?Blank.fmt(v,0):'0'}`).filter(Boolean).join(' · ') || 'нет'}</p></div>`;
-    $('#out').innerHTML = Blank.html(m) + `<h2>Расход по дозаторам</h2>${g('Машины 1–10 · дозатор 1',m.groups['1_10'])}${g('Машины 11–12 · дозатор 2',m.groups['11_12'])}${g('Общий итог · оба дозатора',m.groups.all)}`;
+    $('#out').innerHTML = Blank.html(m);
     $('#warn').innerHTML = Blank.warnings(m).map(w => `<p class="err">${Blank.esc(w)}</p>`).join('');
   } catch (e) {
     $('#out').innerHTML = '<p class="err">Не удалось загрузить данные. Проверьте, что выполнены report.sql и stage2.sql.</p>';
@@ -53,11 +49,13 @@ async function download() {
     if (!res.ok) throw new Error('Файл Blanc.xlsx не найден на сайте. Положите его в корень репозитория рядом с index.html.');
     const zip = await JSZip.loadAsync(await res.arrayBuffer());
     const data = await loads(ym + '-01', ym + '-' + String(lastDay(ym)).padStart(2, '0'));
+    const { data: changes, error: chErr } = await sb.rpc('report_changes', { d1: ym + '-01', d2: ym + '-' + String(lastDay(ym)).padStart(2, '0') });
+    if (chErr) throw chErr;
     const byDay = {};
     data.forEach(l => (byDay[l.shift_date] = byDay[l.shift_date] || []).push(l));
     const days = {};
     Object.keys(byDay).forEach(d => { days[+d.slice(8)] = Blank.build(byDay[d], refs, d); });
-    await Blank.fillWorkbook(zip, days, refs);
+    await Blank.fillWorkbook(zip, days, refs, changes || []);
     const blob = await zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'Blanc-' + ym + '.xlsx';
     document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1e4);
