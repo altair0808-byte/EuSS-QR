@@ -13,72 +13,67 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script><script src="app.js"></script><script src="report-calc.js"></script>
 <script>
-const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-const f = (n, d = 1) => (Math.round(n * 10 ** d) / 10 ** d).toLocaleString('ru-RU');
-let refs = null, tz = 5, st = 6, seq = 0;
+const esc=t=>String(t??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const f=(n,d=1)=>(Math.round(n*10**d)/10**d).toLocaleString('ru-RU');
+let refs=null,tz=5,st=6,seq=0;
+const shiftToday=()=>new Date(Date.now()+(tz-st)*3600e3).toISOString().slice(0,10);
+const addDays=(d,n)=>new Date(new Date(d+'T00:00:00Z').getTime()+n*864e5).toISOString().slice(0,10);
+const hhmm=ts=>new Date(new Date(ts).getTime()+tz*3600e3).toISOString().slice(11,16);
+const dmy=d=>d.split('-').reverse().join('.');
 
-const shiftToday = () => new Date(Date.now() + (tz - st) * 3600e3).toISOString().slice(0, 10);
-const addDays = (d, n) => new Date(new Date(d + 'T00:00:00Z').getTime() + n * 864e5).toISOString().slice(0, 10);
-const hhmm = ts => new Date(new Date(ts).getTime() + tz * 3600e3).toISOString().slice(11, 16);
-const dmy = d => d.split('-').reverse().join('.');
-
-async function show() {
-  const d1 = $('#d1').value, d2 = $('#d2').value, my = ++seq;
-  if (!d1 || !d2 || d1 > d2) { $('#out').innerHTML = '<p class="hint">Укажите период: дата «с» не позже даты «по».</p>'; return; }
-  $('#rng').textContent = `Смена начинается в ${String(st).padStart(2, '0')}:00 и длится сутки.`;
-  const [{ data, error }, { data: chg, error: e2 }] = await Promise.all([sb.rpc('report_loads', { d1, d2 }), sb.rpc('report_changes', { d1, d2 })]);
-  if (my !== seq) return;
-  if (error || e2) { $('#out').innerHTML = '<p class="err">Не удалось загрузить данные. Проверьте, что выполнены report.sql и stage2.sql.</p>'; return; }
-  const r = calcReport(data || [], chg || [], refs), wn = {}, cn = {};
-  refs.washTypes.forEach(w => wn[w.id] = w.name); refs.chemicals.forEach(c => cn[c.id] = c.name);
-  const two = o => o ? [o.l != null ? f(o.l) + ' л' : '', o.kg != null ? f(o.kg) + ' кг' : ''].filter(Boolean).join('<br>') || '–' : '–';
-  const dif = c => {
-    if (c.diff == null) return '–';
-    const u = c.prim === 'l' ? 'л' : 'кг', cls = c.pct != null && c.pct > 10 ? ' class="bad"' : c.pct != null && c.pct < -10 ? ' class="good"' : '';
-    return `<span${cls}>${c.diff > 0 ? '+' : ''}${f(c.diff)} ${u}${c.pct == null ? '' : '<br>' + (c.pct > 0 ? '+' : '') + f(c.pct, 0) + '%'}</span>`;
-  };
-  const note = c => c.prim == null ? 'Задайте литры и кг в настройках'
-    : c.diff == null ? 'Задайте и литры, и кг в настройках'
-    : `замен: ${c.changes}${c.noLeft ? `, без остатка: ${c.noLeft}` : ''}`;
-  const chRows = (chg || []).slice().reverse().slice(0, 300);
-  const rows = (data || []).slice().reverse().slice(0, 300);
-  $('#out').innerHTML = `
-    <div class="kpi"><div><b>${r.total}</b><span>стирок</span></div><div><b>${f(r.kg, 0)}</b><span>кг белья</span></div><div><b>${r.byPart.day}</b><span>день</span></div><div><b>${r.byPart.night}</b><span>ночь</span></div></div>
-    <h2>Количество стирок по видам</h2>
-    <div class="box"><table class="tbl"><tr><th>Вид стирки</th><th>Стирок</th><th>Кг</th></tr>
-      ${refs.washTypes.filter(w => r.byWash[w.id]).map(w => `<tr><td>${esc(w.name)}</td><td>${r.byWash[w.id].n}</td><td>${f(r.byWash[w.id].kg, 0)}</td></tr>`).join('') || '<tr><td colspan="3">За период стирок нет</td></tr>'}
-    </table></div>
-    <h2>Химия: теория и факт</h2>
-    <p class="hint">Теория: рецепт × ${f(refs.water, 0)} л воды на стирку. Факт: каждая замена бутыли = бутыль минус остаток. За один день факт «скачет», смотрите период от недели. Красным: перерасход больше 10%.</p>
-    <div class="box"><table class="tbl"><tr><th>Химия</th><th>Теория</th><th>Факт</th><th>Разница</th></tr>
-      ${r.chem.map(c => `<tr><td>${esc(c.name)}<br><small>${note(c)}</small></td><td>${two(c.theory)}</td><td>${two(c.actual)}</td><td>${dif(c)}</td></tr>`).join('')}
-    </table></div>
-    <h2>Записи${(data || []).length > rows.length ? ` (последние ${rows.length})` : ''}</h2>
-    <div class="box"><table class="tbl"><tr><th>Смена</th><th>Время</th><th>Машина</th><th>Вид</th><th>Кг</th></tr>
-      ${rows.map(l => `<tr><td>${dmy(l.shift_date)} ${l.part === 'night' ? 'ночь' : 'день'}</td><td>${hhmm(l.ts)}</td><td>${l.machine}</td><td>${esc(wn[l.wash_type_id])}</td><td>${f(l.weight_kg)}</td></tr>`).join('') || '<tr><td colspan="5">Нет записей</td></tr>'}
-    </table></div>
-    <h2>Замены химии${(chg || []).length > chRows.length ? ` (последние ${chRows.length})` : ''}</h2>
-    <div class="box"><table class="tbl"><tr><th>Смена</th><th>Время</th><th>Химия</th><th>Остаток</th></tr>
-      ${chRows.map(x => `<tr><td>${dmy(x.shift_date)}</td><td>${hhmm(x.ts)}</td><td>${esc(cn[x.chemical_id])}</td><td>${x.leftover_kg != null ? f(x.leftover_kg) + ' кг' : x.leftover_l != null ? f(x.leftover_l) + ' л' : 'пусто'}</td></tr>`).join('') || '<tr><td colspan="4">Нет замен</td></tr>'}
-    </table></div>`;
+function two(o){return o?[o.l!=null?f(o.l)+' л':'',o.kg!=null?f(o.kg)+' кг':''].filter(Boolean).join('<br>')||'–':'–'}
+function dif(c){if(c.diff==null)return'–';const u=c.prim==='l'?'л':'кг',cls=c.pct!=null&&c.pct>10?' class="bad"':c.pct!=null&&c.pct<-10?' class="good"':'';return `<span${cls}>${c.diff>0?'+':''}${f(c.diff)} ${u}${c.pct==null?'':'<br>'+(c.pct>0?'+':'')+f(c.pct,0)+'%'}</span>`}
+function note(c){return c.prim==null?'Задайте литры и кг в настройках':c.diff==null?'Задайте и литры, и кг в настройках':`замен: ${c.changes}${c.noLeft?`, без остатка: ${c.noLeft}`:''}`}
+function chemTable(g){
+  return `<div class="box"><table class="tbl"><tr><th>Химия</th><th>Теория</th><th>Факт</th><th>Разница</th></tr>
+  ${g.chem.map(c=>`<tr><td>${esc(c.name)}<br><small>${note(c)}</small></td><td>${two(c.theory)}</td><td>${two(c.actual)}</td><td>${dif(c)}</td></tr>`).join('')}</table></div>`;
 }
-function setRange(a, b) { $('#d1').value = a; $('#d2').value = b; show(); }
-$('#d1').onchange = $('#d2').onchange = show;
-$('#t').onclick = () => setRange(shiftToday(), shiftToday());
-$('#y').onclick = () => setRange(addDays(shiftToday(), -1), addDays(shiftToday(), -1));
-$('#w').onclick = () => setRange(addDays(shiftToday(), -6), shiftToday());
+function washTable(g){
+  return `<div class="box"><table class="tbl"><tr><th>Вид стирки</th><th>Стирок</th><th>Кг</th></tr>
+  ${refs.washTypes.filter(w=>g.byWash[w.id]).map(w=>`<tr><td>${esc(w.name)}</td><td>${g.byWash[w.id].n}</td><td>${f(g.byWash[w.id].kg,0)}</td></tr>`).join('')||'<tr><td colspan="3">За период стирок нет</td></tr>'}</table></div>`;
+}
+function groupBlock(title,g){
+  return `<section><h2>${title}</h2><div class="kpi"><div><b>${g.total}</b><span>стирок</span></div><div><b>${f(g.kg,0)}</b><span>кг белья</span></div></div>
+  <h2>Стирки по видам</h2>${washTable(g)}
+  <h2>Химия: теория и факт</h2>${chemTable(g)}</section>`;
+}
 
-(async () => {
-  if (!await need()) return;
-  const { data: ok } = await sb.rpc('can_report');
-  if (!ok) { $('#out').innerHTML = '<p>Нет доступа к отчёту. Обратитесь к администратору.</p>'; return; }
-  const [s, c, w, r] = await Promise.all([
-    sb.from('settings').select('*'), sb.from('chemicals').select('*').order('sort'),
-    sb.from('wash_types').select('id,name').order('sort'), sb.from('recipes').select('*')
-  ]);
-  const g = k => { const x = (s.data || []).find(y => y.key === k); return x ? +x.value : null; };
-  tz = g('tz_offset') ?? 5; st = g('shift_start') ?? 6;
-  refs = { water: g('water_l') ?? 55, washTypes: w.data || [], chemicals: c.data || [], recipes: r.data || [] };
-  setRange(shiftToday(), shiftToday());
+async function show(){
+  const d1=$('#d1').value,d2=$('#d2').value,my=++seq;
+  if(!d1||!d2||d1>d2){$('#out').innerHTML='<p class="hint">Укажите период: дата «с» не позже даты «по».</p>';return;}
+  $('#rng').textContent=`Смена начинается в ${String(st).padStart(2,'0')}:00 и длится сутки. Расход считается отдельно по двум дозаторам.`;
+  const [{data,error},{data:chg,error:e2}]=await Promise.all([sb.rpc('report_loads',{d1,d2}),sb.rpc('report_changes',{d1,d2})]);
+  if(my!==seq)return;
+  if(error||e2){$('#out').innerHTML='<p class="err">Не удалось загрузить данные. Выполните supabase.sql и затем stage3.sql.</p>';return;}
+  const loads=data||[],changes=chg||[],r=calcReport(loads,changes,refs),wn={},cn={};
+  refs.washTypes.forEach(w=>wn[w.id]=w.name);refs.chemicals.forEach(c=>cn[c.id]=c.name);
+  const rows=loads.slice().reverse().slice(0,300), chRows=changes.slice().reverse().slice(0,300);
+  $('#out').innerHTML=`
+    <div class="kpi"><div><b>${r.total}</b><span>стирок всего</span></div><div><b>${f(r.kg,0)}</b><span>кг всего</span></div><div><b>${r.byPart.day}</b><span>день</span></div><div><b>${r.byPart.night}</b><span>ночь</span></div></div>
+    ${groupBlock('Дозатор 1 · машины 1–10',r.groups['1_10'])}
+    ${groupBlock('Дозатор 2 · машины 11–12',r.groups['11_12'])}
+    <section><h2>Общий итог · оба дозатора</h2>${groupBlock('Стирки и химия вместе',r.groups.all)}</section>
+    <h2>Записи загрузок${loads.length>rows.length?` (последние ${rows.length})`:''}</h2>
+    <div class="box"><table class="tbl"><tr><th>Смена</th><th>Время</th><th>Машина</th><th>Дозатор</th><th>Вид</th><th>Кг</th></tr>
+    ${rows.map(l=>`<tr><td>${dmy(l.shift_date)} ${l.part==='night'?'ночь':'день'}</td><td>${hhmm(l.ts)}</td><td>${l.machine}</td><td>${l.machine<=10?'1–10':'11–12'}</td><td>${esc(wn[l.wash_type_id])}</td><td>${f(l.weight_kg)}</td></tr>`).join('')||'<tr><td colspan="6">Нет записей</td></tr>'}</table></div>
+    <h2>Замены химии${changes.length>chRows.length?` (последние ${chRows.length})`:''}</h2>
+    <div class="box"><table class="tbl"><tr><th>Смена</th><th>Время</th><th>Дозатор</th><th>Химия</th><th>Остаток</th></tr>
+    ${chRows.map(x=>`<tr><td>${dmy(x.shift_date)}</td><td>${hhmm(x.ts)}</td><td>${x.machine_group==='11_12'?'11–12':'1–10'}</td><td>${esc(cn[x.chemical_id])}</td><td>${x.leftover_kg!=null?f(x.leftover_kg)+' кг':x.leftover_l!=null?f(x.leftover_l)+' л':'пусто'}</td></tr>`).join('')||'<tr><td colspan="5">Нет замен</td></tr>'}</table></div>`;
+}
+function setRange(a,b){$('#d1').value=a;$('#d2').value=b;show();}
+$('#d1').onchange=$('#d2').onchange=show;
+$('#t').onclick=()=>setRange(shiftToday(),shiftToday());
+$('#y').onclick=()=>{const d=addDays(shiftToday(),-1);setRange(d,d)};
+$('#w').onclick=()=>setRange(addDays(shiftToday(),-6),shiftToday());
+
+(async()=>{
+  if(!await need())return;
+  const {data:ok}=await sb.rpc('can_report');
+  if(!ok){$('#out').innerHTML='<p>Нет доступа к отчёту. Обратитесь к администратору.</p>';return;}
+  const [s,c,w,r]=await Promise.all([sb.from('settings').select('*'),sb.from('chemicals').select('*').order('sort'),sb.from('wash_types').select('id,name').order('sort'),sb.from('recipes').select('*')]);
+  const g=k=>{const x=(s.data||[]).find(y=>y.key===k);return x?+x.value:null};
+  tz=g('tz_offset')??5;st=g('shift_start')??6;
+  refs={water:g('water_l')??55,washTypes:w.data||[],chemicals:c.data||[],recipes:r.data||[]};
+  setRange(shiftToday(),shiftToday());
 })();
 </script></body></html>

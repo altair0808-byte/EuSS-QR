@@ -54,7 +54,32 @@ const Blank = (() => {
       exTot: [0, 1, 2].map(i => r6(types.reduce((a, x) => a + x.exTot[i], 0))),
       colSum
     };
-    return { date, grid, types, total, lost, unknown, mains: S.mains, extras: S.extras };
+
+    // Раздельный расход по двум дозаторам + общий итог.
+    const groups = {
+      '1_10': { n: 0, kg: 0, chem: Array(S.mains.length).fill(0), exQty: Array(S.extras.length).fill(0), exTot: Array(S.extras.length).fill(0) },
+      '11_12': { n: 0, kg: 0, chem: Array(S.mains.length).fill(0), exQty: Array(S.extras.length).fill(0), exTot: Array(S.extras.length).fill(0) }
+    };
+    loads.forEach(l => {
+      const g = +l.machine <= 10 ? groups['1_10'] : groups['11_12'];
+      g.n++; g.kg += +l.weight_kg || 0;
+      S.mains.forEach((c, i) => { g.chem[i] += S.water * (S.rec[l.wash_type_id + ':' + c.id] || 0); });
+      Object.entries(l.extras || {}).forEach(([id, q]) => {
+        const i = S.extras.findIndex(c => String(c.id) === String(id));
+        if (i >= 0) { g.exQty[i] += +q || 0; g.exTot[i] += (+q || 0) * (+S.extras[i].per_unit || 0); }
+      });
+    });
+    Object.values(groups).forEach(g => {
+      g.kg = r6(g.kg); g.chem = g.chem.map(r6); g.exTot = g.exTot.map(r6);
+    });
+    groups.all = {
+      n: groups['1_10'].n + groups['11_12'].n,
+      kg: r6(groups['1_10'].kg + groups['11_12'].kg),
+      chem: groups['1_10'].chem.map((v,i) => r6(v + groups['11_12'].chem[i])),
+      exQty: groups['1_10'].exQty.map((v,i) => v + groups['11_12'].exQty[i]),
+      exTot: groups['1_10'].exTot.map((v,i) => r6(v + groups['11_12'].exTot[i]))
+    };
+    return { date, grid, types, total, groups, lost, unknown, mains: S.mains, extras: S.extras };
   }
 
   // ---------- просмотр на странице ----------
@@ -198,6 +223,34 @@ const Blank = (() => {
     }
     const sp = path[SUMMARY]; if (!sp) throw new Error('В шаблоне нет листа «' + SUMMARY + '»');
     zip.file(sp, fillSummary(await zip.file(sp).async('string'), days));
+
+    // Отдельные листы расхода двух дозаторов и общий итог.
+    function fillGroupSummary(xml, days, key) {
+      const sums = { n: 0, kg: 0, chem: Array(5).fill(0), exTot: Array(3).fill(0) };
+      for (let n = 1; n <= 31; n++) {
+        const m = days[n], g = m && m.groups && m.groups[key];
+        const row = 1 + n;
+        xml = setCell(xml, 'A' + row, m ? serial(m.date) : '');
+        if (g) {
+          xml = setCell(xml, 'B' + row, g.n); xml = setCell(xml, 'C' + row, g.kg);
+          for (let i = 0; i < 5; i++) { xml = setCell(xml, LET(4 + i) + row, g.chem[i] || ''); sums.chem[i] += g.chem[i] || 0; }
+          for (let i = 0; i < 3; i++) { xml = setCell(xml, LET(9 + i) + row, g.exTot[i] || ''); sums.exTot[i] += g.exTot[i] || 0; }
+          sums.n += g.n || 0; sums.kg += g.kg || 0;
+        } else {
+          xml = setCell(xml, 'B' + row, ''); xml = setCell(xml, 'C' + row, '');
+          for (let i = 0; i < 5; i++) xml = setCell(xml, LET(4 + i) + row, '');
+          for (let i = 0; i < 3; i++) xml = setCell(xml, LET(9 + i) + row, '');
+        }
+      }
+      xml = setCell(xml, 'B33', sums.n); xml = setCell(xml, 'C33', r6(sums.kg));
+      for (let i = 0; i < 5; i++) xml = setCell(xml, LET(4 + i) + '33', r6(sums.chem[i]));
+      for (let i = 0; i < 3; i++) xml = setCell(xml, LET(9 + i) + '33', r6(sums.exTot[i]));
+      return xml;
+    }
+    for (const [sheet, key] of [['Расход 1-10','1_10'],['Расход 11-12','11_12'],['Расход общий','all']]) {
+      const gp = path[sheet]; if (!gp) throw new Error('В шаблоне нет листа «' + sheet + '»');
+      zip.file(gp, fillGroupSummary(await zip.file(gp).async('string'), days, key));
+    }
     if (!/fullCalcOnLoad/.test(wb)) zip.file('xl/workbook.xml', wb.replace(/<calcPr\b([^>]*?)\/>/, '<calcPr$1 fullCalcOnLoad="1"/>'));
     return zip;
   }

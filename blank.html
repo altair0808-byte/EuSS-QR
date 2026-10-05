@@ -34,7 +34,11 @@ async function show() {
     const data = await loads(date, date);
     if (my !== seq) return;
     const m = Blank.build(data, refs, date);
-    $('#out').innerHTML = Blank.html(m);
+    const g = (title, x) => `<div class="box"><h2 style="margin-top:0">${title}</h2><div class="kpi">
+      <div><b>${x.n}</b><span>стирок</span></div><div><b>${Blank.fmt(x.kg,0)}</b><span>кг белья</span></div>
+      ${x.chem.map((v,i)=>`<div><b>${Blank.fmt(v,0)}</b><span>${Blank.esc(m.mains[i]?.name||'Химия')}</span></div>`).join('')}
+    </div><p class="hint">Доп. химия: ${x.exTot.map((v,i)=>`${Blank.esc(m.extras[i]?.name||'')} ${v?Blank.fmt(v,0):'0'}`).filter(Boolean).join(' · ') || 'нет'}</p></div>`;
+    $('#out').innerHTML = Blank.html(m) + `<h2>Расход по дозаторам</h2>${g('Машины 1–10 · дозатор 1',m.groups['1_10'])}${g('Машины 11–12 · дозатор 2',m.groups['11_12'])}${g('Общий итог · оба дозатора',m.groups.all)}`;
     $('#warn').innerHTML = Blank.warnings(m).map(w => `<p class="err">${Blank.esc(w)}</p>`).join('');
   } catch (e) {
     $('#out').innerHTML = '<p class="err">Не удалось загрузить данные. Проверьте, что выполнены report.sql и stage2.sql.</p>';

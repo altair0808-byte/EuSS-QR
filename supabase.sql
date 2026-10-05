@@ -31,7 +31,7 @@ create table loads(id uuid primary key default gen_random_uuid(),
 create table chem_changes(id uuid primary key default gen_random_uuid(),
   form_id uuid not null references forms, ts timestamptz not null default now(),
   shift_date date, chemical_id int not null references chemicals,
-  leftover_l numeric, user_id uuid default auth.uid());
+  leftover_l numeric, machine_group text not null default '1_10' check (machine_group in ('1_10','11_12')), user_id uuid default auth.uid());
 create table residents(day date not null, form_id uuid references forms,
   cnt int not null, primary key (day, form_id));
 
