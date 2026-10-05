@@ -1,5 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@600;700&display=swap");
 :root{--bg:#eef4f6;--card:#fff;--ink:#10303f;--mut:#587584;--ac:#1f5fbf;--ln:#cfdde3;--tint:#dbe9fb;font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-@media(prefers-color-scheme:dark){:root{--bg:#0d1b24;--card:#14293a;--ink:#e8f1f5;--mut:#8eaab8;--ac:#5b9bff;--ln:#27465a;--tint:#1d3a57}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink)}
 main{max-width:520px;margin:0 auto;padding:16px 16px 48px}
@@ -53,7 +53,6 @@ code{background:var(--tint);padding:2px 6px;border-radius:6px}
 
 /* ---- обновлённый вид ---- */
 :root{--sh:0 1px 2px rgba(16,48,63,.06),0 6px 18px rgba(16,48,63,.07);--ac2:#3b82e6}
-@media(prefers-color-scheme:dark){:root{--sh:0 1px 2px rgba(0,0,0,.3),0 6px 18px rgba(0,0,0,.25);--ac2:#7db0ff}}
 body{background:radial-gradient(900px 360px at 50% -120px,var(--tint),transparent 70%),var(--bg);min-height:100vh}
 main{padding-top:20px}
 header h1{font-size:1.5rem}
@@ -113,3 +112,23 @@ main.wide.full{max-width:100%}
 .blk tr.first td,.blk tr.first th{border-top:2px solid var(--mut)}
 .blk tr.tot td,.blk tr.tot th{font-weight:700;border-top:2px solid var(--mut)}
 .blk .dn{font-weight:400;color:var(--mut)}
+
+/* ---- единый стиль с панелью смены ---- */
+:root{--bg:oklch(.981 .006 195);--card:#fff;--ink:oklch(.285 .063 225);--mut:oklch(.52 .04 220);--ac:oklch(.62 .125 208);--ac2:oklch(.66 .12 208);--ln:oklch(.89 .018 204);--tint:oklch(.936 .026 193);--sh:0 1px 2px rgb(0 0 0/.05),0 6px 18px rgb(10 50 70/.07);font-family:Manrope,system-ui,sans-serif}
+body{background:var(--bg)}
+h1,h2,.kpi b{font-family:Sora,Manrope,sans-serif}
+main{max-width:560px}main.wide{max-width:760px}
+header{position:sticky;top:0;z-index:20;margin:-20px -16px 8px;padding:10px 16px;background:rgb(255 255 255/.95);backdrop-filter:blur(8px);border-bottom:1px solid var(--ln)}
+header h1{font-size:1.15rem;margin:0}
+header .ghost{border:1px solid var(--ln);background:#fff;border-radius:.5rem;padding:8px 12px;font-weight:600;font-size:.85rem;color:var(--ink)}
+header .ghost:hover,.ghost:hover{border-color:var(--ac);color:var(--ac)}
+button,input,select,.box,.card,.kpi div,details{border-radius:.5rem}
+.card,.box,.kpi div{border-radius:.6rem}
+.go{background:var(--ac);border-radius:.5rem}.bar .go{box-shadow:0 6px 18px color-mix(in oklab,var(--ac) 35%,transparent)}
+button.on,.grid button.on,.list button.on{background:var(--ac);border-color:var(--ac);color:#fff;box-shadow:0 4px 14px color-mix(in oklab,var(--ac) 40%,transparent)}
+.list button.on{border-left-color:var(--tint)}
+h2.st::before{background:var(--ac)}
+.kpi div{border-bottom:3px solid var(--ac)}.kpi div:nth-child(2){border-bottom-color:var(--ink)}.kpi div:nth-child(3){border-bottom-color:oklch(.72 .11 174)}.kpi div:nth-child(4){border-bottom-color:oklch(.69 .17 48)}
+.tbl th{text-transform:uppercase;font-size:.68rem;letter-spacing:.02em}
+.err{color:oklch(.577 .245 27.3)}
+@media(max-width:600px){header{margin-left:-16px;margin-right:-16px}}

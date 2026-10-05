@@ -62,6 +62,22 @@ main{max-width:1440px;margin:0 auto;padding:1.25rem 1rem}
 .lw input{width:100%;margin-top:.25rem;height:2.75rem;padding:0 .75rem;border:1px solid var(--bd);border-radius:var(--r);font:inherit;background:#fff;color:var(--fg)}
 .lw input:focus-visible{outline:2px solid var(--pri);outline-offset:1px}.lw .btn{width:100%;height:2.75rem;margin-top:1rem}
 .err{color:var(--bad);font-size:.875rem;min-height:1.3em;margin:.75rem 0 0}.hint{color:var(--mf);font-size:.9rem}
+.pn{max-height:92vh;overflow:auto;border-radius:1rem 1rem 0 0}
+.ph{display:flex;justify-content:space-between;gap:1rem}.ph p{margin:.25rem 0 0;font-size:.875rem;color:var(--mf)}
+.pn h3{font-size:.75rem;font-weight:800;text-transform:uppercase;color:var(--mf);margin:1.25rem 0 .5rem}
+.cur{display:flex;align-items:center;justify-content:space-between;gap:.75rem;margin-top:1rem;padding:.875rem;border-radius:var(--r);background:color-mix(in oklab,var(--pri) 8%,#fff);border:1px solid color-mix(in oklab,var(--pri) 30%,var(--bd))}
+.cur b{display:block}.cur span{font-size:.8rem;color:var(--mf)}
+.wl{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}
+.wl button{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:.1rem;min-height:3.25rem;padding:.5rem .75rem;border:1px solid var(--bd);border-radius:var(--r);background:#fff;text-align:left;font-weight:600;font-size:.875rem}
+.wl button small{font-size:.7rem;color:var(--mf);font-weight:500}
+.wl button.sel{background:var(--pri);border-color:var(--pri);color:#fff}.wl button.sel small{color:#fff;opacity:.85}
+.kgr{display:grid;grid-template-columns:3.5rem 1fr 3.5rem;gap:.5rem}
+.kgr button{height:3.25rem;border:1px solid var(--bd);border-radius:var(--r);background:#fff;font-size:1.5rem}
+.kgr input,.xg input{width:100%;height:3.25rem;border:1px solid var(--bd);border-radius:var(--r);padding:0 .75rem;font:inherit;background:#fff;color:var(--fg);text-align:center;font-weight:700;font-size:1.25rem}
+.xg{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}.xg label{font-size:.75rem;font-weight:700;color:var(--mf)}.xg input{height:2.75rem;font-size:1rem;margin-top:.25rem}
+.wide{width:100%;height:3.25rem;margin-top:1.25rem;font-size:1rem}.btn:disabled{opacity:.4;cursor:default}
+#toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,16px);background:var(--fg);color:#fff;padding:.75rem 1.4rem;border-radius:99px;opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;z-index:60}#toast.show{opacity:1;transform:translate(-50%,0)}
+@media(min-width:640px){.pn{border-radius:var(--r)}}
 @keyframes sp{to{transform:rotate(360deg)}}
 @media(min-width:640px){main,.hd>div{padding-left:1.5rem;padding-right:1.5rem}.mgr{grid-template-columns:repeat(3,1fr)}.pn{border-radius:var(--r);margin:1rem}.top h1{font-size:1.875rem}}
 @media(min-width:768px){.mg{grid-template-columns:repeat(4,1fr)}.qg{grid-template-columns:1fr 1fr}}
@@ -112,7 +128,7 @@ async function loadAll(session){
 const shiftDate=()=>new Date(Date.now()+(S.tz-S.st)*3600e3).toISOString().slice(0,10);
 async function loadLoads(){
   const d=shiftDate();
-  const r=S.can?await sb.rpc('report_loads',{d1:d,d2:d}):await sb.from('loads').select('id,ts,shift_date,part,machine,wash_type_id,weight_kg,extras').eq('shift_date',d).order('ts');
+  const r=S.can?await sb.rpc('report_loads',{d1:d,d2:d}):await sb.from('loads').select('id,ts,shift_date,part,machine,wash_type_id,weight_kg,extras,finished_at').eq('shift_date',d).order('ts');
   S.loads=r.data||[];
 }
 const roleOf=id=>S.isSuper?'admin':S.acc.find(a=>a.form_id===id)?.role;
@@ -125,7 +141,7 @@ function machines(){
     let status='ready',left=null,w=null;
     if(last){w=S.refs.washTypes.find(x=>x.id===last.wash_type_id);
       const end=new Date(last.ts).getTime()+(w?.minutes||0)*60000;
-      if(now<end){status='working';left=Math.max(1,Math.ceil((end-now)/60000));}}
+      if(!last.finished_at&&now<end){status='working';left=Math.max(1,Math.ceil((end-now)/60000));}}
     out.push({id,status,left,last,w});
   }
   return out;
@@ -170,15 +186,34 @@ function dashView(){
 }
 
 function panel(m,first){
-  const l=m.last,hhmm=ts=>new Date(new Date(ts).getTime()+S.tz*3600e3).toISOString().slice(11,16);
-  $('#ovl').innerHTML=`<div class="ov" id="bg"><section class="pn" role="dialog" aria-modal="true">
-   <div style="display:flex;justify-content:space-between;gap:1rem"><div><p class="eb">${m.status==='working'?'Стирка':'Свободна'}</p><h2>Машина ${String(m.id).padStart(2,'0')}</h2>
-   <p>${l?esc(m.w?.name||'Загрузка')+' · '+fmt(l.weight_kg,1)+' кг · '+hhmm(l.ts)+(m.status==='working'?' · осталось '+m.left+' мин':''):'Загрузок за смену не было'}</p></div>
-   <button class="ib" id="cl" aria-label="Закрыть">✕</button></div>
-   <div class="pg"><div><span>Дозатор</span><b>${m.id<=10?'Основной':'Отдельный'}</b></div><div><span>Группа</span><b>${m.id<=10?'1–10':'11–12'}</b></div></div>
-   ${first?`<a class="btn p" style="width:100%;margin-top:1.25rem" href="form.html?f=${encodeURIComponent(first.slug)}">Добавить загрузку</a>`:''}</section></div>`;
+  const l=m.last,busy=m.status==='working',wt=S.refs.washTypes,ex=S.refs.chemicals.filter(c=>c.kind==='extra');
+  const hhmm=ts=>new Date(new Date(ts).getTime()+S.tz*3600e3).toISOString().slice(11,16);
+  let w=null;
+  $('#ovl').innerHTML=`<div class="ov" id="bg"><section class="pn" role="dialog" aria-modal="true" aria-label="Машина ${m.id}">
+   <div class="ph"><div><p class="eb">${busy?'Стирка идёт':'Свободна'}</p><h2>Машина ${String(m.id).padStart(2,'0')}</h2><p>${m.id<=10?'Основной дозатор · 1–10':'Отдельный дозатор · 11–12'}</p></div><button class="ib" id="cl" aria-label="Закрыть">✕</button></div>
+   ${busy?`<div class="cur"><div><b>${esc(m.w?.name||'Загрузка')}</b><span>${fmt(l.weight_kg,1)} кг · с ${hhmm(l.ts)} · осталось ${m.left} мин</span></div><button class="btn p" id="fin">✓ Постиралось</button></div>`:''}
+   ${first?`<h3>${busy?'Следующая стирка':'Вид стирки'}</h3>
+   <div class="wl" id="wl">${wt.map(x=>`<button data-v="${x.id}"><span>${esc(x.name)}</span>${x.minutes?`<small>${x.minutes} мин</small>`:''}</button>`).join('')}</div>
+   <h3>Вес, кг</h3><div class="kgr"><button id="mi" aria-label="Меньше">−</button><input id="kg" type="number" inputmode="decimal" min="0" step="0.5" value="25"><button id="pl" aria-label="Больше">+</button></div>
+   ${ex.length?`<h3>Дополнительно</h3><div class="xg">${ex.map(x=>`<label>${esc(x.name)}, ${x.per_unit_unit==='g'?'г':'мл'}<input type="number" min="0" step="1" inputmode="numeric" data-x="${x.id}" placeholder="0"></label>`).join('')}</div>`:''}
+   <button class="btn p wide" id="save" disabled>${busy?'Записать и начать следующую':'Записать загрузку'}</button>`
+   :'<p class="hint" style="margin-top:1rem">Нет доступа к бланку загрузки.</p>'}</section></div>`;
   const close=()=>{sel=null;$('#ovl').innerHTML='';};
   $('#cl').onclick=close;$('#bg').onmousedown=e=>{if(e.target.id==='bg')close();};
+  const fin=async()=>{const{error}=await sb.rpc('finish_load',{p_id:l.id});if(error){toast('Не удалось: '+error.message);return false;}return true;};
+  if($('#fin'))$('#fin').onclick=async()=>{$('#fin').disabled=true;if(await fin()){await loadLoads();toast('Машина '+m.id+' свободна');dashView();}else $('#fin').disabled=false;};
+  if(!first)return;
+  $('#wl').onclick=e=>{const b=e.target.closest('button');if(!b)return;w=+b.dataset.v;$('#wl').querySelectorAll('button').forEach(x=>x.classList.toggle('sel',x===b));$('#save').disabled=false;};
+  $('#mi').onclick=()=>$('#kg').value=Math.max(0,(+$('#kg').value||0)-1);
+  $('#pl').onclick=()=>$('#kg').value=(+$('#kg').value||0)+1;
+  $('#save').onclick=async()=>{
+    const b=$('#save');b.disabled=true;
+    if(busy&&!await fin()){b.disabled=false;return;}
+    const extras={};document.querySelectorAll('[data-x]').forEach(i=>{if(+i.value>0)extras[i.dataset.x]=+i.value;});
+    const{error}=await sb.from('loads').insert({form_id:first.id,machine:m.id,wash_type_id:w,weight_kg:+$('#kg').value||25,extras});
+    if(error){toast('Не сохранено: '+error.message);b.disabled=false;return;}
+    sel=null;await loadLoads();dashView();toast('Машина '+m.id+': загрузка записана');
+  };
 }
 
 async function start(){
