@@ -1,48 +1,29 @@
-# Прачечная: QR-формы
+# Welcome to your Lovable project
 
-Файлы лежат в корне: `index.html`, `form.html`, `qr.html`, `app.js`, `config.js`, `style.css`, `supabase.sql`, `users.sql`, `admin.html`, `settings.html`, `admin-users.ts`.
-Этап 1: отчёт по сменам со счётом стирок и теоретическим расходом химии. Этап 2: факт расхода, сравнение с теорией, остаток в кг. Дальше: ввод и правка админом, Excel в формате бланка.
+This project was built with [Lovable](https://lovable.dev).
 
-## Запуск
-1. **Supabase**: создайте проект, откройте SQL Editor, вставьте `supabase.sql`, нажмите Run.
-2. **Ключи**: Project Settings, API. Впишите Project URL и anon key в `config.js`.
-3. **Пользователи**: Authentication, Users, Add user (почта и пароль, отметьте Auto Confirm).
-   Затем Authentication, Sign In / Providers: выключите Allow new users to sign up.
-4. **Суперадмин** (один): создайте его в Authentication, Users, затем в SQL Editor выполните `users.sql`, потом:
-```sql
-insert into profiles(id, role) select id, 'superadmin' from auth.users where email = 'you@mail.com';
-insert into people(id, email) select id, email from auth.users where email = 'you@mail.com' on conflict do nothing;
+## Build with Lovable
+
+Open your project in the [Lovable editor](https://lovable.dev) and keep building.
+
+- **Ship faster**: describe what you want to build and Lovable handles the code.
+- **Stay in sync**: connect the project to GitHub and every change made in Lovable is committed straight to your repository.
+- **Full ownership**: this code is yours. Push to your repository and your changes sync back into Lovable, ready for your next prompt.
+
+## Development
+
+Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+
+```sh
+git clone <this-repository-url>
+cd <repository-name>
+npm i
+npm run dev
 ```
-   Остальных сотрудников суперадмин создаёт сам на странице **Пользователи** (карточка на главной). Для этого один раз разверните функцию: Supabase, Edge Functions, Create function, имя `admin-users`, вставьте код из `admin-users.ts`, Deploy.
-5. **Роли через SQL** (необязательно, если пользуетесь страницей «Пользователи»):
-```sql
--- суперадмин
-insert into profiles(id, role) select id, 'superadmin' from auth.users where email = 'you@mail.com';
--- сотрудник прачечной (загрузки)
-insert into form_access select id, (select id from forms where slug='laundry-load'), 'worker' from auth.users where email = 'worker@mail.com';
--- бригадир (замена химии)
-insert into form_access select id, (select id from forms where slug='laundry-chem'), 'foreman' from auth.users where email = 'foreman@mail.com';
--- админ бланка
-insert into form_access select id, (select id from forms where slug='laundry-load'), 'admin' from auth.users where email = 'admin@mail.com';
-```
-6. **Настройки**: объёмы бутылей, часовой пояс, начало смены, виды стирки с рецептами и бланки суперадмин меняет на странице **Настройки** (карточка на главной). Через SQL это делать не нужно.
-7. **Суперадмин** на странице **Пользователи** может менять имя и пароль себе и сотрудникам. Для смены имён выполните обновлённый `users.sql` (добавлена политика `pe_upd`) и заново разверните `admin-users.ts`.
-8. **GitHub и Render**: загрузите файлы в репозиторий, на Render создайте Static Site, Build Command пустой, Publish Directory `.`
-9. **QR**: войдите как суперадмин, на главной нажмите QR у бланка и распечатайте.
 
-10. **Отчёт по сменам (этап 1)**: в SQL Editor выполните `report.sql` (после `supabase.sql` и `users.sql`). Страница `report.html` доступна бригадиру, админу и суперадмину, карточка «Отчёт по сменам» появляется на главной.
+## Built with
 
-11. **Факт расхода (этап 2)**: выполните `stage2.sql` (после `report.sql`). Затем в **Настройках** для каждой химии задайте «1 шт = литров = кг». Бригадир вводит остаток в кг, в отчёте появляются теория, факт и разница.
-
-
-## Разделение дозаторов и подтверждение загрузки
-
-После обновления выполните `stage3.sql` в Supabase после `report.sql` и `stage2.sql`.
-
-- Машины 1–10 относятся к дозатору 1.
-- Машины 11–12 относятся к дозатору 2.
-- Каждая машина на бланке настраивается отдельно: вид стирки, вес и дополнительная химия.
-- Перед отправкой появляется итоговый экран с настройками всех машин и кнопкой «Все верно — отправить».
-- Замена химии также записывается с указанием дозатора.
-- Отчёт показывает отдельно 1–10, отдельно 11–12 и общий итог.
-- В выгружаемом `Blanc.xlsx` добавлены листы `Расход 1-10`, `Расход 11-12`, `Расход общий`.
+- TanStack Start
+- TypeScript
+- React
+- Tailwind CSS
