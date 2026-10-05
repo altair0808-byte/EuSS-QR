@@ -15,39 +15,58 @@
 
   async function laundryLoad() {
     const [{ data: wt }, { data: ex }] = await Promise.all([
-      sb.from('wash_types').select('id,name').order('sort'),
+      sb.from('wash_types').select('id,name,minutes').order('sort'),
       sb.from('chemicals').select('id,name').eq('kind', 'extra').order('sort')
     ]);
-    const mb = a => a.map(n => `<button data-v="${n}">${n}</button>`).join('');
+    const mb = a => a.map(n => `<button data-v="${n}" aria-pressed="false">${n}</button>`).join('');
+    const mw = n => n % 10 === 1 && n % 100 !== 11 ? 'машина' : (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? 'машины' : 'машин');
     app.innerHTML = head + `
-      <h2>Машина</h2>
+      <h2 class="st">Машины <small id="cnt"></small></h2>
+      <p class="hint">Нажмите одну или несколько машин, которые загрузили одинаково.</p>
       <div id="mg"><div class="sub">Основные</div><div class="grid">${mb([1,2,3,4,5,6,7,8,9,10])}</div>
       <div class="sub">Дополнительные</div><div class="grid">${mb([11,12])}</div></div>
-      <h2>Вид стирки</h2><div class="list" id="wg">${wt.map(x => `<button data-v="${x.id}">${x.name}</button>`).join('')}</div>
-      <h2>Вес, кг</h2><div class="kg"><button id="mi">−</button><input id="kg" type="number" value="25" step="0.5" inputmode="decimal"><button id="pl">+</button></div>
-      <details><summary>Дополнительно</summary>${ex.map(x => `<label>${x.name}<input type="number" min="0" step="1" inputmode="numeric" data-x="${x.id}"></label>`).join('')}</details>
-      <button class="go" id="save" disabled>Сохранить</button>
-      <button class="ghost" id="undo" hidden>Отменить последнюю запись</button>`;
-    let m = null, w = null; const show = undoBtn('loads');
-    const chk = () => $('#save').disabled = !(m && w);
-    pick('#mg', v => { m = v; chk(); }); pick('#wg', v => { w = v; chk(); });
+      <button class="ghost" id="clr" hidden>Сбросить выбор</button>
+      <h2 class="st">Вид стирки</h2>
+      <div class="list" id="wg">${wt.map(x => `<button data-v="${x.id}"><span>${x.name}</span>${x.minutes ? `<small>${x.minutes} мин</small>` : ''}</button>`).join('')}</div>
+      <h2 class="st">Вес одной машины, кг</h2>
+      <div class="kg"><button id="mi" aria-label="Меньше">−</button><input id="kg" type="number" value="25" step="0.5" inputmode="decimal"><button id="pl" aria-label="Больше">+</button></div>
+      ${ex.length ? `<details><summary>Дополнительно (на каждую машину)</summary>${ex.map(x => `<label>${x.name}<input type="number" min="0" step="1" inputmode="numeric" data-x="${x.id}"></label>`).join('')}</details>` : ''}
+      <div class="bar"><button class="go" id="save" disabled>Сохранить</button>
+      <button class="ghost" id="undo" hidden>Отменить последнюю запись</button></div>`;
+    const ms = new Set(); let w = null; const show = undoBtn('loads');
+    const chk = () => {
+      const n = ms.size;
+      $('#save').disabled = !(n && w);
+      $('#save').textContent = n > 1 ? `Сохранить · ${n} ${mw(n)}` : 'Сохранить';
+      $('#cnt').textContent = n ? `выбрано: ${n}` : '';
+      $('#clr').hidden = !n;
+    };
+    $('#mg').onclick = e => {
+      const b = e.target.closest('button'); if (!b) return;
+      const v = b.dataset.v; ms.has(v) ? ms.delete(v) : ms.add(v);
+      b.classList.toggle('on', ms.has(v)); b.setAttribute('aria-pressed', ms.has(v)); chk();
+    };
+    $('#clr').onclick = () => { ms.clear(); app.querySelectorAll('#mg button').forEach(x => { x.classList.remove('on'); x.setAttribute('aria-pressed', 'false'); }); chk(); };
+    pick('#wg', v => { w = v; chk(); });
     $('#mi').onclick = () => $('#kg').value = Math.max(0, (+$('#kg').value || 0) - 1);
     $('#pl').onclick = () => $('#kg').value = (+$('#kg').value || 0) + 1;
     $('#save').onclick = async () => {
-      const extras = {};
+      const extras = {}, kg = +$('#kg').value || 25, list = [...ms].sort((a, b) => a - b);
       app.querySelectorAll('[data-x]').forEach(i => { if (+i.value > 0) extras[i.dataset.x] = +i.value; });
-      const { data, error } = await sb.from('loads').insert({ form_id: f.id, machine: +m, wash_type_id: +w, weight_kg: +$('#kg').value || 25, extras }).select('id').single();
-      if (error) { toast('Не сохранено, нажмите ещё раз'); return; }
-      show(data.id); toast('Сохранено');
-      m = w = null; unpick('#mg'); unpick('#wg'); $('#kg').value = 25;
-      app.querySelectorAll('[data-x]').forEach(i => i.value = ''); chk();
+      $('#save').disabled = true;
+      const { data, error } = await sb.from('loads').insert(list.map(m => ({ form_id: f.id, machine: +m, wash_type_id: +w, weight_kg: kg, extras }))).select('id');
+      if (error) { toast('Не сохранено, нажмите ещё раз'); chk(); return; }
+      show(data.map(r => r.id));
+      toast(list.length > 1 ? `Сохранено: машины ${list.join(', ')}` : `Сохранено: машина ${list[0]}`);
+      ms.clear(); w = null; unpick('#mg'); unpick('#wg'); app.querySelectorAll('#mg button').forEach(x => x.setAttribute('aria-pressed', 'false'));
+      $('#kg').value = 25; app.querySelectorAll('[data-x]').forEach(i => i.value = ''); chk();
     };
   }
 
   async function laundryChem() {
     const { data: ch } = await sb.from('chemicals').select('id,name').order('sort');
     app.innerHTML = head + `
-      <h2>Какая химия закончилась</h2><div class="list" id="cg">${ch.map(x => `<button data-v="${x.id}">${x.name}</button>`).join('')}</div>
+      <h2 class="st">Какая химия закончилась</h2><div class="list" id="cg">${ch.map(x => `<button data-v="${x.id}">${x.name}</button>`).join('')}</div>
       <label>Остаток на дне, л (необязательно)<input id="lf" type="number" min="0" step="0.1" inputmode="decimal"></label>
       <button class="go" id="save" disabled>Бутыль заменена</button>
       <button class="ghost" id="undo" hidden>Отменить последнюю запись</button>`;
