@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Бланк за смену</title><link rel="stylesheet" href="style.css"></head>
+<body><main class="wide full">
+<header><h1>Бланк за смену</h1><a class="ghost" href="index.html">Бланки</a></header>
+<div class="box">
+  <label>Дата смены<input type="date" id="d"></label>
+  <div class="row"><button class="mini" id="t">Сегодня</button><button class="mini" id="y">Вчера</button><button class="mini" id="x">Скачать Excel за месяц</button></div>
+  <p class="hint" id="msg"></p>
+</div>
+<div id="warn"></div>
+<div class="box blkwrap" id="out"><p class="hint">Загрузка…</p></div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="config.js"></script><script src="app.js"></script><script src="blanc.js"></script>
+<script>
+let refs = null, tz = 5, st = 6, seq = 0;
+const shiftToday = () => new Date(Date.now() + (tz - st) * 3600e3).toISOString().slice(0, 10);
+const addDays = (d, n) => new Date(new Date(d + 'T00:00:00Z').getTime() + n * 864e5).toISOString().slice(0, 10);
+const lastDay = ym => new Date(Date.UTC(+ym.slice(0, 4), +ym.slice(5, 7), 0)).getUTCDate();
+
+async function loads(d1, d2) {
+  const { data, error } = await sb.rpc('report_loads', { d1, d2 });
+  if (error) throw error;
+  return data || [];
+}
+
+async function show() {
+  const date = $('#d').value, my = ++seq;
+  if (!date) return;
+  $('#msg').textContent = `Смена ${date.split('-').reverse().join('.')} с ${String(st).padStart(2, '0')}:00, сутки.`;
+  try {
+    const data = await loads(date, date);
+    if (my !== seq) return;
+    const m = Blank.build(data, refs, date);
+    $('#out').innerHTML = Blank.html(m);
+    $('#warn').innerHTML = Blank.warnings(m).map(w => `<p class="err">${Blank.esc(w)}</p>`).join('');
+  } catch (e) {
+    $('#out').innerHTML = '<p class="err">Не удалось загрузить данные. Проверьте, что выполнены report.sql и stage2.sql.</p>';
+  }
+}
+
+async function download() {
+  const date = $('#d').value; if (!date) return;
+  const ym = date.slice(0, 7), b = $('#x'); b.disabled = true; $('#msg').textContent = 'Собираю файл…';
+  try {
+    const res = await fetch('Blanc.xlsx', { cache: 'no-store' });
+    if (!res.ok) throw new Error('Файл Blanc.xlsx не найден на сайте. Положите его в корень репозитория рядом с index.html.');
+    const zip = await JSZip.loadAsync(await res.arrayBuffer());
+    const data = await loads(ym + '-01', ym + '-' + String(lastDay(ym)).padStart(2, '0'));
+    const byDay = {};
+    data.forEach(l => (byDay[l.shift_date] = byDay[l.shift_date] || []).push(l));
+    const days = {};
+    Object.keys(byDay).forEach(d => { days[+d.slice(8)] = Blank.build(byDay[d], refs, d); });
+    await Blank.fillWorkbook(zip, days, refs);
+    const blob = await zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'Blanc-' + ym + '.xlsx';
+    document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1e4);
+    $('#msg').textContent = 'Файл готов: ' + a.download;
+    toast('Файл скачан');
+  } catch (e) { $('#msg').textContent = ''; $('#warn').innerHTML = `<p class="err">${Blank.esc(e.message || e)}</p>`; }
+  b.disabled = false;
+}
+
+$('#d').onchange = show;
+$('#t').onclick = () => { $('#d').value = shiftToday(); show(); };
+$('#y').onclick = () => { $('#d').value = addDays(shiftToday(), -1); show(); };
+$('#x').onclick = download;
+
+(async () => {
+  if (!await need()) return;
+  const { data: ok } = await sb.rpc('can_report');
+  if (!ok) { $('#out').innerHTML = '<p>Нет доступа. Обратитесь к администратору.</p>'; return; }
+  const [s, c, w, r] = await Promise.all([
+    sb.from('settings').select('*'), sb.from('chemicals').select('*').order('sort'),
+    sb.from('wash_types').select('*').order('sort'), sb.from('recipes').select('*')
+  ]);
+  const g = k => { const x = (s.data || []).find(y => y.key === k); return x ? +x.value : null; };
+  tz = g('tz_offset') ?? 5; st = g('shift_start') ?? 6;
+  refs = { water: g('water_l') ?? 55, washTypes: w.data || [], chemicals: c.data || [], recipes: r.data || [] };
+  $('#d').value = shiftToday(); show();
+})();
+</script></body></html>

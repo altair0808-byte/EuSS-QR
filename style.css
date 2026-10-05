@@ -100,3 +100,16 @@ details{background:var(--card);border:1px solid var(--ln);border-radius:14px;pad
 
 .cb{padding:12px 0;border-top:1px solid var(--ln)}.cb:first-of-type{border-top:0}
 .tbl small{color:var(--mut)}.bad{color:#c0392b;font-weight:600}.good{color:#1e8449;font-weight:600}
+
+/* бланк за смену */
+main.wide.full{max-width:100%}
+.blkwrap{overflow-x:auto;padding:8px}
+.blk{border-collapse:collapse;font-size:.78rem;white-space:nowrap}
+.blk th,.blk td{border:1px solid var(--ln);padding:3px 5px;text-align:center}
+.blk thead th{background:var(--card);position:sticky;top:0}
+.blk .vt{writing-mode:vertical-rl;transform:rotate(180deg);min-width:26px}
+.blk .nm{text-align:left;position:sticky;left:0;background:var(--card)}
+.blk .nt{background:rgba(0,0,0,.04)}
+.blk tr.first td,.blk tr.first th{border-top:2px solid var(--mut)}
+.blk tr.tot td,.blk tr.tot th{font-weight:700;border-top:2px solid var(--mut)}
+.blk .dn{font-weight:400;color:var(--mut)}
