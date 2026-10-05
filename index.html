@@ -1,85 +1,194 @@
 <!doctype html>
 <html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>EuSS — Бланки</title><link rel="stylesheet" href="style.css"></head>
-<body><main id="app"><p class="hint">Загрузка…</p></main>
+<title>Панель смены — EuSS</title>
+<link rel="icon" href="favicon.png" type="image/png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@600;700&display=swap">
+<style>
+:root{--bg:oklch(.981 .006 195);--fg:oklch(.285 .063 225);--card:#fff;--pri:oklch(.62 .125 208);--sec:oklch(.936 .026 193);--mut:oklch(.956 .012 198);--mf:oklch(.52 .04 220);--bd:oklch(.89 .018 204);--bad:oklch(.577 .245 27.3);--r:.5rem;font-family:Manrope,system-ui,sans-serif}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg)}
+h1,h2{font-family:Sora,Manrope,sans-serif;margin:0}
+button{font:inherit;color:inherit;cursor:pointer}a{color:inherit;text-decoration:none}
+[hidden]{display:none!important}
+.hd{position:sticky;top:0;z-index:40;border-bottom:1px solid var(--bd);background:rgb(255 255 255/.95);backdrop-filter:blur(8px)}
+.hd>div{max-width:1440px;margin:0 auto;height:4rem;display:flex;align-items:center;justify-content:space-between;padding:0 1rem}
+.lg{display:flex;align-items:center;gap:.75rem;min-width:0}.lg img{height:2.25rem;max-width:7rem;object-fit:contain}
+.sep{width:1px;height:1.5rem;background:var(--bd)}.sub{font-size:.875rem;font-weight:600;color:var(--mf);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.me{display:flex;align-items:center;gap:.75rem}.me .t{text-align:right}
+.eb{font-size:.7rem;font-weight:800;text-transform:uppercase;color:var(--pri);margin:0}.t p+p{margin:0;font-size:.75rem;font-weight:600}
+.av{width:2.25rem;height:2.25rem;border-radius:50%;background:var(--fg);color:#fff;display:grid;place-items:center;font-size:.75rem;font-weight:700}
+.ib{width:2.25rem;height:2.25rem;border:0;background:none;border-radius:var(--r);font-size:1.1rem}.ib:hover{background:var(--sec)}
+main{max-width:1440px;margin:0 auto;padding:1.25rem 1rem}
+.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:1rem;margin-bottom:1.25rem}
+.top h1{font-size:1.5rem}.top .eb{margin-bottom:.25rem;font-size:.75rem;font-weight:700}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.4rem;height:2.5rem;padding:0 1rem;border-radius:var(--r);border:1px solid var(--bd);background:var(--card);font-size:.875rem;font-weight:600}
+.btn.p{background:var(--pri);border-color:var(--pri);color:#fff}
+.btn.s{height:2.25rem;width:100%}.btn:hover{filter:brightness(.97)}
+.mg{display:grid;grid-template-columns:repeat(2,1fr);gap:.75rem}
+.m{min-width:0;border:1px solid var(--bd);border-bottom-width:3px;border-radius:var(--r);background:var(--card);padding:1rem;box-shadow:0 1px 2px rgb(0 0 0/.05)}
+.m .l{font-size:.7rem;font-weight:800;text-transform:uppercase;color:var(--mf);margin:0}
+.m .v{font-family:Sora,sans-serif;font-size:1.5rem;font-weight:700;margin:.25rem 0 0}.m .v small{font-size:.875rem;font-weight:600;color:var(--mf)}
+.m .n{font-size:.75rem;color:var(--mf);margin:.25rem 0 0}
+.m1{border-bottom-color:var(--pri)}.m2{border-bottom-color:var(--fg)}.m3{border-bottom-color:oklch(.72 .11 174)}.m4{border-bottom-color:oklch(.69 .17 48)}
+.sh{margin-top:1.5rem;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.75rem;margin-bottom:1rem}
+.sh h2{font-size:1.125rem}.sh p{margin:.15rem 0 0;font-size:.875rem;color:var(--mf)}
+.tabs{display:flex;gap:.25rem;overflow-x:auto;max-width:100%;border-radius:var(--r);background:var(--sec);padding:.25rem}
+.tabs button{flex:none;border:0;background:none;height:2rem;padding:0 .75rem;border-radius:calc(var(--r) - 2px);font-size:.8rem;font-weight:600}
+.tabs button[aria-selected=true]{background:var(--card);color:var(--pri)}
+.mgr{display:grid;grid-template-columns:repeat(2,1fr);gap:.75rem}
+.mc{display:flex;flex-direction:column;gap:.6rem;min-width:0}
+.mv{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;aspect-ratio:4/4.5;overflow:hidden;border:1px solid var(--bd);border-radius:var(--r);background:var(--card);transition:border-color .16s,box-shadow .16s,transform .12s}
+.mv:hover{border-color:color-mix(in oklab,var(--pri) 55%,var(--bd));box-shadow:0 8px 22px rgb(0 0 0/.08)}.mv:active{transform:scale(.985)}
+.mv:focus-visible,.qa:focus-visible,.btn:focus-visible{outline:2px solid var(--pri);outline-offset:2px}
+.ct{position:absolute;top:.75rem;left:.75rem;right:.75rem;display:flex;align-items:center;gap:.25rem;padding-bottom:.55rem;border-bottom:1px solid var(--bd)}
+.ct i{display:block;width:.28rem;height:.28rem;border-radius:99px;background:var(--mf);opacity:.45}.ct i:first-child{width:1.15rem}
+.dr{position:relative;display:grid;width:clamp(4.4rem,7vw,6rem);aspect-ratio:1;place-items:center;border:.45rem solid var(--sec);border-radius:99px;background:var(--mut);box-shadow:inset 0 0 0 1px var(--bd)}
+.dr strong{font-family:Sora,sans-serif;font-size:clamp(1.7rem,3vw,2.3rem);line-height:1}
+.on .dr{border-color:color-mix(in oklab,var(--pri) 28%,#fff);background:color-mix(in oklab,var(--pri) 7%,#fff);color:var(--pri)}
+.on .dr::after{content:"";position:absolute;inset:-.45rem;border:.22rem solid transparent;border-top-color:var(--pri);border-radius:99px;animation:sp 3.2s linear infinite}
+.st{margin-top:.8rem;max-width:calc(100% - 1rem);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.68rem;font-weight:800;text-transform:uppercase;color:var(--mf)}.on .st{color:var(--pri)}
+.qg{display:grid;gap:.75rem;margin-top:1.75rem;padding-bottom:2.5rem}
+.qa{display:flex;align-items:center;gap:.875rem;border:1px solid var(--bd);border-radius:var(--r);background:var(--card);padding:.875rem;text-align:left;width:100%}
+.qa:hover{border-color:color-mix(in oklab,var(--pri) 45%,var(--bd));background:color-mix(in oklab,var(--pri) 3%,#fff)}
+.qi{display:grid;width:2.6rem;height:2.6rem;flex:none;place-items:center;border-radius:calc(var(--r) - 2px);background:var(--sec);color:var(--pri);font-size:1.1rem}
+.qa b{display:block;font-size:.875rem}.qa small{display:block;font-size:.75rem;color:var(--mf)}.qa>span:nth-child(2){flex:1;min-width:0}
+.ov{position:fixed;inset:0;z-index:50;display:flex;align-items:flex-end;justify-content:flex-end;background:rgb(10 40 55/.25)}
+.pn{width:100%;max-width:28rem;background:var(--card);padding:1.25rem;box-shadow:0 20px 50px rgb(0 0 0/.25)}
+.pn h2{font-size:1.5rem;margin-top:.25rem}.pn p{margin:.25rem 0 0;font-size:.875rem;color:var(--mf)}.pn p.eb{color:var(--pri);font-size:.7rem}
+.pg{display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin:1.5rem 0 0;padding:1rem 0;border-block:1px solid var(--bd);font-size:.875rem}.pg span{display:block;font-size:.75rem;color:var(--mf)}
+.lw{max-width:24rem;margin:12vh auto 0;padding:0 1rem}.lw .box{background:var(--card);border:1px solid var(--bd);border-radius:var(--r);padding:1.5rem;box-shadow:0 1px 2px rgb(0 0 0/.05)}
+.lw img{height:2.5rem;display:block;margin:0 auto 1rem}.lw h1{font-size:1.25rem;text-align:center;margin-bottom:1rem}
+.lw label{display:block;margin-top:.75rem;font-size:.8rem;font-weight:700;color:var(--mf)}
+.lw input{width:100%;margin-top:.25rem;height:2.75rem;padding:0 .75rem;border:1px solid var(--bd);border-radius:var(--r);font:inherit;background:#fff;color:var(--fg)}
+.lw input:focus-visible{outline:2px solid var(--pri);outline-offset:1px}.lw .btn{width:100%;height:2.75rem;margin-top:1rem}
+.err{color:var(--bad);font-size:.875rem;min-height:1.3em;margin:.75rem 0 0}.hint{color:var(--mf);font-size:.9rem}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media(min-width:640px){main,.hd>div{padding-left:1.5rem;padding-right:1.5rem}.mgr{grid-template-columns:repeat(3,1fr)}.pn{border-radius:var(--r);margin:1rem}.top h1{font-size:1.875rem}}
+@media(min-width:768px){.mg{grid-template-columns:repeat(4,1fr)}.qg{grid-template-columns:1fr 1fr}}
+@media(min-width:900px){.mgr{grid-template-columns:repeat(4,1fr)}}
+@media(min-width:1180px){.mgr{grid-template-columns:repeat(6,1fr)}}
+@media(max-width:639px){.hide-s{display:none}}
+@media(prefers-reduced-motion:reduce){.on .dr::after{animation:none}.mv{transition:none}}
+</style></head>
+<body><div id="app"><p class="hint" style="padding:1rem">Загрузка…</p></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="config.js"></script><script src="app.js"></script>
+<script src="config.js"></script><script src="app.js"></script><script src="report-calc.js"></script>
 <script>
-const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
-const app = $('#app');
-const ROLE = { admin: 'Админ', foreman: 'Бригадир', worker: 'Сотрудник' };
+const esc=t=>String(t??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmt=(n,d=0)=>(Math.round(n*10**d)/10**d).toLocaleString('ru-RU');
+const app=$('#app');
+const MON=['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+let S=null,tab='all',timer=null,sel=null;
+const nextUrl=()=>{const n=q.get('next')||'';return /^[a-z0-9_-]+\.html(\?[^#]*)?$/i.test(n)?n:null;};
 
-// безопасный переход после входа: только на страницы этого же сайта
-function nextUrl() {
-  const n = q.get('next') || '';
-  return /^[a-z0-9_-]+\.html(\?[^#]*)?$/i.test(n) ? n : null;
+function loginView(){
+  clearInterval(timer);
+  app.innerHTML=`<div class="lw"><div class="box"><img src="euss-logo.png" alt="EuSS"><h1>Вход</h1>
+  <form id="lf"><label>Почта<input id="em" type="email" autocomplete="username" required></label>
+  <label>Пароль<input id="pw" type="password" autocomplete="current-password" required></label>
+  <p class="err" id="er" role="alert"></p><button class="btn p" id="go" type="submit">Войти</button></form></div></div>`;
+  $('#lf').onsubmit=async e=>{e.preventDefault();const b=$('#go');b.disabled=true;$('#er').textContent='';
+    const{error}=await sb.auth.signInWithPassword({email:$('#em').value.trim(),password:$('#pw').value});
+    if(error){$('#er').textContent=/invalid/i.test(error.message)?'Неверная почта или пароль':error.message;b.disabled=false;return;}
+    const n=nextUrl();if(n){location.href=n;return;}start();};
 }
 
-function loginView() {
-  app.innerHTML = `
-    <header><h1>Вход</h1></header>
-    <form id="login" class="box" autocomplete="on">
-      <label>Почта<input id="em" type="email" autocomplete="username" required></label>
-      <label>Пароль<input id="pw" type="password" autocomplete="current-password" required></label>
-      <p class="err" id="err" role="alert"></p>
-      <button class="go" id="enter" type="submit" style="margin-top:8px">Войти</button>
-    </form>`;
-  $('#login').onsubmit = async e => {
-    e.preventDefault();
-    const b = $('#enter'); b.disabled = true; $('#err').textContent = '';
-    const { error } = await sb.auth.signInWithPassword({ email: $('#em').value.trim(), password: $('#pw').value });
-    if (error) {
-      $('#err').textContent = /invalid/i.test(error.message) ? 'Неверная почта или пароль' : error.message;
-      b.disabled = false; return;
-    }
-    const n = nextUrl(); if (n) { location.href = n; return; }
-    start();
-  };
+async function loadAll(session){
+  const uid=session.user.id;
+  const[{data:pr},{data:forms},{data:acc},{data:can},{data:set},{data:wt},{data:ch},{data:rc}]=await Promise.all([
+    sb.from('profiles').select('role').eq('id',uid).maybeSingle(),
+    sb.from('forms').select('id,slug,name,type,sort_order').eq('archived',false).order('sort_order'),
+    sb.from('form_access').select('form_id,role').eq('user_id',uid),
+    sb.rpc('can_report'),
+    sb.from('settings').select('*'),
+    sb.from('wash_types').select('id,name,minutes').order('sort'),
+    sb.from('chemicals').select('*').order('sort'),
+    sb.from('recipes').select('*')]);
+  const g=k=>{const x=(set||[]).find(y=>y.key===k);return x?+x.value:null};
+  S={session,isSuper:pr?.role==='superadmin',forms:forms||[],acc:acc||[],can:!!can,tz:g('tz_offset')??5,st:g('shift_start')??6,
+     refs:{water:g('water_l')??55,washTypes:wt||[],chemicals:ch||[],recipes:rc||[]},loads:[]};
+  await loadLoads();
+}
+const shiftDate=()=>new Date(Date.now()+(S.tz-S.st)*3600e3).toISOString().slice(0,10);
+async function loadLoads(){
+  const d=shiftDate();
+  const r=S.can?await sb.rpc('report_loads',{d1:d,d2:d}):await sb.from('loads').select('id,ts,shift_date,part,machine,wash_type_id,weight_kg,extras').eq('shift_date',d).order('ts');
+  S.loads=r.data||[];
+}
+const roleOf=id=>S.isSuper?'admin':S.acc.find(a=>a.form_id===id)?.role;
+const canFill=f=>S.isSuper||(f.type==='laundry_load'?['worker','admin'].includes(roleOf(f.id)):['foreman','admin'].includes(roleOf(f.id)));
+
+function machines(){
+  const now=Date.now(),out=[];
+  for(let id=1;id<=12;id++){
+    const last=S.loads.filter(l=>l.machine===id).sort((a,b)=>new Date(b.ts)-new Date(a.ts))[0];
+    let status='ready',left=null,w=null;
+    if(last){w=S.refs.washTypes.find(x=>x.id===last.wash_type_id);
+      const end=new Date(last.ts).getTime()+(w?.minutes||0)*60000;
+      if(now<end){status='working';left=Math.max(1,Math.ceil((end-now)/60000));}}
+    out.push({id,status,left,last,w});
+  }
+  return out;
+}
+function metrics(ms){
+  const r=calcReport(S.loads,[],S.refs);
+  const chem=r.groups.all.chem.filter(c=>c.kind==='main').reduce((s,c)=>s+(c.theory?.l||0),0);
+  const work=ms.filter(m=>m.status==='working').length,own=S.can?'за смену':'ваши за смену';
+  return[['Стирок',fmt(r.total),'',own,'m1'],['Общий вес',fmt(r.kg),'кг',own,'m2'],['Химия',fmt(chem,1),'л','по рецептам (теория)','m3'],['В работе',work+' / 12','','сейчас','m4']];
 }
 
-async function listView(session) {
-  const uid = session.user.id;
-  const [{ data: pr }, { data: forms, error: fe }, { data: acc }, { data: can }] = await Promise.all([
-    sb.from('profiles').select('role').eq('id', uid).maybeSingle(),
-    sb.from('forms').select('id,slug,name,type,sort_order,archived').eq('archived', false).order('sort_order'),
-    sb.from('form_access').select('form_id,role').eq('user_id', uid),
-    sb.rpc('can_report')
-  ]);
-  const isSuper = pr?.role === 'superadmin';
-  const roleOf = id => isSuper ? 'admin' : (acc || []).find(a => a.form_id === id)?.role;
-
-  const items = (forms || []).map(f => {
-    const r = roleOf(f.id);
-    const canFill = isSuper || (f.type === 'laundry_load' ? ['worker', 'admin'].includes(r) : ['foreman', 'admin'].includes(r));
-    return `<div class="card"><div><span class="nm">${esc(f.name)}</span><small>${isSuper ? 'Суперадмин' : esc(ROLE[r] || '')}</small></div>
-      <span>${canFill ? `<a href="form.html?f=${encodeURIComponent(f.slug)}">Открыть</a>` : '<small>только просмотр</small>'}${isSuper || r === 'admin' ? ` · <a href="qr.html?f=${encodeURIComponent(f.slug)}">QR</a>` : ''}</span></div>`;
-  }).join('');
-
-  const nav = [
-    can ? '<a class="ghost" href="report.html">Отчёт</a>' : '',
-    can ? '<a class="ghost" href="blank.html">Бланк за смену</a>' : '',
-    isSuper ? '<a class="ghost" href="settings.html">Настройки</a><a class="ghost" href="admin.html">Пользователи</a>' : ''
-  ].join('');
-
-  let empty = '';
-  if (fe) empty = `<p class="err">Не удалось загрузить бланки: ${esc(fe.message)}</p>`;
-  else if (!items) empty = isSuper
-    ? '<p class="hint">Бланков нет. Выполните supabase.sql (раздел «Начальные данные»).</p>'
-    : '<p class="hint">Вам пока не выдан доступ ни к одному бланку. Обратитесь к суперадмину.</p>';
-
-  app.innerHTML = `
-    <header><h1>Бланки</h1><button class="ghost" id="out">Выйти</button></header>
-    <p class="hint">${esc(session.user.email)}${isSuper ? ' · суперадмин' : ''}</p>
-    <div class="cards">${items}</div>${empty}
-    ${nav ? `<h2>Разделы</h2><div class="row" style="flex-wrap:wrap">${nav}</div>` : ''}`;
-  $('#out').onclick = async () => { await sb.auth.signOut(); loginView(); };
+function dashView(){
+  const ms=machines(),em=S.session.user.email||'',ini=em.slice(0,2).toUpperCase();
+  const loc=new Date(Date.now()+S.tz*3600e3),first=S.forms.find(f=>f.type==='laundry_load'&&canFill(f));
+  const hh=n=>String(n).padStart(2,'0'),acts=[];
+  S.forms.filter(canFill).forEach(f=>acts.push([f.type==='laundry_chem'?'⚗':'▤',f.name,'Открыть бланк','form.html?f='+encodeURIComponent(f.slug)]));
+  if(S.can){acts.push(['▦','Бланк за смену','Проверить и подготовить отчёт','blank.html']);acts.push(['▥','Отчёт по сменам','Теория и факт по химии','report.html']);}
+  if(S.isSuper){acts.push(['⚙','Настройки','Химия, рецепты, бланки','settings.html']);acts.push(['☺','Пользователи','Создать и выдать доступ','admin.html']);
+    S.forms.forEach(f=>acts.push(['▣','QR: '+f.name,'Печать QR-кода','qr.html?f='+encodeURIComponent(f.slug)]));}
+  const vis=ms.filter(m=>tab==='all'||(tab==='main'?m.id<=10:m.id>=11));
+  const T=[['all','Все машины'],['main','Дозатор 1 · 1–10'],['extra','Дозатор 2 · 11–12']];
+  app.innerHTML=`
+  <header class="hd"><div><div class="lg"><img src="euss-logo.png" alt="EuSS"><span class="sep hide-s"></span><span class="sub">Панель смены</span></div>
+   <div class="me"><div class="t hide-s"><p class="eb">Смена ${hh(S.st)}:00–${hh(S.st)}:00</p><p>${esc(em)}${S.isSuper?' · суперадмин':''}</p></div>
+   <div class="av">${esc(ini)}</div><button class="ib" id="out" aria-label="Выйти" title="Выйти">⎋</button></div></div></header>
+  <main><div class="top"><div><p class="eb">Сегодня, ${loc.getUTCDate()} ${MON[loc.getUTCMonth()]}</p><h1>Обзор текущей смены</h1></div>
+   ${first?`<a class="btn p" href="form.html?f=${encodeURIComponent(first.slug)}">+ Новая запись</a>`:''}</div>
+  <section class="mg" aria-label="Статистика смены">${metrics(ms).map(([l,v,u,n,c])=>`<article class="m ${c}"><p class="l">${l}</p><p class="v">${v} ${u?`<small>${u}</small>`:''}</p><p class="n">${n}</p></article>`).join('')}</section>
+  <section><div class="sh"><div><h2>Стиральные машины</h2><p>Выберите машину, чтобы открыть запись</p></div>
+   <div class="tabs" role="tablist">${T.map(([id,l])=>`<button role="tab" aria-selected="${tab===id}" data-t="${id}">${l}</button>`).join('')}</div></div>
+   <div class="mgr">${vis.map(m=>`<article class="mc ${m.status==='working'?'on':''}"><button class="mv" data-m="${m.id}" aria-label="Машина ${m.id}">
+    <span class="ct"><i></i><i></i><i></i></span><span class="dr"><strong>${hh(m.id)}</strong></span>
+    <span class="st">${m.status==='working'?'Стирка · '+m.left+' мин':'Свободна'}</span></button>
+    <button class="btn s ${m.status==='working'?'p':''}" data-m="${m.id}">${m.status==='working'?'Открыть':'Добавить загрузку'} →</button></article>`).join('')}</div></section>
+  ${acts.length?`<section class="qg" aria-label="Быстрые действия">${acts.map(a=>`<a class="qa" href="${a[3]}"><span class="qi">${a[0]}</span><span><b>${esc(a[1])}</b><small>${esc(a[2])}</small></span><span>→</span></a>`).join('')}</section>`
+   :'<p class="hint">Вам пока не выдан доступ ни к одному бланку. Обратитесь к суперадмину.</p>'}
+  </main><div id="ovl"></div>`;
+  $('#out').onclick=async()=>{await sb.auth.signOut();loginView();};
+  document.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{tab=b.dataset.t;dashView();});
+  document.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{sel=+b.dataset.m;panel(ms.find(m=>m.id===sel),first);});
+  if(sel){const m=ms.find(m=>m.id===sel);if(m)panel(m,first);}
 }
 
-async function start() {
-  const { data: { session } } = await sb.auth.getSession();
-  if (!session) return loginView();
-  const n = nextUrl(); if (n) { location.replace(n); return; }
-  listView(session);
+function panel(m,first){
+  const l=m.last,hhmm=ts=>new Date(new Date(ts).getTime()+S.tz*3600e3).toISOString().slice(11,16);
+  $('#ovl').innerHTML=`<div class="ov" id="bg"><section class="pn" role="dialog" aria-modal="true">
+   <div style="display:flex;justify-content:space-between;gap:1rem"><div><p class="eb">${m.status==='working'?'Стирка':'Свободна'}</p><h2>Машина ${String(m.id).padStart(2,'0')}</h2>
+   <p>${l?esc(m.w?.name||'Загрузка')+' · '+fmt(l.weight_kg,1)+' кг · '+hhmm(l.ts)+(m.status==='working'?' · осталось '+m.left+' мин':''):'Загрузок за смену не было'}</p></div>
+   <button class="ib" id="cl" aria-label="Закрыть">✕</button></div>
+   <div class="pg"><div><span>Дозатор</span><b>${m.id<=10?'Основной':'Отдельный'}</b></div><div><span>Группа</span><b>${m.id<=10?'1–10':'11–12'}</b></div></div>
+   ${first?`<a class="btn p" style="width:100%;margin-top:1.25rem" href="form.html?f=${encodeURIComponent(first.slug)}">Добавить загрузку</a>`:''}</section></div>`;
+  const close=()=>{sel=null;$('#ovl').innerHTML='';};
+  $('#cl').onclick=close;$('#bg').onmousedown=e=>{if(e.target.id==='bg')close();};
+}
+
+async function start(){
+  const{data:{session}}=await sb.auth.getSession();
+  if(!session)return loginView();
+  const n=nextUrl();if(n){location.replace(n);return;}
+  try{await loadAll(session);}catch(e){app.innerHTML='<p class="err" style="padding:1rem">Не удалось загрузить данные: '+esc(e.message)+'</p>';return;}
+  dashView();
+  clearInterval(timer);
+  let k=0;timer=setInterval(async()=>{if(++k%2===0)await loadLoads();if(!sel)dashView();},30000);
 }
 start();
 </script></body></html>

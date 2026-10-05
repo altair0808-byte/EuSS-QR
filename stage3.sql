@@ -1,14 +1,23 @@
--- Этап 3: разделение двух дозаторов.
--- Выполнить после report.sql и stage2.sql.
+-- Этап 3: разделение двух дозаторов (машины 1-10 и 11-12).
+-- Выполнять после supabase.sql, users.sql, report.sql и stage2.sql.
+-- Можно запускать повторно.
 
 alter table chem_changes
-  add column if not exists machine_group text not null default '1_10'
-  check (machine_group in ('1_10','11_12'));
+  add column if not exists machine_group text not null default '1_10';
 
--- Старые записи считаем относящимися к основному дозатору 1-10.
-update chem_changes set machine_group = '1_10' where machine_group is null;
+-- ограничение значений (если его ещё нет)
+do $$ begin
+  if not exists (select 1 from pg_constraint where conrelid = 'chem_changes'::regclass and contype = 'c'
+                 and pg_get_constraintdef(oid) like '%machine_group%') then
+    alter table chem_changes add constraint chem_changes_machine_group_chk check (machine_group in ('1_10','11_12'));
+  end if;
+end $$;
 
-create or replace function report_changes(d1 date, d2 date)
+-- ВАЖНО: у функции меняется набор возвращаемых колонок (добавлен machine_group),
+-- поэтому create or replace без drop падает с ошибкой "cannot change return type".
+drop function if exists report_changes(date, date);
+
+create function report_changes(d1 date, d2 date)
 returns table(
   id uuid, ts timestamptz, shift_date date, machine_group text,
   chemical_id int, leftover_l numeric, leftover_kg numeric
@@ -22,5 +31,5 @@ $$
   order by c.ts
 $$;
 
-revoke all on function report_changes(date,date) from public;
-grant execute on function report_changes(date,date) to authenticated;
+revoke all on function report_changes(date, date) from public;
+grant execute on function report_changes(date, date) to authenticated;
