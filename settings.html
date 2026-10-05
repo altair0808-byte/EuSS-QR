@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Настройки</title><link rel="stylesheet" href="style.css"></head>
+<body><main class="wide">
+<header><h1>Настройки</h1><span><a class="ghost" href="admin.html">Пользователи</a><a class="ghost" href="index.html">Бланки</a></span></header>
+
+<h2>Общие</h2>
+<div class="box" id="gen">
+  <label>Вода на загрузку, л<input type="number" step="1" data-k="water_l"></label>
+  <label>Часовой пояс, часы от UTC<input type="number" step="1" data-k="tz_offset"></label>
+  <label>Начало смены, час<input type="number" min="0" max="23" step="1" data-k="shift_start"></label>
+  <button class="go" id="sg">Сохранить</button>
+</div>
+
+<h2>Химия</h2>
+<div class="box" id="chem"></div>
+
+<h2>Виды стирки и рецепты</h2>
+<div id="wt"></div>
+<div class="box">
+  <b>Новый вид стирки</b>
+  <label>Название<input id="wn"></label>
+  <label>Минуты<input id="wm" type="number" min="0" inputmode="numeric"></label>
+  <button class="go" id="wa">Добавить</button>
+</div>
+
+<h2>Бланки</h2>
+<div id="fm"></div>
+<div class="box">
+  <b>Новый бланк</b>
+  <label>Название<input id="fn"></label>
+  <label>Адрес (латиница, например laundry-load-2)<input id="fs" autocapitalize="off"></label>
+  <label>Тип<select id="ft"><option value="laundry_load">Загрузка белья</option><option value="laundry_chem">Замена химии</option></select></label>
+  <button class="go" id="fa">Добавить</button>
+</div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script><script src="app.js"></script>
+<script>
+const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const num = v => v === '' ? null : +v;
+const done = e => { toast(e ? 'Не сохранено: ' + e.message : 'Сохранено'); return !e; };
+let chems = [], wts = [], rec = [];
+
+async function load() {
+  const [{ data: st }, { data: ch }, { data: w }, { data: rc }, { data: fm }] = await Promise.all([
+    sb.from('settings').select('*'),
+    sb.from('chemicals').select('*').order('sort'),
+    sb.from('wash_types').select('*').order('sort'),
+    sb.from('recipes').select('*'),
+    sb.from('forms').select('*').order('sort_order')
+  ]);
+  chems = ch || []; wts = w || []; rec = rc || [];
+  document.querySelectorAll('#gen [data-k]').forEach(i => { const r = (st || []).find(x => x.key === i.dataset.k); i.value = r ? r.value : ''; });
+
+  $('#chem').innerHTML = chems.map(c => c.kind === 'main'
+    ? `<label>${esc(c.name)}: объём бутыли, л<input type="number" min="0" step="0.5" data-c="${c.id}" data-f="bottle_l" value="${c.bottle_l ?? ''}"></label>`
+    : `<label>${esc(c.name)}: расход на единицу<input type="number" min="0" step="1" data-c="${c.id}" data-f="per_unit" value="${c.per_unit ?? ''}"></label>`
+  ).join('') + '<button class="go" id="sc">Сохранить</button>';
+
+  const mains = chems.filter(c => c.kind === 'main');
+  $('#wt').innerHTML = wts.map(x => `<details class="box" data-w="${x.id}"><summary><b>${esc(x.name)}</b> <small>${x.minutes ?? '–'} мин</small></summary>
+    <label>Название<input data-wf="name" value="${esc(x.name)}"></label>
+    <label>Минуты<input data-wf="minutes" type="number" min="0" value="${x.minutes ?? ''}"></label>
+    <h2>Химия, мл на литр воды</h2>
+    ${mains.map(c => { const r = rec.find(y => y.wash_type_id === x.id && y.chemical_id === c.id);
+      return `<label>${esc(c.name)}<input type="number" min="0" step="0.5" data-r="${c.id}" value="${r ? r.ml_per_l : 0}"></label>`; }).join('')}
+    <button class="go" data-act="sw">Сохранить</button></details>`).join('');
+
+  $('#fm').innerHTML = (fm || []).map(x => `<div class="box" data-fid="${x.id}"><b>${esc(x.name)}</b> <small>${esc(x.slug)}${x.archived ? ' · в архиве' : ''}</small>
+    <div class="row"><button class="mini" data-act="fr">Переименовать</button><button class="mini" data-act="fz">${x.archived ? 'Вернуть' : 'В архив'}</button></div></div>`).join('');
+}
+
+$('#sg').onclick = async () => {
+  const rows = [...document.querySelectorAll('#gen [data-k]')].filter(i => i.value !== '').map(i => ({ key: i.dataset.k, value: +i.value }));
+  done((await sb.from('settings').upsert(rows)).error);
+};
+
+$('#chem').onclick = async e => {
+  if (e.target.id !== 'sc') return;
+  let err = null;
+  for (const i of document.querySelectorAll('#chem [data-c]')) {
+    const { error } = await sb.from('chemicals').update({ [i.dataset.f]: num(i.value) }).eq('id', i.dataset.c);
+    err = err || error;
+  }
+  done(err);
+};
+
+$('#wt').onclick = async e => {
+  const b = e.target.closest('[data-act="sw"]'); if (!b) return;
+  const d = b.closest('[data-w]'), id = +d.dataset.w;
+  const name = d.querySelector('[data-wf="name"]').value.trim();
+  if (!name) { toast('Укажите название'); return; }
+  let { error } = await sb.from('wash_types').update({ name, minutes: num(d.querySelector('[data-wf="minutes"]').value) }).eq('id', id);
+  if (!error) ({ error } = await sb.from('recipes').upsert([...d.querySelectorAll('[data-r]')].map(i => ({ wash_type_id: id, chemical_id: +i.dataset.r, ml_per_l: +i.value || 0 }))));
+  if (done(error)) load();
+};
+
+$('#wa').onclick = async () => {
+  const name = $('#wn').value.trim(); if (!name) { toast('Укажите название'); return; }
+  const { data, error } = await sb.from('wash_types').insert({ name, minutes: num($('#wm').value), sort: Math.max(0, ...wts.map(x => x.sort || 0)) + 1 }).select('id').single();
+  if (error) { done(error); return; }
+  await sb.from('recipes').insert(chems.filter(c => c.kind === 'main').map(c => ({ wash_type_id: data.id, chemical_id: c.id, ml_per_l: 0 })));
+  $('#wn').value = $('#wm').value = ''; toast('Добавлено, задайте рецепт'); load();
+};
+
+$('#fm').onclick = async e => {
+  const b = e.target.closest('button'); if (!b) return;
+  const id = b.closest('[data-fid]').dataset.fid;
+  if (b.dataset.act === 'fr') {
+    const name = prompt('Новое название'); if (!name || !name.trim()) return;
+    if (done((await sb.from('forms').update({ name: name.trim() }).eq('id', id)).error)) load();
+  } else if (b.dataset.act === 'fz') {
+    const { data: f } = await sb.from('forms').select('archived').eq('id', id).single();
+    if (done((await sb.from('forms').update({ archived: !f.archived }).eq('id', id)).error)) load();
+  }
+};
+
+$('#fa').onclick = async () => {
+  const name = $('#fn').value.trim(), slug = $('#fs').value.trim().toLowerCase();
+  if (!name || !/^[a-z0-9-]+$/.test(slug)) { toast('Нужны название и адрес из латиницы, цифр и дефиса'); return; }
+  const { error } = await sb.from('forms').insert({ name, slug, type: $('#ft').value });
+  if (done(error)) { $('#fn').value = $('#fs').value = ''; load(); }
+};
+
+(async () => {
+  const s = await need(); if (!s) return;
+  const { data: pr } = await sb.from('profiles').select('role').eq('id', s.user.id).maybeSingle();
+  if (!pr || pr.role !== 'superadmin') { location.replace('index.html'); return; }
+  load();
+})();
+</script></body></html>

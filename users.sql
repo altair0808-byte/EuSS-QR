@@ -9,3 +9,7 @@ create table if not exists people(
 alter table people enable row level security;
 create policy pe_sel on people for select to authenticated using (is_super());
 insert into people(id, email) select id, email from auth.users on conflict do nothing;
+
+-- Суперадмин может менять имена сотрудников на странице «Пользователи»:
+drop policy if exists pe_upd on people;
+create policy pe_upd on people for update to authenticated using (is_super()) with check (is_super());

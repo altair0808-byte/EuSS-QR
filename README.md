@@ -1,6 +1,6 @@
 # Прачечная: QR-формы
 
-Файлы лежат в корне: `index.html`, `form.html`, `qr.html`, `app.js`, `config.js`, `style.css`, `supabase.sql`.
+Файлы лежат в корне: `index.html`, `form.html`, `qr.html`, `app.js`, `config.js`, `style.css`, `supabase.sql`, `users.sql`, `admin.html`, `settings.html`, `admin-users.ts`.
 Дашборды, итоги и Excel подключаются следующим этапом.
 
 ## Запуск
@@ -25,7 +25,7 @@ insert into form_access select id, (select id from forms where slug='laundry-che
 -- админ бланка
 insert into form_access select id, (select id from forms where slug='laundry-load'), 'admin' from auth.users where email = 'admin@mail.com';
 ```
-6. **Объёмы бутылей** (литры): `update chemicals set bottle_l = 20 where name = 'ALKALINE';`
-7. **Часовой пояс**: `update settings set value = 5 where key = 'tz_offset';` (часы от UTC).
+6. **Настройки**: объёмы бутылей, часовой пояс, начало смены, виды стирки с рецептами и бланки суперадмин меняет на странице **Настройки** (карточка на главной). Через SQL это делать не нужно.
+7. **Суперадмин** на странице **Пользователи** может менять имя и пароль себе и сотрудникам. Для смены имён выполните обновлённый `users.sql` (добавлена политика `pe_upd`) и заново разверните `admin-users.ts`.
 8. **GitHub и Render**: загрузите файлы в репозиторий, на Render создайте Static Site, Build Command пустой, Publish Directory `.`
 9. **QR**: войдите как суперадмин, на главной нажмите QR у бланка и распечатайте.

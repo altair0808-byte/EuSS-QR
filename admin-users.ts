@@ -20,8 +20,9 @@ Deno.serve(async (req) => {
     const { data, error } = await admin.auth.admin.createUser({ email: b.email, password: b.password, email_confirm: true });
     if (error) return out({ error: error.message }, 400);
     const id = data.user.id;
-    await admin.from('people').insert({ id, email: b.email, full_name: b.full_name || null });
-    if (b.access?.length) await admin.from('form_access').insert(b.access.map((a: any) => ({ user_id: id, form_id: a.form_id, role: a.role })));
+    const r1 = await admin.from('people').insert({ id, email: b.email, full_name: b.full_name || null });
+    const r2 = b.access?.length ? await admin.from('form_access').insert(b.access.map((a: any) => ({ user_id: id, form_id: a.form_id, role: a.role }))) : { error: null };
+    if (r1.error || r2.error) { await admin.auth.admin.deleteUser(id); return out({ error: (r1.error || r2.error)!.message }, 400); }
     return out({ id });
   }
   if (b.action === 'password') {

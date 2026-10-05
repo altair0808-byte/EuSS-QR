@@ -2,7 +2,7 @@
 <html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Пользователи</title><link rel="stylesheet" href="style.css"></head>
 <body><main class="wide">
-<header><h1>Пользователи</h1><a class="ghost" href="index.html">Бланки</a></header>
+<header><h1>Пользователи</h1><span><a class="ghost" href="settings.html">Настройки</a><a class="ghost" href="index.html">Бланки</a></span></header>
 <div class="box">
   <b>Новый сотрудник</b>
   <label>Имя<input id="nm" placeholder="Фамилия Имя" autocomplete="off"></label>
@@ -39,10 +39,10 @@ async function load() {
   $('#fa').innerHTML = forms.map(x => `<div class="acc"><span>${x.name}</span><select data-f="${x.id}">${opts('')}</select></div>`).join('');
   $('#list').innerHTML = (ppl || []).map(p => {
     const isS = (sup || []).some(s => s.id === p.id);
-    return `<div class="box" data-u="${p.id}"><b>${p.full_name || p.email}</b> <small>${p.full_name ? p.email : ''}</small>` + (isS ? ' <small>(суперадмин)</small></div>' :
+    return `<div class="box" data-u="${p.id}"><b>${p.full_name || p.email}</b> <small>${p.full_name ? p.email : ''}</small>` + (isS ? ' <small>(суперадмин)</small><div class="row"><button class="mini" data-act="nm">Имя</button><button class="mini" data-act="pw">Новый пароль</button></div></div>' :
       forms.map(x => { const a = (acc || []).find(r => r.user_id === p.id && r.form_id === x.id);
         return `<div class="acc"><span>${x.name}</span><select data-f="${x.id}">${opts(a ? a.role : '')}</select></div>`; }).join('') +
-      `<div class="row"><button class="mini" data-act="pw">Новый пароль</button><button class="mini" data-act="del">Удалить</button></div></div>`);
+      `<div class="row"><button class="mini" data-act="nm">Имя</button><button class="mini" data-act="pw">Новый пароль</button><button class="mini" data-act="del">Удалить</button></div></div>`);
   }).join('');
 }
 
@@ -73,7 +73,11 @@ $('#list').onchange = async e => {
 $('#list').onclick = async e => {
   const b = e.target.closest('button'); if (!b) return;
   const u = b.closest('[data-u]').dataset.u;
-  if (b.dataset.act === 'pw') {
+  if (b.dataset.act === 'nm') {
+    const name = prompt('Фамилия Имя'); if (name === null) return;
+    const { error } = await sb.from('people').update({ full_name: name.trim() || null }).eq('id', u);
+    toast(error ? 'Не сохранено' : 'Сохранено'); load();
+  } else if (b.dataset.act === 'pw') {
     const password = prompt('Новый пароль (от 6 символов)'); if (!password) return;
     if (await call({ action: 'password', id: u, password })) toast('Пароль изменён');
   } else if (b.dataset.act === 'del' && confirm('Удалить пользователя?')) {
