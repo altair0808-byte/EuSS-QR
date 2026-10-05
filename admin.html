@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Пользователи</title><link rel="stylesheet" href="style.css"></head>
+<body><main class="wide">
+<header><h1>Пользователи</h1><a class="ghost" href="index.html">Бланки</a></header>
+<div class="box">
+  <b>Новый сотрудник</b>
+  <label>Имя<input id="nm" placeholder="Фамилия Имя" autocomplete="off"></label>
+  <label>Почта (логин)<input id="em" type="email" autocomplete="off"></label>
+  <label>Пароль<input id="pw" autocomplete="off"></label>
+  <button class="ghost" id="gen" type="button">Придумать пароль</button>
+  <h2>Доступ к бланкам</h2><div id="fa"></div>
+  <button class="go" id="mk">Создать сотрудника</button>
+</div>
+<div id="made" class="box" hidden></div>
+<h2>Все пользователи</h2><div id="list"></div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script><script src="app.js"></script>
+<script>
+const R = { '': 'Нет доступа', worker: 'Сотрудник', foreman: 'Бригадир', admin: 'Админ' };
+const opts = v => Object.entries(R).map(([k, t]) => `<option value="${k}"${k === v ? ' selected' : ''}>${t}</option>`).join('');
+let forms = [];
+
+async function call(b) {
+  const { data, error } = await sb.functions.invoke('admin-users', { body: b });
+  if (error) { let m = error.message; try { m = (await error.context.json()).error || m; } catch (e) {} toast('Не выполнено: ' + m); return null; }
+  return data;
+}
+
+async function load() {
+  const [{ data: f }, { data: ppl }, { data: acc }, { data: sup }] = await Promise.all([
+    sb.from('forms').select('id,name').eq('archived', false).order('sort_order'),
+    sb.from('people').select('*').order('created_at'),
+    sb.from('form_access').select('*'),
+    sb.from('profiles').select('id').eq('role', 'superadmin')
+  ]);
+  forms = f || [];
+  $('#fa').innerHTML = forms.map(x => `<div class="acc"><span>${x.name}</span><select data-f="${x.id}">${opts('')}</select></div>`).join('');
+  $('#list').innerHTML = (ppl || []).map(p => {
+    const isS = (sup || []).some(s => s.id === p.id);
+    return `<div class="box" data-u="${p.id}"><b>${p.full_name || p.email}</b> <small>${p.full_name ? p.email : ''}</small>` + (isS ? ' <small>(суперадмин)</small></div>' :
+      forms.map(x => { const a = (acc || []).find(r => r.user_id === p.id && r.form_id === x.id);
+        return `<div class="acc"><span>${x.name}</span><select data-f="${x.id}">${opts(a ? a.role : '')}</select></div>`; }).join('') +
+      `<div class="row"><button class="mini" data-act="pw">Новый пароль</button><button class="mini" data-act="del">Удалить</button></div></div>`);
+  }).join('');
+}
+
+$('#gen').onclick = () => {
+  const c = 'abcdefghjkmnpqrstuvwxyz23456789', a = crypto.getRandomValues(new Uint8Array(9));
+  $('#pw').value = [...a].map(x => c[x % c.length]).join('');
+};
+
+$('#mk').onclick = async () => {
+  const access = [...document.querySelectorAll('#fa select')].filter(s => s.value).map(s => ({ form_id: s.dataset.f, role: s.value }));
+  const b = { action: 'create', email: $('#em').value.trim(), password: $('#pw').value, full_name: $('#nm').value.trim(), access };
+  if (!await call(b)) return;
+  $('#made').hidden = false;
+  $('#made').innerHTML = `Создан: <b>${b.full_name || b.email}</b><br>Почта: <code>${b.email}</code><br>Пароль: <code>${b.password}</code><br><small>Передайте сотруднику. Пароль больше нигде не показывается.</small>`;
+  ['nm', 'em', 'pw'].forEach(i => $('#' + i).value = '');
+  load();
+};
+
+$('#list').onchange = async e => {
+  const s = e.target.closest('select'); if (!s) return;
+  const u = s.closest('[data-u]').dataset.u;
+  const { error } = s.value
+    ? await sb.from('form_access').upsert({ user_id: u, form_id: s.dataset.f, role: s.value })
+    : await sb.from('form_access').delete().eq('user_id', u).eq('form_id', s.dataset.f);
+  toast(error ? 'Не сохранено' : 'Сохранено');
+};
+
+$('#list').onclick = async e => {
+  const b = e.target.closest('button'); if (!b) return;
+  const u = b.closest('[data-u]').dataset.u;
+  if (b.dataset.act === 'pw') {
+    const password = prompt('Новый пароль (от 6 символов)'); if (!password) return;
+    if (await call({ action: 'password', id: u, password })) toast('Пароль изменён');
+  } else if (b.dataset.act === 'del' && confirm('Удалить пользователя?')) {
+    if (await call({ action: 'remove', id: u })) { toast('Удалён'); load(); }
+  }
+};
+
+(async () => {
+  const s = await need(); if (!s) return;
+  const { data: pr } = await sb.from('profiles').select('role').eq('id', s.user.id).maybeSingle();
+  if (!pr || pr.role !== 'superadmin') { location.replace('index.html'); return; }
+  load();
+})();
+</script></body></html>

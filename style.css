@@ -42,3 +42,11 @@ label input{margin-top:4px}
 [hidden]{display:none!important}
 @media print{.go,.ghost{display:none}body{background:#fff;color:#000}}
 @media(prefers-reduced-motion:reduce){#toast{transition:none}}
+main.wide{max-width:720px}
+select{width:100%;padding:12px;border:1px solid var(--ln);border-radius:10px;background:var(--card);color:var(--ink);font:inherit}
+.box{background:var(--card);border:1px solid var(--ln);border-radius:14px;padding:16px;margin-top:12px}
+.acc{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:center;margin-top:8px}
+.acc span{color:var(--mut);font-size:.95rem}
+.mini{min-height:44px;padding:8px 12px;font-size:.9rem}
+.row{display:flex;gap:8px;margin-top:12px}.row button{flex:1}
+code{background:var(--tint);padding:2px 6px;border-radius:6px}
