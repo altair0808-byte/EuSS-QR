@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Бланк</title><link rel="stylesheet" href="style.css"></head>
+<body><main id="app"></main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script><script src="app.js"></script>
+<script>
+(async () => {
+  if (!await need()) return;
+  const app = $('#app');
+  const { data: f } = await sb.from('forms').select('*').eq('slug', q.get('f')).maybeSingle();
+  if (!f) { app.innerHTML = '<h1>Бланк недоступен</h1><a href="index.html">К списку бланков</a>'; return; }
+  document.title = f.name;
+  const head = `<header><h1>${f.name}</h1><a class="ghost" href="index.html">Бланки</a></header>`;
+
+  async function laundryLoad() {
+    const [{ data: wt }, { data: ex }] = await Promise.all([
+      sb.from('wash_types').select('id,name').order('sort'),
+      sb.from('chemicals').select('id,name').eq('kind', 'extra').order('sort')
+    ]);
+    const mb = a => a.map(n => `<button data-v="${n}">${n}</button>`).join('');
+    app.innerHTML = head + `
+      <h2>Машина</h2>
+      <div id="mg"><div class="sub">Основные</div><div class="grid">${mb([1,2,3,4,5,6,7,8,9,10])}</div>
+      <div class="sub">Дополнительные</div><div class="grid">${mb([11,12])}</div></div>
+      <h2>Вид стирки</h2><div class="list" id="wg">${wt.map(x => `<button data-v="${x.id}">${x.name}</button>`).join('')}</div>
+      <h2>Вес, кг</h2><div class="kg"><button id="mi">−</button><input id="kg" type="number" value="25" step="0.5" inputmode="decimal"><button id="pl">+</button></div>
+      <details><summary>Дополнительно</summary>${ex.map(x => `<label>${x.name}<input type="number" min="0" step="1" inputmode="numeric" data-x="${x.id}"></label>`).join('')}</details>
+      <button class="go" id="save" disabled>Сохранить</button>
+      <button class="ghost" id="undo" hidden>Отменить последнюю запись</button>`;
+    let m = null, w = null; const show = undoBtn('loads');
+    const chk = () => $('#save').disabled = !(m && w);
+    pick('#mg', v => { m = v; chk(); }); pick('#wg', v => { w = v; chk(); });
+    $('#mi').onclick = () => $('#kg').value = Math.max(0, (+$('#kg').value || 0) - 1);
+    $('#pl').onclick = () => $('#kg').value = (+$('#kg').value || 0) + 1;
+    $('#save').onclick = async () => {
+      const extras = {};
+      app.querySelectorAll('[data-x]').forEach(i => { if (+i.value > 0) extras[i.dataset.x] = +i.value; });
+      const { data, error } = await sb.from('loads').insert({ form_id: f.id, machine: +m, wash_type_id: +w, weight_kg: +$('#kg').value || 25, extras }).select('id').single();
+      if (error) { toast('Не сохранено, нажмите ещё раз'); return; }
+      show(data.id); toast('Сохранено');
+      m = w = null; unpick('#mg'); unpick('#wg'); $('#kg').value = 25;
+      app.querySelectorAll('[data-x]').forEach(i => i.value = ''); chk();
+    };
+  }
+
+  async function laundryChem() {
+    const { data: ch } = await sb.from('chemicals').select('id,name').order('sort');
+    app.innerHTML = head + `
+      <h2>Какая химия закончилась</h2><div class="list" id="cg">${ch.map(x => `<button data-v="${x.id}">${x.name}</button>`).join('')}</div>
+      <label>Остаток на дне, л (необязательно)<input id="lf" type="number" min="0" step="0.1" inputmode="decimal"></label>
+      <button class="go" id="save" disabled>Бутыль заменена</button>
+      <button class="ghost" id="undo" hidden>Отменить последнюю запись</button>`;
+    let c = null; const show = undoBtn('chem_changes');
+    pick('#cg', v => { c = v; $('#save').disabled = false; });
+    $('#save').onclick = async () => {
+      const lf = $('#lf').value;
+      const { data, error } = await sb.from('chem_changes').insert({ form_id: f.id, chemical_id: +c, leftover_l: lf === '' ? null : +lf }).select('id').single();
+      if (error) { toast('Не сохранено, нажмите ещё раз'); return; }
+      show(data.id); toast('Записано');
+      c = null; unpick('#cg'); $('#lf').value = ''; $('#save').disabled = true;
+    };
+  }
+
+  ({ laundry_load: laundryLoad, laundry_chem: laundryChem }[f.type] || (() => app.innerHTML = head + '<p>Этот тип бланка пока не подключён.</p>'))();
+})();
+</script></body></html>

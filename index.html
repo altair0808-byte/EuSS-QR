@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Бланки</title><link rel="stylesheet" href="style.css"></head>
+<body><main>
+<section id="login" hidden>
+  <h1>Вход для сотрудников</h1>
+  <input id="em" type="email" placeholder="Почта" autocomplete="username">
+  <input id="pw" type="password" placeholder="Пароль" autocomplete="current-password">
+  <button class="go" id="in">Войти</button>
+  <p id="err" class="err"></p>
+</section>
+<section id="hub" hidden>
+  <header><h1>Бланки</h1><button class="ghost" id="out">Выйти</button></header>
+  <div id="cards" class="cards"></div>
+</section>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script><script src="app.js"></script>
+<script>
+const safe = n => /^[\w-]+\.html(\?[\w=&%.-]*)?$/.test(n || '') ? n : 'index.html';
+$('#in').onclick = async () => {
+  const { error } = await sb.auth.signInWithPassword({ email: $('#em').value.trim(), password: $('#pw').value });
+  if (error) $('#err').textContent = 'Неверная почта или пароль'; else location.href = safe(q.get('next'));
+};
+$('#out').onclick = async () => { await sb.auth.signOut(); location.href = 'index.html'; };
+(async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { $('#login').hidden = false; return; }
+  if (q.get('next')) { location.replace(safe(q.get('next'))); return; }
+  const [{ data: forms }, { data: acc }, { data: pr }] = await Promise.all([
+    sb.from('forms').select('slug,name').eq('archived', false).order('sort_order'),
+    sb.from('form_access').select('form_id,role').eq('user_id', session.user.id),
+    sb.from('profiles').select('role').eq('id', session.user.id).maybeSingle()
+  ]);
+  const sup = pr && pr.role === 'superadmin';
+  const adm = (acc || []).some(a => a.role === 'admin');
+  if (!sup && !adm && forms && forms.length === 1) { location.replace('form.html?f=' + forms[0].slug); return; }
+  $('#cards').innerHTML = (forms || []).map(f =>
+    `<div class="card"><span class="nm">${f.name}</span><span>${sup || adm ? `<a href="qr.html?f=${f.slug}">QR</a> &nbsp; ` : ''}<a href="form.html?f=${f.slug}">Открыть</a></span></div>`
+  ).join('') || '<p>Нет доступных бланков. Обратитесь к администратору.</p>';
+  $('#hub').hidden = false;
+})();
+</script></body></html>
