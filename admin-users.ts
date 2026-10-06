@@ -20,7 +20,7 @@ Deno.serve(async (req) => {
   if (b.action === 'create') {
     const login = String(b.login || '').trim().toLowerCase();
     if (login.length < 4 || login.length > 32 || !/^[a-z0-9._-]+$/.test(login)) return out({ error: 'Логин: от 4 до 32 символов, латинские буквы, цифры и . _ -' }, 400);
-    if ((b.password || '').length < 4) return out({ error: 'Пароль: не меньше 4 символов' }, 400);
+    if ((b.password || '').length < 6) return out({ error: 'Пароль: не меньше 6 символов' }, 400);
     const email = login + '@' + LOGIN_DOMAIN;
     const { data, error } = await admin.auth.admin.createUser({ email, password: b.password, email_confirm: true });
     if (error) return out({ error: /already|registered|exists/i.test(error.message) ? 'Такой логин уже занят' : error.message }, 400);
@@ -31,7 +31,7 @@ Deno.serve(async (req) => {
     return out({ id });
   }
   if (b.action === 'password') {
-    if ((b.password || '').length < 4) return out({ error: 'Пароль: не меньше 4 символов' }, 400);
+    if ((b.password || '').length < 6) return out({ error: 'Пароль: не меньше 6 символов' }, 400);
     const { error } = await admin.auth.admin.updateUserById(b.id, { password: b.password });
     return error ? out({ error: error.message }, 400) : out({ ok: true });
   }
