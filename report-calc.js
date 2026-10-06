@@ -90,7 +90,12 @@ function calcReport(loads, changes, refs, connects, ctx) {
     const d = dens(c); if (!d) return null;
     return from === 'l' ? v*d : v/d;
   };
-  const both = (c,v,u) => ({ l:conv(c,v,u,'l'), kg:conv(c,v,u,'kg') });
+  // значение сразу в литрах, кг и штуках (штука = одна бутыль из настроек); штуки только для основной химии
+  const both = (c,v,u) => {
+    const l = conv(c,v,u,'l'), kg = conv(c,v,u,'kg');
+    const pc = c.kind === 'extra' ? null : (l != null && +c.bottle_l > 0 ? l / +c.bottle_l : kg != null && +c.bottle_kg > 0 ? kg / +c.bottle_kg : null);
+    return { l, kg, pc };
+  };
 
   function chemRows(groupKey) {
     return chemicals.map(c => {

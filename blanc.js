@@ -358,7 +358,7 @@ const Blank = (() => {
       Object.values(days).forEach(m => { models[m.date] = m; });
       (changes || []).concat(connects || []).forEach(x => { if (x.shift_date && !models[x.shift_date]) models[x.shift_date] = build([], refs, x.shift_date); });
       const dateList = Object.keys(models).sort();
-      xml = setCell(xml, 'E1', 'Теория'); xml = setCell(xml, 'F1', 'Факт'); xml = setCell(xml, 'G1', 'Разница'); xml = setCell(xml, 'K1', 'Ед.');
+      xml = setCell(xml, 'E1', 'Теория'); xml = setCell(xml, 'F1', 'Факт'); xml = setCell(xml, 'G1', 'Разница'); xml = setCell(xml, 'K1', 'Ед.'); ['Теория, шт','Факт, шт','Теория, л','Факт, л','Теория, кг','Факт, кг'].forEach((t, i) => { xml = setCell(xml, LET(12 + i) + '1', t); });
       let row = 2;
       const density = c => (+c.bottle_l > 0 && +c.bottle_kg > 0) ? (+c.bottle_kg / +c.bottle_l) : null;
       const toL = (c, v, unit) => unit === 'l' ? v : (density(c) ? v / density(c) : null);
@@ -388,7 +388,17 @@ const Blank = (() => {
             const diff = prim && theoryOut ? r6(actualOut-theoryOut) : '';
             const pct = prim && theoryOut ? r6((actualOut-theoryOut)/theoryOut*100) : '';
             xml=setCell(xml,'A'+row,serial(date)); xml=setCell(xml,'B'+row,group); xml=setCell(xml,'C'+row,c.name); xml=setCell(xml,'D'+row,c.kind==='main'?'основная':'дополнительная');
-            xml=setCell(xml,'E'+row,theoryOut); xml=setCell(xml,'F'+row,actualOut); xml=setCell(xml,'G'+row,diff); xml=setCell(xml,'H'+row,pct); xml=setCell(xml,'I'+row,mine.length||''); xml=setCell(xml,'J'+row,noLeft||''); xml=setCell(xml,'K'+row,(prim||theoryUnit)==='l'?'л':'кг'); row++;
+            xml=setCell(xml,'E'+row,theoryOut); xml=setCell(xml,'F'+row,actualOut); xml=setCell(xml,'G'+row,diff); xml=setCell(xml,'H'+row,pct); xml=setCell(xml,'I'+row,mine.length||''); xml=setCell(xml,'J'+row,noLeft||''); xml=setCell(xml,'K'+row,(prim||theoryUnit)==='l'?'л':'кг');
+            // те же значения сразу в штуках, литрах и кг (пересчёт по размеру бутыли из настроек)
+            const trio = (v, u) => {
+              if (v === '' || v == null) return ['', '', ''];
+              const d = density(c), size1 = prim === 'l' ? +c.bottle_l : prim === 'kg' ? +c.bottle_kg : 0;
+              const l = u === 'l' ? v : (d ? v / d : ''), kg = u === 'kg' ? v : (d ? v * d : '');
+              return [prim && size1 > 0 ? r6(v / size1) : '', l === '' ? '' : r6(l), kg === '' ? '' : r6(kg)];
+            };
+            const tu = prim || theoryUnit, tt = trio(theoryOut, tu), aa = prim ? trio(actualOut, tu) : ['', '', ''];
+            [tt[0], aa[0], tt[1], aa[1], tt[2], aa[2]].forEach((v, i) => { xml = setCell(xml, LET(12 + i) + row, v); });
+            row++;
           }
         }
       }
