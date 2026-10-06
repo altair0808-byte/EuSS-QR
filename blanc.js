@@ -197,6 +197,7 @@ const Blank = (() => {
 
   // Формулы листа дня: минуты и расход на литр берутся из настроек сайта
   function syncFormulas(xml, S) {
+    xml = setFormula(xml, 'C40', 'C5+C10+C15+C20+C25+C30+C35');           // в шаблоне пропущен C25 (синтетика), итог «Количество» занижался
     for (let t = 0; t < 7; t++) {
       const r = 5 + t * SLOTS, w = S.wt[t];
       if (w) {
@@ -206,6 +207,16 @@ const Blank = (() => {
       S.extras.forEach((c, i) => { xml = setFormula(xml, LET(36 + i * 2) + r, `${LET(35 + i * 2)}${r}*${+c.per_unit || 0}`); });   // AJ, AL, AN
     }
     return xml;
+  }
+
+  // Сбрасывает случайные числа в ячейках веса (J5:AG39), если они не формулы. Шаблон мог сохраниться с тестовыми данными.
+  function clearWeights(xml) {
+    return xml.replace(/<c r="([A-Z]+)(\d+)"([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g, (all, col, row, attrs, body) => {
+      const c = colNum(col), r = +row;
+      if (c < 10 || c > 33 || r < 5 || r > 39 || (body && /<f\b/.test(body))) return all;
+      if (!body || !/<v>[^<]+<\/v>|<is>/.test(body)) return all;
+      return '<c r="' + col + row + '"' + attrs.replace(/\s+t="[^"]*"/, '') + '/>';
+    });
   }
 
   function fillDay(xml, m) {
@@ -240,7 +251,10 @@ const Blank = (() => {
       xml = setCell(xml, 'C' + row, m ? serial(m.date) : '');
       vals.forEach((v, i) => { xml = setCell(xml, LET(4 + i) + row, v > 0 ? v : ''); sum[i] += v > 0 ? v : 0; });
     }
-    sum.forEach((v, i) => { xml = setCell(xml, LET(4 + i) + 41, v); });
+    sum.forEach((v, i) => {
+      xml = setCell(xml, LET(4 + i) + 41, v);
+      xml = setFormula(xml, LET(4 + i) + 41, `SUM(${LET(4 + i)}10:${LET(4 + i)}40)`);   // в шаблоне было 11:40, 1-е число не попадало в итог
+    });
     return xml;
   }
 
@@ -261,7 +275,7 @@ const Blank = (() => {
     }
     for (let n = 1; n <= 31; n++) {
       const p = path[String(n)]; if (!p) throw new Error('В шаблоне нет листа ' + n);
-      let xml = syncFormulas(await zip.file(p).async('string'), S);
+      let xml = clearWeights(syncFormulas(await zip.file(p).async('string'), S));
       if (days[n]) xml = fillDay(xml, days[n]);
       zip.file(p, xml);
     }

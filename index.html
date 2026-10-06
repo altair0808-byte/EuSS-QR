@@ -130,12 +130,12 @@ const nextUrl=()=>{const n=q.get('next')||'';return /^[a-z0-9_-]+\.html(\?[^#]*)
 function loginView(){
   clearInterval(timer);
   app.innerHTML=`<div class="lw"><div class="box"><img src="euss-logo.png" alt="EuSS"><h1>Вход</h1>
-  <form id="lf"><label>Почта<input id="em" type="email" autocomplete="username" required></label>
+  <form id="lf"><label>Логин<input id="em" type="text" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required></label>
   <label>Пароль<input id="pw" type="password" autocomplete="current-password" required></label>
   <p class="err" id="er" role="alert"></p><button class="btn p" id="go" type="submit">Войти</button></form></div></div>`;
   $('#lf').onsubmit=async e=>{e.preventDefault();const b=$('#go');b.disabled=true;$('#er').textContent='';
-    const{error}=await sb.auth.signInWithPassword({email:$('#em').value.trim(),password:$('#pw').value});
-    if(error){$('#er').textContent=/invalid/i.test(error.message)?'Неверная почта или пароль':error.message;b.disabled=false;return;}
+    const{error}=await sb.auth.signInWithPassword({email:loginToEmail($('#em').value),password:$('#pw').value});
+    if(error){$('#er').textContent=/invalid/i.test(error.message)?'Неверный логин или пароль':error.message;b.disabled=false;return;}
     const n=nextUrl();if(n){location.href=n;return;}start();};
 }
 
@@ -212,7 +212,7 @@ function feedBlock(){
 }
 
 function dashView(){
-  const ms=machines(),em=S.session.user.email||'',ini=em.slice(0,2).toUpperCase();
+  const ms=machines(),em=showLogin(S.session.user.email),ini=em.slice(0,2).toUpperCase();
   const loc=new Date(Date.now()+S.tz*3600e3),first=S.forms.find(f=>f.type==='laundry_load'&&canFill(f)),firstChem=S.forms.find(f=>f.type==='laundry_chem'&&canFill(f));
   const hh=n=>String(n).padStart(2,'0'),acts=[];
   S.forms.filter(canFill).forEach(f=>acts.push([f.type==='laundry_chem'?'⚗':'▤',f.name,f.type==='laundry_chem'?'Замена химии':'Загрузка белья','form.html?f='+encodeURIComponent(f.slug),f.type==='laundry_chem'?'ch':'']));

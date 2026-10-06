@@ -2,6 +2,16 @@ const sb = supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY);
 const $ = s => document.querySelector(s);
 const q = new URLSearchParams(location.search);
 
+// ---- вход по логину ----
+const LOGIN_MIN = 4, LOGIN_RE = /^[a-z0-9._-]+$/;
+const normLogin = v => String(v || '').trim().toLowerCase();
+// «ivan» -> «ivan@euss.local»; если введена полная почта (старый суперадмин), она остаётся как есть
+const loginToEmail = v => { v = normLogin(v); return v.includes('@') ? v : v + '@' + CFG.LOGIN_DOMAIN; };
+// для показа: «ivan@euss.local» -> «ivan», настоящую почту не трогаем
+const showLogin = e => { e = String(e || ''); const sfx = '@' + CFG.LOGIN_DOMAIN; return e.toLowerCase().endsWith(sfx) ? e.slice(0, -sfx.length) : e; };
+// текст ошибки или '' если логин подходит
+const loginError = v => { v = normLogin(v); if (v.length < LOGIN_MIN) return 'Логин: не меньше ' + LOGIN_MIN + ' символов'; if (v.length > 32) return 'Логин: не больше 32 символов'; if (!LOGIN_RE.test(v)) return 'Логин: только латинские буквы, цифры и символы . _ -'; return ''; };
+
 async function need() {
   const { data: { session } } = await sb.auth.getSession();
   if (!session) {

@@ -8,8 +8,8 @@
 <div class="box">
   <h2>Новый сотрудник</h2>
   <label>Имя<input id="nm" placeholder="Фамилия Имя" autocomplete="off"></label>
-  <label>Почта (логин)<input id="em" type="email" autocomplete="off"></label>
-  <label>Пароль<input id="pw" autocomplete="off"></label>
+  <label>Логин <small>(от 4 символов: латиница, цифры, . _ -)</small><input id="em" type="text" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false"></label>
+  <label>Пароль <small>(от 4 символов)</small><input id="pw" autocomplete="off"></label>
   <button class="mini" id="gen" type="button" style="margin-top:.5rem">Придумать пароль</button>
   <h3>Доступ к бланкам</h3><div id="fa"></div>
   <button class="go" id="mk">Создать сотрудника</button>
@@ -20,6 +20,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script><script src="app.js"></script>
 <script>
+const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const R = { '': 'Нет доступа', worker: 'Сотрудник', foreman: 'Бригадир', admin: 'Админ' };
 const opts = v => Object.entries(R).map(([k, t]) => `<option value="${k}"${k === v ? ' selected' : ''}>${t}</option>`).join('');
 let forms = [];
@@ -41,7 +42,7 @@ async function load() {
   $('#fa').innerHTML = forms.map(x => `<div class="acc"><span>${x.name}</span><select data-f="${x.id}">${opts('')}</select></div>`).join('');
   $('#list').innerHTML = (ppl || []).map(p => {
     const isS = (sup || []).some(s => s.id === p.id);
-    return `<div class="box" data-u="${p.id}"><b>${p.full_name || p.email}</b> <small>${p.full_name ? p.email : ''}</small>` + (isS ? ' <small>(суперадмин)</small><div class="row"><button class="mini" data-act="nm">Имя</button><button class="mini" data-act="pw">Новый пароль</button></div></div>' :
+    return `<div class="box" data-u="${p.id}"><b>${p.full_name || showLogin(p.email)}</b> <small>${p.full_name ? 'логин: ' + showLogin(p.email) : ''}</small>` + (isS ? ' <small>(суперадмин)</small><div class="row"><button class="mini" data-act="nm">Имя</button><button class="mini" data-act="pw">Новый пароль</button></div></div>' :
       forms.map(x => { const a = (acc || []).find(r => r.user_id === p.id && r.form_id === x.id);
         return `<div class="acc"><span>${x.name}</span><select data-f="${x.id}">${opts(a ? a.role : '')}</select></div>`; }).join('') +
       `<div class="row"><button class="mini" data-act="nm">Имя</button><button class="mini" data-act="pw">Новый пароль</button><button class="mini danger" data-act="del">Удалить</button></div></div>`);
@@ -49,16 +50,18 @@ async function load() {
 }
 
 $('#gen').onclick = () => {
-  const c = 'abcdefghjkmnpqrstuvwxyz23456789', a = crypto.getRandomValues(new Uint8Array(9));
+  const c = 'abcdefghjkmnpqrstuvwxyz23456789', a = crypto.getRandomValues(new Uint8Array(8));
   $('#pw').value = [...a].map(x => c[x % c.length]).join('');
 };
 
 $('#mk').onclick = async () => {
   const access = [...document.querySelectorAll('#fa select')].filter(s => s.value).map(s => ({ form_id: s.dataset.f, role: s.value }));
-  const b = { action: 'create', email: $('#em').value.trim(), password: $('#pw').value, full_name: $('#nm').value.trim(), access };
+  const le = loginError($('#em').value); if (le) { toast(le); return; }
+  if ($('#pw').value.length < 4) { toast('Пароль: не меньше 4 символов'); return; }
+  const b = { action: 'create', login: normLogin($('#em').value), password: $('#pw').value, full_name: $('#nm').value.trim(), access };
   if (!await call(b)) return;
   $('#made').hidden = false;
-  $('#made').innerHTML = `Создан: <b>${b.full_name || b.email}</b><br>Почта: <code>${b.email}</code><br>Пароль: <code>${b.password}</code><br><small>Передайте сотруднику. Пароль больше нигде не показывается.</small>`;
+  $('#made').innerHTML = `Создан: <b>${esc(b.full_name || b.login)}</b><br>Логин: <code>${esc(b.login)}</code><br>Пароль: <code>${esc(b.password)}</code><br><small>Передайте сотруднику. Пароль больше нигде не показывается.</small>`;
   ['nm', 'em', 'pw'].forEach(i => $('#' + i).value = '');
   load();
 };
@@ -80,7 +83,8 @@ $('#list').onclick = async e => {
     const { error } = await sb.from('people').update({ full_name: name.trim() || null }).eq('id', u);
     toast(error ? 'Не сохранено' : 'Сохранено'); load();
   } else if (b.dataset.act === 'pw') {
-    const password = prompt('Новый пароль (от 6 символов)'); if (!password) return;
+    const password = prompt('Новый пароль (от 4 символов)'); if (!password) return;
+    if (password.length < 4) { toast('Пароль: не меньше 4 символов'); return; }
     if (await call({ action: 'password', id: u, password })) toast('Пароль изменён');
   } else if (b.dataset.act === 'del' && confirm('Удалить пользователя?')) {
     if (await call({ action: 'remove', id: u })) { toast('Удалён'); load(); }

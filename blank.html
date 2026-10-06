@@ -1,6 +1,47 @@
 <!doctype html>
 <html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Бланк за смену — EuSS</title><link rel="icon" href="favicon.png" type="image/png"><link rel="stylesheet" href="style.css"></head>
+<title>Бланк за смену — EuSS</title><link rel="icon" href="favicon.png" type="image/png"><link rel="stylesheet" href="style.css"><style>
+/* бланк за смену: спокойный вид таблиц */
+.sum{display:grid;grid-template-columns:repeat(4,1fr);margin-top:.75rem;border:1px solid var(--ln);border-radius:var(--r);background:#fff;box-shadow:var(--sh)}
+.sum>div{padding:.7rem .9rem;min-width:0}.sum>div+div{border-left:1px solid var(--ln)}
+.sum span{display:block;font-size:.68rem;font-weight:800;text-transform:uppercase;color:var(--mut)}
+.sum b{display:block;margin-top:.1rem;font-family:Sora,Manrope,sans-serif;font-size:1.35rem;line-height:1.2;font-variant-numeric:tabular-nums}
+.sum b i{font-style:normal;font-family:Manrope,sans-serif;font-size:.8rem;font-weight:600;color:var(--mut)}
+.sum small{display:block;font-size:.75rem;color:var(--mut)}
+@media(max-width:639px){.sum{grid-template-columns:1fr 1fr}.sum>div:nth-child(3){border-left:0}.sum>div:nth-child(n+3){border-top:1px solid var(--ln)}.sum b{font-size:1.15rem}}
+.okl{margin:.6rem 0 0;font-size:.82rem;color:var(--mut)}.okl::before{content:"✓ ";color:var(--good);font-weight:800}
+details.cx{margin:.6rem 0 0;border:1px solid color-mix(in oklab,oklch(.69 .17 48) 45%,var(--ln));border-radius:var(--r);background:color-mix(in oklab,oklch(.69 .17 48) 7%,#fff)}
+details.cx.bad{border-color:color-mix(in oklab,var(--bad) 40%,var(--ln));background:color-mix(in oklab,var(--bad) 5%,#fff)}
+details.cx>summary{padding:.6rem .9rem;cursor:pointer;font-size:.88rem;font-weight:700;list-style:none}
+details.cx>summary::-webkit-details-marker{display:none}
+details.cx>div{padding:.1rem .9rem .6rem;font-size:.85rem}details.cx>div+div{border-top:1px dashed var(--ln);padding-top:.5rem}
+details.cx span{display:block;color:var(--mut);font-size:.8rem}
+.tabs2{margin-top:1rem}.tabs2 button{flex:1 1 auto}
+.pn2{margin-top:.75rem}.pn2>.hint{margin:0 0 .5rem}
+.tw{border:1px solid var(--ln);border-radius:var(--r);background:#fff;box-shadow:var(--sh);overflow-x:auto}
+.tw.scroll{max-height:70vh;overflow:auto}
+.t2{width:100%;border-collapse:collapse;font-size:.86rem;font-variant-numeric:tabular-nums}
+.t2 th,.t2 td{padding:.34rem .65rem;text-align:right;white-space:nowrap;border-top:1px solid color-mix(in oklab,var(--ln) 60%,#fff)}
+.t2 thead th{position:sticky;top:0;z-index:1;background:var(--soft);border-top:0;font-size:.68rem;font-weight:800;text-transform:uppercase;color:var(--mut)}
+.t2 thead tr+tr th{top:1.85rem}
+.t2 th.l,.t2 td.l{text-align:left}
+.t2 tbody th{font-weight:600;color:var(--ink)}
+.t2 .z{color:color-mix(in oklab,var(--mut) 40%,#fff)}
+.t2 .dim{color:var(--mut);font-weight:500}
+.t2 tr.sub th,.t2 tr.sub td{background:var(--soft);font-weight:700;border-top:1px solid var(--ln)}
+.t2 tr.tot th,.t2 tr.tot td{background:var(--tint);font-weight:800;border-top:2px solid var(--ink)}
+.t2 tfoot th,.t2 tfoot td{position:sticky;bottom:0;background:var(--tint);font-weight:800;border-top:2px solid var(--ink)}
+.t2 tr.flag th,.t2 tr.flag td{background:color-mix(in oklab,oklch(.69 .17 48) 9%,#fff)}
+.t2 tr.miss th,.t2 tr.miss td{background:color-mix(in oklab,oklch(.69 .17 48) 8%,#fff)}
+.t2 td.none{text-align:left;color:var(--mut);font-size:.8rem}
+.t2 tr.go-day{cursor:pointer}.t2 tr.go-day:hover th,.t2 tr.go-day:hover td{background:var(--soft)}
+.t2 th a{color:var(--ac-d);text-decoration:underline;text-underline-offset:2px}
+.t2 .sp{border-left:1px solid var(--ln)}
+details.det{margin-top:.75rem}
+.cal{margin-top:0}
+@media(max-width:640px){.t2 .hs{display:none}.t2 th,.t2 td{padding:.4rem .45rem}}
+</style>
+</head>
 <body>
 <header class="hd"><div><a class="lg" href="index.html" aria-label="На панель смены"><img src="euss-logo.png" alt="EuSS"><span class="sep"></span><span class="sub">Отчёты</span></a><nav class="nav"><a class="btn s" href="index.html">← Панель</a></nav></div></header>
 <main class="wide">
@@ -32,7 +73,6 @@ const MON = ['января','февраля','марта','апреля','мая
 const dmy = d => d.split('-').reverse().join('.');
 const longDate = d => `${+d.slice(8)} ${MON[+d.slice(5, 7) - 1]} ${d.slice(0, 4)}`;
 const E = Blank.esc, F = (n, d = 1) => (Math.round(n * 10 ** d) / 10 ** d).toLocaleString('ru-RU');
-const cell = (v, d = 1) => v ? F(v, d) : '<span class="z">–</span>';
 
 async function loads(d1, d2) {
   const { data, error } = await sb.rpc('report_loads', { d1, d2 });
@@ -72,34 +112,50 @@ const wdOf = d => WD[(new Date(d + 'T00:00:00Z').getUTCDay() + 6) % 7];
 const addMonth = (ym, n) => { const d = new Date(Date.UTC(+ym.slice(0, 4), +ym.slice(5, 7) - 1 + n, 1)); return d.toISOString().slice(0, 7); };
 const ymLabel = ym => MONN[+ym.slice(5, 7) - 1] + ' ' + ym.slice(0, 4);
 let mode = 'day', ym = null;
+const tabState = { day: 'mach', mon: 'cal' };            // выбранная вкладка помнится при смене даты
 
-// ---------- общие блоки: машины, виды стирки по дозаторам, химия ----------
+// ---------- общие элементы ----------
+const strip = k => `<div class="sum">${k.map(([l, v, u, n]) => `<div><span>${l}</span><b>${v}${u ? ` <i>${u}</i>` : ''}</b><small>${n}</small></div>`).join('')}</div>`;
+// одна строка «всё сходится» или раскрывающийся список замечаний: вместо длинного блока проверок
+function chkLine(out) {
+  const ok = out.filter(c => c.k === 'ok'), bad = out.filter(c => c.k === 'bad'), warn = out.filter(c => c.k === 'warn'), n = bad.length + warn.length;
+  const line = ok.length ? `<p class="okl">${ok.map(c => c.t).join(' · ')}</p>` : '';
+  if (!n) return line;
+  return `${line}<details class="cx${bad.length ? ' bad' : ''}"${bad.length ? ' open' : ''}><summary>${bad.length ? '✕' : '⚠'} Замечаний: ${n}</summary>${[...bad, ...warn].map(c => `<div><b>${c.t}</b>${c.n ? `<span>${c.n}</span>` : ''}</div>`).join('')}</details>`;
+}
+const tabBar = (g, items) => `<div class="seg tabs2" data-tabs="${g}" role="tablist">${items.map(([v, l]) => `<button role="tab" data-tab="${v}" aria-selected="${v === tabState[g]}" class="${v === tabState[g] ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+function setTab(g, v) {
+  tabState[g] = v;
+  document.querySelectorAll(`[data-tabs="${g}"] button`).forEach(b => { const on = b.dataset.tab === v; b.classList.toggle('on', on); b.setAttribute('aria-selected', on); });
+  document.querySelectorAll(`[data-p^="${g}:"]`).forEach(p => { p.hidden = p.dataset.p !== g + ':' + v; });
+}
+const applyTabs = () => Object.keys(tabState).forEach(g => document.querySelector(`[data-tabs="${g}"]`) && setTab(g, tabState[g]));
+const cell = (v, d = 1) => v ? F(v, d) : '<span class="z">·</span>';
+
+// ---------- машины ----------
 function machTable(ms, flags) {
-  const maxN = Math.max(1, ...Object.values(ms).map(x => x.n));
-  const mrow = n => { const x = ms[n], flag = flags.has(String(n));
-    return `<tr class="${flag ? 'flag' : ''}"><th class="l">Машина ${n}</th><td class="dim hs">${n <= 10 ? 'Дозатор 1' : 'Дозатор 2'}</td>
-      <td class="grp">${cell(x.day, 0)}</td><td>${cell(x.dayKg)}</td><td class="grp">${cell(x.night, 0)}</td><td>${cell(x.nightKg)}</td>
-      <td class="grp"><b>${cell(x.n, 0)}</b></td><td><b>${cell(x.kg)}</b></td><td>${x.n ? F(x.kg / x.n) : '<span class="z">–</span>'}</td>
-      <td class="l"><span class="mcell" style="justify-content:flex-start"><span class="meter${n > 10 ? ' b' : ''}" style="width:${Math.round(x.n / maxN * 100)}px"></span></span></td></tr>`; };
-  const sumRow = (label, rows) => { const a = rows.map(n => ms[n]), n = a.reduce((s, x) => s + x.n, 0), kg = a.reduce((s, x) => s + x.kg, 0);
-    return `<tr class="tot"><th class="l">${label}</th><td class="hs"></td><td class="grp">${a.reduce((s, x) => s + x.day, 0)}</td><td>${F(a.reduce((s, x) => s + x.dayKg, 0))}</td><td class="grp">${a.reduce((s, x) => s + x.night, 0)}</td><td>${F(a.reduce((s, x) => s + x.nightKg, 0))}</td><td class="grp">${n}</td><td>${F(kg)}</td><td>${n ? F(kg / n) : '–'}</td><td></td></tr>`; };
-  return `<div class="box"><table class="tbl"><tr><th class="l">Машина</th><th class="l hs">Дозатор</th><th class="grp">День, ст.</th><th>День, кг</th><th class="grp">Ночь, ст.</th><th>Ночь, кг</th><th class="grp">Всего, ст.</th><th>Всего, кг</th><th>Ср. вес</th><th class="l">Нагрузка</th></tr>
-    ${all12.slice(0, 10).map(mrow).join('')}${sumRow('Итого 1–10', all12.slice(0, 10))}${all12.slice(10).map(mrow).join('')}${sumRow('Итого 11–12', [11, 12])}${sumRow('Итого, оба дозатора', all12)}</table></div>`;
+  const row = n => { const x = ms[n], flag = flags.has(String(n));
+    return `<tr${flag ? ' class="flag"' : ''}><th class="l">Машина ${n}</th><td class="sp">${cell(x.day, 0)}</td><td>${cell(x.dayKg)}</td><td class="sp">${cell(x.night, 0)}</td><td>${cell(x.nightKg)}</td><td class="sp"><b>${cell(x.n, 0)}</b></td><td><b>${cell(x.kg)}</b></td><td>${x.n ? F(x.kg / x.n) : '<span class="z">·</span>'}</td></tr>`; };
+  const sumRow = (label, rows, cls) => { const a = rows.map(n => ms[n]), s = k => a.reduce((t, x) => t + x[k], 0), n = s('n'), kg = s('kg');
+    return `<tr class="${cls}"><th class="l">${label}</th><td class="sp">${s('day')}</td><td>${F(s('dayKg'))}</td><td class="sp">${s('night')}</td><td>${F(s('nightKg'))}</td><td class="sp">${n}</td><td>${F(kg)}</td><td>${n ? F(kg / n) : '–'}</td></tr>`; };
+  return `<div class="tw"><table class="t2"><thead><tr><th class="l" rowspan="2">Машина</th><th colspan="2" class="sp">День</th><th colspan="2" class="sp">Ночь</th><th colspan="2" class="sp">Всего</th><th rowspan="2">Ср. кг</th></tr><tr><th class="sp">ст.</th><th>кг</th><th class="sp">ст.</th><th>кг</th><th class="sp">ст.</th><th>кг</th></tr></thead><tbody>
+    ${all12.slice(0, 10).map(row).join('')}${sumRow('Итого 1–10 · дозатор 1', all12.slice(0, 10), 'sub')}${all12.slice(10).map(row).join('')}${sumRow('Итого 11–12 · дозатор 2', [11, 12], 'sub')}${sumRow('Всего', all12, 'tot')}</tbody></table></div>`;
 }
 
-// виды стирки: дозатор 1 (машины 1–10) и дозатор 2 (11–12) отдельно
-function typeGroupTable(data) {
+// ---------- виды стирки: дозатор 1 и дозатор 2 в одной таблице ----------
+function typesTable(data) {
   const rows = {}, order = [];
-  const get = id => rows[id] || (order.push(id), rows[id] = { name: 'вид ' + id, a: { n: 0, kg: 0 }, b: { n: 0, kg: 0 } });
-  refs.washTypes.forEach(w => { get(w.id).name = w.name; });
+  const get = id => rows[id] || (order.push(id), rows[id] = { name: 'вид ' + id, min: 0, a: { n: 0, kg: 0 }, b: { n: 0, kg: 0 } });
+  refs.washTypes.forEach(w => { const r = get(w.id); r.name = w.name; r.min = +w.minutes || 0; });
   data.forEach(l => { const g = +l.machine <= 10 ? get(l.wash_type_id).a : get(l.wash_type_id).b; g.n++; g.kg += +l.weight_kg || 0; });
   const list = order.map(id => rows[id]).filter(r => r.a.n || r.b.n);
-  const T = list.reduce((t, r) => ({ an: t.an + r.a.n, ak: t.ak + r.a.kg, bn: t.bn + r.b.n, bk: t.bk + r.b.kg }), { an: 0, ak: 0, bn: 0, bk: 0 });
-  return `<div class="box"><table class="tbl"><tr><th class="l">Вид стирки</th><th class="grp">1–10, ст.</th><th>1–10, кг</th><th class="grp">11–12, ст.</th><th>11–12, кг</th><th class="grp">Всего, ст.</th><th>Всего, кг</th></tr>
-    ${list.map(r => `<tr><th class="l">${E(r.name)}</th><td class="grp">${cell(r.a.n, 0)}</td><td>${cell(r.a.kg)}</td><td class="grp">${cell(r.b.n, 0)}</td><td>${cell(r.b.kg)}</td><td class="grp"><b>${r.a.n + r.b.n}</b></td><td><b>${F(r.a.kg + r.b.kg)}</b></td></tr>`).join('') || '<tr><td class="l" colspan="7">Нет стирок</td></tr>'}
-    <tr class="tot"><th class="l">Итого</th><td class="grp">${T.an}</td><td>${F(T.ak)}</td><td class="grp">${T.bn}</td><td>${F(T.bk)}</td><td class="grp">${T.an + T.bn}</td><td>${F(T.ak + T.bk)}</td></tr></table></div>`;
+  const T = list.reduce((t, r) => ({ an: t.an + r.a.n, ak: t.ak + r.a.kg, bn: t.bn + r.b.n, bk: t.bk + r.b.kg, h: t.h + (r.a.n + r.b.n) * r.min / 60 }), { an: 0, ak: 0, bn: 0, bk: 0, h: 0 });
+  return `<div class="tw"><table class="t2"><thead><tr><th class="l">Вид стирки</th><th class="sp">1–10, ст.</th><th>1–10, кг</th><th class="sp">11–12, ст.</th><th>11–12, кг</th><th class="sp">Всего, ст.</th><th>Всего, кг</th><th class="sp hs">Время, ч</th></tr></thead><tbody>
+    ${list.map(r => `<tr><th class="l">${E(r.name)}</th><td class="sp">${cell(r.a.n, 0)}</td><td>${cell(r.a.kg)}</td><td class="sp">${cell(r.b.n, 0)}</td><td>${cell(r.b.kg)}</td><td class="sp"><b>${r.a.n + r.b.n}</b></td><td><b>${F(r.a.kg + r.b.kg)}</b></td><td class="sp hs">${F((r.a.n + r.b.n) * r.min / 60)}</td></tr>`).join('') || '<tr><td class="none" colspan="8">Нет стирок</td></tr>'}
+    <tr class="tot"><th class="l">Итого</th><td class="sp">${T.an}</td><td>${F(T.ak)}</td><td class="sp">${T.bn}</td><td>${F(T.bk)}</td><td class="sp">${T.an + T.bn}</td><td>${F(T.ak + T.bk)}</td><td class="sp hs">${F(T.h)}</td></tr></tbody></table></div>`;
 }
 
+// ---------- химия ----------
 // расход химии по дозаторам за одну или несколько смен (list: модели Blank.build)
 function chemBlock(list) {
   const base = list[0] || Blank.build([], refs, '2000-01-01');
@@ -107,35 +163,35 @@ function chemBlock(list) {
   const unit = c => c.per_unit_unit === 'g' ? 'г' : 'мл';
   const rows = [...base.mains.map((c, i) => [c.name, 'по рецепту', sum('chem', i, '1_10') / 1000, sum('chem', i, '11_12') / 1000, 'л']),
     ...base.extras.map((c, i) => [c.name, `${F(sum('exQty', i, 'all'), 0)} шт × ${+c.per_unit || 0} ${unit(c)}`, sum('exTot', i, '1_10') / 1000, sum('exTot', i, '11_12') / 1000, c.per_unit_unit === 'g' ? 'кг' : 'л'])];
-  return `<div class="box"><table class="tbl"><tr><th class="l">Химия</th><th class="l">Как посчитано</th><th>Дозатор 1</th><th>Дозатор 2</th><th>Всего</th></tr>
-    ${rows.map(([n, how, a, b, u]) => `<tr><th class="l">${E(n)}</th><td class="dim l">${how}</td><td>${cell(a, 2)} <span class="dim">${u}</span></td><td>${cell(b, 2)} <span class="dim">${u}</span></td><td><b>${cell(a + b, 2)}</b> <span class="dim">${u}</span></td></tr>`).join('')}</table>
-    <p class="note" style="padding:0 .5rem .5rem">Это теоретический расход по рецептам и отправленным загрузкам. Фактический расход по заменам бутылей смотрите в отчёте по сменам.</p></div>`;
+  return `<div class="tw"><table class="t2"><thead><tr><th class="l">Химия</th><th class="l hs">Как посчитано</th><th>Дозатор 1</th><th>Дозатор 2</th><th>Всего</th></tr></thead><tbody>
+    ${rows.map(([n, how, a, b, u]) => `<tr><th class="l">${E(n)}</th><td class="l dim hs">${how}</td><td>${cell(a, 2)}${a ? ` <span class="dim">${u}</span>` : ''}</td><td>${cell(b, 2)}${b ? ` <span class="dim">${u}</span>` : ''}</td><td><b>${cell(a + b, 2)}</b>${a + b ? ` <span class="dim">${u}</span>` : ''}</td></tr>`).join('')}</tbody></table></div>
+    <p class="note">Теоретический расход по рецептам и отправленным загрузкам. Фактический расход по заменам бутылей смотрите в отчёте по сменам.</p>`;
 }
-
-const kpiHtml = k => `<section class="mg">${k.map(([l, v, u, n, c]) => `<article class="m ${c}"><p class="l">${l}</p><p class="v">${v} ${u ? `<small>${u}</small>` : ''}</p><p class="n">${n}</p></article>`).join('')}</section>`;
-const chkHtml = out => `<div class="box" role="list" aria-label="Проверка данных" style="margin-top:.75rem"><h3 style="margin-top:0">Проверка данных</h3>${out.map(c => `<div class="chk ${c.k === 'ok' ? '' : 'w-' + c.k}" role="listitem"><div><b>${c.t}</b>${c.n ? `<span>${c.n}</span>` : ''}</div></div>`).join('')}</div>`;
+// теоретический расход основной химии по видам стирки (раскрывается по желанию)
+function chemByType(list) {
+  const base = list[0]; if (!base) return '';
+  const rows = base.types.map((ty, t) => ({ name: ty.name, n: list.reduce((s, m) => s + m.types[t].n, 0), chem: base.mains.map((_, i) => list.reduce((s, m) => s + m.types[t].chem[i], 0) / 1000) })).filter(r => r.n);
+  if (!rows.length) return '';
+  const tot = base.mains.map((_, i) => rows.reduce((s, r) => s + r.chem[i], 0));
+  return `<details class="box det"><summary><b>Расход основной химии по видам стирки</b> <small>литры</small></summary><div class="tw" style="margin-bottom:1rem"><table class="t2"><thead><tr><th class="l">Вид стирки</th><th>Стирок</th>${base.mains.map(c => `<th>${E(c.name)}</th>`).join('')}</tr></thead><tbody>
+    ${rows.map(r => `<tr><th class="l">${E(r.name)}</th><td>${r.n}</td>${r.chem.map(v => `<td>${cell(v, 2)}</td>`).join('')}</tr>`).join('')}
+    <tr class="tot"><th class="l">Итого</th><td>${rows.reduce((s, r) => s + r.n, 0)}</td>${tot.map(v => `<td>${F(v, 2)}</td>`).join('')}</tr></tbody></table></div></details>`;
+}
 
 // ---------- одна смена ----------
 function view(m, data) {
-  const G = m.groups, T = m.total, ms = m.machineStats;
+  const G = m.groups, ms = m.machineStats;
   const day = Object.values(ms).reduce((a, x) => a + x.day, 0), night = Object.values(ms).reduce((a, x) => a + x.night, 0);
   const used = Object.values(ms).filter(x => x.n).length;
   const ck = checks(m, data);
-  const kpi = [['Стирок', F(G.all.n, 0), '', `день ${day} · ночь ${night}`, ''], ['Общий вес', F(G.all.kg), 'кг', G.all.n ? `в среднем ${F(G.all.kg / G.all.n)} кг на стирку` : 'нет данных', 'm2'],
-    ['Дозатор 1 · 1–10', F(G['1_10'].n, 0), 'стирок', `${F(G['1_10'].kg)} кг`, 'm3'], ['Дозатор 2 · 11–12', F(G['11_12'].n, 0), 'стирок', `${F(G['11_12'].kg)} кг`, 'm4']];
-  return `${kpiHtml(kpi)}<p class="hint" style="margin:.75rem 0 0">Машин задействовано: ${used} / 12 · время работы по рецептуре: ${F(T.time / 60)} ч</p>
-    ${chkHtml(ck.out)}
-    <h2>Машины</h2><p class="hint">Сколько стирок и килограммов прошло на каждой машине днём и ночью. Машины 1–10 и 11–12 считаются отдельно.</p>${machTable(ms, ck.overlapMachines)}
-    <h2>Стирки по дозаторам</h2>${typeGroupTable(data)}
-    <h2>Виды стирки и химия</h2>${types(m)}
-    <h2>Расход химии по дозаторам</h2>${chemBlock([m])}
-    <details class="box" style="margin-top:1.5rem"><summary><b>Классический бланк, как в Excel</b> <small>вес каждой стирки по машинам</small></summary><div class="blkwrap" style="margin-bottom:.5rem">${Blank.html(m)}</div></details>`;
-}
-function types(m) {
-  const T = m.total;
-  return `<div class="box"><table class="tbl"><tr><th class="l">Вид стирки</th><th>Стирок</th><th>Кг</th><th>Время, мин</th>${m.mains.map(c => `<th>${E(c.name)}, л</th>`).join('')}</tr>
-    ${m.types.filter(ty => ty.n).map(ty => `<tr><th class="l">${E(ty.name)}</th><td>${ty.n}</td><td>${F(ty.kg)}</td><td>${F(ty.time, 0)}</td>${m.mains.map((_, i) => `<td>${cell(ty.chem[i] / 1000, 2)}</td>`).join('')}</tr>`).join('') || `<tr><td class="l" colspan="${4 + m.mains.length}">Нет стирок</td></tr>`}
-    <tr class="tot"><th class="l">Итого</th><td>${T.n}</td><td>${F(T.kg)}</td><td>${F(T.time, 0)}</td>${m.mains.map((_, i) => `<td>${F(T.chem[i] / 1000, 2)}</td>`).join('')}</tr></table></div>`;
+  return `${strip([['Стирок', F(G.all.n, 0), '', `день ${day} · ночь ${night}`], ['Белья', F(G.all.kg), 'кг', G.all.n ? `в среднем ${F(G.all.kg / G.all.n)} кг` : 'нет данных'],
+      ['Дозатор 1 · 1–10', F(G['1_10'].n, 0), 'ст.', `${F(G['1_10'].kg)} кг`], ['Дозатор 2 · 11–12', F(G['11_12'].n, 0), 'ст.', `${F(G['11_12'].kg)} кг`]])}
+    ${chkLine(ck.out)}
+    ${tabBar('day', [['mach', 'Машины'], ['type', 'Виды стирки'], ['chem', 'Химия'], ['blk', 'Бланк как в Excel']])}
+    <section class="pn2" data-p="day:mach"><p class="hint">Задействовано машин: ${used} из 12. Дозаторы 1–10 и 11–12 считаются отдельно.</p>${machTable(ms, ck.overlapMachines)}</section>
+    <section class="pn2" data-p="day:type">${typesTable(data)}</section>
+    <section class="pn2" data-p="day:chem">${chemBlock([m])}${chemByType([m])}</section>
+    <section class="pn2" data-p="day:blk"><p class="hint">Вес каждой стирки по машинам: так же, как в листе дня Excel.</p><div class="blkwrap box" style="margin-top:0">${Blank.html(m)}</div></section>`;
 }
 
 // ---------- месяц ----------
@@ -150,9 +206,8 @@ function viewMonth(ym, data, days) {
   const g1 = g('1_10'), g2 = g('11_12'), n = g1.n + g2.n, kg = g1.kg + g2.kg;
   const part = k => live.reduce((a, x) => a + Object.values(x.m.machineStats).reduce((s, y) => s + y[k], 0), 0);
   const best = live.reduce((b, x) => !b || x.m.groups.all.kg > b.m.groups.all.kg ? x : b, null);
-  const kpi = [['Стирок за месяц', F(n, 0), '', `день ${part('day')} · ночь ${part('night')}`, ''],
-    ['Общий вес', F(kg, 0), 'кг', live.length ? `в среднем ${F(kg / live.length, 0)} кг в смену` : 'нет данных', 'm2'],
-    ['Дозатор 1 · 1–10', F(g1.n, 0), 'стирок', `${F(g1.kg, 0)} кг`, 'm3'], ['Дозатор 2 · 11–12', F(g2.n, 0), 'стирок', `${F(g2.kg, 0)} кг`, 'm4']];
+  const kpi = [['Стирок', F(n, 0), '', `день ${part('day')} · ночь ${part('night')}`], ['Белья', F(kg, 0), 'кг', live.length ? `в среднем ${F(kg / live.length, 0)} кг в смену` : 'нет данных'],
+    ['Дозатор 1 · 1–10', F(g1.n, 0), 'ст.', `${F(g1.kg, 0)} кг`], ['Дозатор 2 · 11–12', F(g2.n, 0), 'ст.', `${F(g2.kg, 0)} кг`]];
 
   // проверки
   const out = [], rawKg = data.reduce((s, l) => s + (+l.weight_kg || 0), 0);
@@ -164,42 +219,38 @@ function viewMonth(ym, data, days) {
   if (odd.length) out.push({ k: 'bad', t: `Подозрительный вес: ${odd.length}`, n: odd.slice(0, 4).map(l => `${dmy(l.shift_date)}, машина ${l.machine}, ${F(l.weight_kg)} кг`).join('; ') + (odd.length > 4 ? '…' : '') });
   const unk = live.reduce((s, x) => s + x.m.total.unknownN, 0);
   if (unk) out.push({ k: 'warn', t: `Вид стирки не из шаблона: ${unk}`, n: 'Они есть в итогах, но в листы дней Excel не попадают.' });
-  if (live.length && !odd.length && !unk && !missing.length) out.push({ k: 'ok', t: 'Пропусков и подозрительных записей нет' });
-  if (best) out.push({ k: 'ok', t: `Самая загруженная смена: ${dmy(best.date)} (${wdOf(best.date)}), ${F(best.m.groups.all.kg, 0)} кг, ${best.m.groups.all.n} стирок` });
+  if (best) out.push({ k: 'ok', t: `Самая загруженная смена: ${dmy(best.date).slice(0, 5)} (${wdOf(best.date)}), ${F(best.m.groups.all.kg, 0)} кг` });
 
   // календарь
   const maxKg = Math.max(1, ...live.map(x => x.m.groups.all.kg));
   const lead = (new Date(ym + '-01T00:00:00Z').getUTCDay() + 6) % 7;
-  const cal = `<div class="box"><div class="cal" role="list">${WD.map(w => `<div class="wd">${w}</div>`).join('')}${'<span class="ep"></span>'.repeat(lead)}${days.map(x => {
+  const cal = `<div class="cal" role="list">${WD.map(w => `<div class="wd">${w}</div>`).join('')}${'<span class="ep"></span>'.repeat(lead)}${days.map(x => {
     if (x.m) { const a = x.m.groups['1_10'], b = x.m.groups['11_12'], k = x.m.groups.all.kg, p = Math.round(12 + k / maxKg * 55);
       return `<button class="dc${x.date === today ? ' now' : ''}" style="--p:${p}%" data-day="${x.date}" title="${dmy(x.date)}: дозатор 1 — ${a.n} ст., ${F(a.kg, 0)} кг; дозатор 2 — ${b.n} ст., ${F(b.kg, 0)} кг"><b>${x.d}</b><span>${F(k, 0)} кг</span><small>${a.n} | ${b.n}</small></button>`; }
     const fut = x.date > today, now = x.date === today;
-    return `<button class="dc ${fut || now ? 'no' : 'miss'}${fut ? ' fut' : ''}${now ? ' now' : ''}" data-day="${x.date}"><b>${x.d}</b><span>–</span><small>${fut ? '' : 'нет записей'}</small></button>`; }).join('')}</div>
-    <div class="lgd"><span>В ячейке: вес за смену и стирок «дозатор 1 | дозатор 2». Чем темнее, тем больше белья.</span><span><i style="background:color-mix(in oklab,oklch(.69 .17 48) 25%,#fff)"></i>прошедший день без записей</span><span>Нажмите на день, чтобы открыть его бланк.</span></div></div>`;
+    return `<button class="dc ${fut || now ? 'no' : 'miss'}${fut ? ' fut' : ''}${now ? ' now' : ''}" data-day="${x.date}"><b>${x.d}</b><span>–</span><small>${fut || now ? '' : 'нет записей'}</small></button>`; }).join('')}</div>
+    <p class="note">В ячейке: вес за смену и стирок «дозатор 1 | дозатор 2». Чем темнее, тем больше белья. Нажмите на день, чтобы открыть его бланк.</p>`;
 
-  // таблица по дням
-  const maxDay = Math.max(1, ...live.map(x => x.m.groups.all.kg));
+  // таблица по дням: только прошедшие дни и сегодня, будущие не показываем
   const drow = x => { const m = x.m, a = m && m.groups['1_10'], b = m && m.groups['11_12'];
-    if (!m) { const miss = x.date < today; return `<tr class="go-day${miss ? ' miss' : ''}" data-day="${x.date}"><th class="l"><a href="#" data-day="${x.date}">${dmy(x.date).slice(0, 5)}</a> <span class="dim">${wdOf(x.date)}</span></th><td class="grp"><span class="z">–</span></td><td><span class="z">–</span></td><td class="grp"><span class="z">–</span></td><td><span class="z">–</span></td><td class="grp"><span class="z">–</span></td><td><span class="z">–</span></td><td class="grp hs"><span class="z">–</span></td><td class="l hs"></td></tr>`; }
+    const lab = `<th class="l"><a href="#" data-day="${x.date}">${dmy(x.date).slice(0, 5)}</a> <span class="dim">${wdOf(x.date)}</span></th>`;
+    if (!m) return `<tr class="go-day${x.date < today ? ' miss' : ''}" data-day="${x.date}">${lab}<td class="none" colspan="7">${x.date < today ? 'нет записей' : 'пока нет записей'}</td></tr>`;
     const dn = Object.values(m.machineStats), d = dn.reduce((s, y) => s + y.day, 0), nt = dn.reduce((s, y) => s + y.night, 0);
-    return `<tr class="go-day" data-day="${x.date}"><th class="l"><a href="#" data-day="${x.date}">${dmy(x.date).slice(0, 5)}</a> <span class="dim">${wdOf(x.date)}</span></th>
-      <td class="grp">${cell(a.n, 0)}</td><td>${cell(a.kg)}</td><td class="grp">${cell(b.n, 0)}</td><td>${cell(b.kg)}</td><td class="grp"><b>${a.n + b.n}</b></td><td><b>${F(a.kg + b.kg)}</b></td>
-      <td class="grp hs">${d} / ${nt}</td><td class="l hs"><span class="mcell" style="justify-content:flex-start"><span class="meter" style="width:${Math.round(a.kg / maxDay * 120)}px"></span><span class="meter b" style="width:${Math.round(b.kg / maxDay * 120)}px"></span></span></td></tr>`; };
-  const dayTbl = `<div class="box"><table class="tbl"><tr><th class="l">Смена</th><th class="grp">1–10, ст.</th><th>1–10, кг</th><th class="grp">11–12, ст.</th><th>11–12, кг</th><th class="grp">Всего, ст.</th><th>Всего, кг</th><th class="grp hs">День / ночь</th><th class="l hs">Нагрузка</th></tr>
-    ${days.map(drow).join('')}
-    <tr class="tot"><th class="l">Итого за месяц</th><td class="grp">${g1.n}</td><td>${F(g1.kg)}</td><td class="grp">${g2.n}</td><td>${F(g2.kg)}</td><td class="grp">${n}</td><td>${F(kg)}</td><td class="grp hs">${part('day')} / ${part('night')}</td><td class="hs"></td></tr></table>
-    <p class="note" style="padding:0 .5rem .5rem"><span class="meter" style="width:18px"></span> дозатор 1 &nbsp; <span class="meter b" style="width:18px"></span> дозатор 2</p></div>`;
+    return `<tr class="go-day" data-day="${x.date}">${lab}<td class="sp">${cell(a.n, 0)}</td><td>${cell(a.kg)}</td><td class="sp">${cell(b.n, 0)}</td><td>${cell(b.kg)}</td><td class="sp"><b>${a.n + b.n}</b></td><td><b>${F(a.kg + b.kg)}</b></td><td class="sp hs">${d} / ${nt}</td></tr>`; };
+  const dayTbl = `<div class="tw scroll"><table class="t2"><thead><tr><th class="l">Смена</th><th class="sp">1–10, ст.</th><th>1–10, кг</th><th class="sp">11–12, ст.</th><th>11–12, кг</th><th class="sp">Всего, ст.</th><th>Всего, кг</th><th class="sp hs">День / ночь</th></tr></thead><tbody>
+    ${days.filter(x => x.date <= today).map(drow).join('')}</tbody>
+    <tfoot><tr><th class="l">Итого за месяц</th><td class="sp">${g1.n}</td><td>${F(g1.kg)}</td><td class="sp">${g2.n}</td><td>${F(g2.kg)}</td><td class="sp">${n}</td><td>${F(kg)}</td><td class="sp hs">${part('day')} / ${part('night')}</td></tr></tfoot></table></div>`;
 
   // машины за месяц
   const agg = {}; all12.forEach(i => agg[i] = { n: 0, kg: 0, day: 0, night: 0, dayKg: 0, nightKg: 0 });
   live.forEach(x => all12.forEach(i => { const s = x.m.machineStats[i]; Object.keys(agg[i]).forEach(k => { agg[i][k] += s[k]; }); }));
 
-  return `${kpiHtml(kpi)}${chkHtml(out)}
-    <h2>Календарь смен</h2>${cal}
-    <h2>Смены по дням</h2><p class="hint">Дозатор 1 (машины 1–10) и дозатор 2 (машины 11–12) посчитаны отдельно.</p>${dayTbl}
-    <h2>Машины за месяц</h2>${machTable(agg, new Set())}
-    <h2>Стирки по дозаторам</h2>${typeGroupTable(data)}
-    <h2>Расход химии по дозаторам за месяц</h2>${chemBlock(live.map(x => x.m))}`;
+  return `${strip(kpi)}${chkLine(out)}
+    ${tabBar('mon', [['cal', 'Календарь'], ['days', 'По дням'], ['mach', 'Машины'], ['type', 'Виды и химия']])}
+    <section class="pn2" data-p="mon:cal">${cal}</section>
+    <section class="pn2" data-p="mon:days">${dayTbl}</section>
+    <section class="pn2" data-p="mon:mach">${machTable(agg, new Set())}</section>
+    <section class="pn2" data-p="mon:type">${typesTable(data)}<div style="height:.75rem"></div>${chemBlock(live.map(x => x.m))}${chemByType(live.map(x => x.m))}</section>`;
 }
 
 async function showMonth() {
@@ -211,7 +262,7 @@ async function showMonth() {
   try {
     const data = await loads(ym + '-01', ym + '-' + String(lastDay(ym)).padStart(2, '0'));
     if (my !== seq) return;
-    $('#out').innerHTML = viewMonth(ym, data, monthDays(ym, data));
+    $('#out').innerHTML = viewMonth(ym, data, monthDays(ym, data)); applyTabs();
   } catch (e) {
     $('#out').innerHTML = '<p class="err">Не удалось загрузить данные. Проверьте, что выполнены report.sql, stage2.sql и stage5.sql.</p>';
   }
@@ -226,7 +277,7 @@ async function showDay() {
   try {
     const data = await loads(date, date);
     if (my !== seq) return;
-    $('#out').innerHTML = view(Blank.build(data, refs, date), data);
+    $('#out').innerHTML = view(Blank.build(data, refs, date), data); applyTabs();
   } catch (e) {
     $('#out').innerHTML = '<p class="err">Не удалось загрузить данные. Проверьте, что выполнены report.sql и stage2.sql.</p>';
   }
@@ -287,7 +338,7 @@ $('#mpv').onclick = () => ym && goMonth(addMonth(ym, -1));
 $('#mnx').onclick = () => ym && goMonth(addMonth(ym, 1));
 $('#x').onclick = download;
 // нажатие на день в календаре или таблице открывает бланк этой смены
-$('#out').onclick = e => { const b = e.target.closest('[data-day]'); if (!b || b.disabled) return; e.preventDefault(); mode = 'day'; $('#d').value = b.dataset.day; setMode('day'); window.scrollTo({ top: 0 }); };
+$('#out').onclick = e => { const t = e.target.closest('[data-tab]'); if (t) { setTab(t.closest('[data-tabs]').dataset.tabs, t.dataset.tab); return; } const b = e.target.closest('[data-day]'); if (!b || b.disabled) return; e.preventDefault(); mode = 'day'; $('#d').value = b.dataset.day; setMode('day'); window.scrollTo({ top: 0 }); };
 
 (async () => {
   if (!await need()) return;
