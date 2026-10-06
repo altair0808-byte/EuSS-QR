@@ -8,7 +8,7 @@
 <script src="config.js"></script><script src="app.js"></script>
 <script>
 (async () => {
-  if (!await need()) return;
+  const ses = await need(); if (!ses) return;
   const app = $('#app');
   const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
   const mw = n => n % 10 === 1 && n % 100 !== 11 ? 'машина' : (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? 'машины' : 'машин');
@@ -20,85 +20,86 @@
   document.title = f.name + ' — EuSS';
   const kind = { laundry_load: 'Загрузка белья', laundry_chem: 'Замена химии' }[f.type] || 'Бланк';
   const head = `<div class="top"><p class="eb">${kind}</p><h1>${esc(f.name)}</h1></div>`;
+  const washList = w => w || [];
   const toTop = () => window.scrollTo({ top: 0 });
   const smooth = () => matchMedia('(prefers-reduced-motion:reduce)').matches ? 'auto' : 'smooth';
 
   async function laundryLoad() {
+    app.classList.add('wide');
     const [{ data: wt }, { data: ex }] = await Promise.all([
       sb.from('wash_types').select('id,name,minutes').order('sort'),
       sb.from('chemicals').select('id,name,per_unit,per_unit_unit').eq('kind','extra').order('sort')
     ]);
-    const washTypes = wt || [], extras = ex || [];
+    const washTypes = washList(wt), extras = ex || [];
     const state = new Map();
-    let openM = null, lastIds = null;
-
-    const group = m => m <= 10 ? '1_10' : '11_12';
-    const groupName = g => g === '1_10' ? 'Машины 1–10' : 'Машины 11–12';
-    const dos = m => m <= 10 ? 'основной дозатор' : 'отдельный дозатор';
-    const tile = n => `<button data-m="${n}" class="${state.has(n) ? 'on' : ''}${n === openM ? ' cur' : ''}" aria-label="Машина ${n}${state.has(n) ? ', настроена' : ''}">${n}${state.has(n) ? '<small>готово</small>' : ''}</button>`;
+    let lastIds = null, tab = 'all';
+    const hh = n => String(n).padStart(2, '0');
+    const fmt = n => (Math.round(n * 10) / 10).toLocaleString('ru-RU');
+    const dos = m => m <= 10 ? 'Основной дозатор · 1–10' : 'Отдельный дозатор · 11–12';
+    const wname = id => washTypes.find(x => x.id === +id)?.name || 'Не выбран';
 
     function render() {
-      app.innerHTML = head + `
-        <h2>Настройка машин</h2>
-        <p class="hint">Каждую машину настройте отдельно: вид стирки, вес и дополнительную химию. После этого система покажет полный список для проверки.</p>
-        <div id="mg"><div class="grp">Основной дозатор · машины 1–10</div><div class="grid">${Array.from({length:10},(_,i)=>tile(i+1)).join('')}</div>
-        <div class="grp">Отдельный дозатор · машины 11–12</div><div class="grid">${[11,12].map(n=>tile(n)).join('')}</div></div>
-        <div id="cfg" class="box"><p class="hint" style="margin:0">Выберите машину выше, чтобы указать вид стирки и вес.</p></div>
+      const vis = Array.from({ length: 12 }, (_, i) => i + 1).filter(m => tab === 'all' || (tab === 'main' ? m <= 10 : m >= 11));
+      const kg = [...state.values()].reduce((a, v) => a + (+v.weight_kg || 0), 0);
+      const nMain = [...state.keys()].filter(m => m <= 10).length, nExtra = state.size - nMain;
+      const T = [['all', 'Все машины'], ['main', 'Дозатор 1 · 1–10'], ['extra', 'Дозатор 2 · 11–12']];
+      const M = [['Настроено', state.size + ' / 12', '', 'машин в этой отправке', ''], ['Общий вес', fmt(kg), 'кг', 'по настроенным', 'm2'], ['Дозатор 1', nMain + ' / 10', '', 'машины 1–10', 'm3'], ['Дозатор 2', nExtra + ' / 2', '', 'машины 11–12', 'm4']];
+      app.innerHTML = `
+        <div class="top"><p class="eb">Загрузка белья</p><h1>${esc(f.name)}</h1></div>
+        <section class="mg" aria-label="Итоги">${M.map(([l, v, u, n, c]) => `<article class="m ${c}"><p class="l">${l}</p><p class="v">${v} ${u ? `<small>${u}</small>` : ''}</p><p class="n">${n}</p></article>`).join('')}</section>
+        <div class="sh"><div><h2>Стиральные машины</h2><p>Выберите машину, задайте вид стирки и вес, затем проверьте всё и отправьте</p></div>
+          <div class="seg" role="tablist">${T.map(([id, l]) => `<button role="tab" aria-selected="${tab === id}" class="${tab === id ? 'on' : ''}" data-t="${id}">${l}</button>`).join('')}</div></div>
+        <div class="mgr">${vis.map(m => { const v = state.get(m); return `<article class="mc ${v ? 'set' : ''}"><button class="mv" data-m="${m}" aria-label="Машина ${m}"><span class="ct"><i></i><i></i><i></i></span><span class="dr"><strong>${hh(m)}</strong></span><span class="st">${v ? esc(wname(v.wash_type_id)) + ' · ' + fmt(v.weight_kg) + ' кг' : 'Не настроена'}</span></button><button class="btn s ${v ? '' : 'p'}" data-m="${m}">${v ? 'Изменить' : 'Настроить'} →</button></article>`; }).join('')}</div>
         <div class="bar"><button class="go" id="review">Проверить всё${state.size ? ' · ' + state.size + ' ' + mw(state.size) : ''}</button>
-        <button class="ghost" id="undo" hidden>Отменить последнюю запись</button></div>`;
-      $('#mg').onclick = e => {
-        const b = e.target.closest('[data-m]'); if (!b) return;
-        openMachine(+b.dataset.m, true);
-      };
+        <button class="ghost" id="undo" hidden>Отменить последнюю запись</button></div><div id="ovl"></div>`;
+      document.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { tab = b.dataset.t; render(); });
+      document.querySelectorAll('[data-m]').forEach(b => b.onclick = () => panel(+b.dataset.m));
       $('#review').onclick = () => state.size ? showReview() : toast('Сначала настройте хотя бы одну машину');
       const show = undoBtn('loads');
       if (lastIds) show(lastIds);
     }
 
-    function openMachine(machine, scroll) {
-      openM = machine;
-      document.querySelectorAll('#mg [data-m]').forEach(b => b.classList.toggle('cur', +b.dataset.m === machine));
+    function panel(machine) {
       const old = state.get(machine) || { wash_type_id: null, weight_kg: 25, extras: {} };
-      $('#cfg').innerHTML = `
-        <h2>Машина ${machine} · ${dos(machine)}</h2>
-        <p class="hint">Параметры сохраняются только для машины ${machine} до общего подтверждения.</p>
-        <h3>Вид стирки</h3>
-        <div class="list" id="wg">${washTypes.map(x=>`<button data-v="${x.id}" class="${+old.wash_type_id===x.id?'on':''}"><span>${esc(x.name)}</span>${x.minutes?`<small>${x.minutes} мин</small>`:''}</button>`).join('')}</div>
-        <h3>Вес машины, кг</h3>
-        <div class="kg"><button id="mi" aria-label="Меньше">−</button><input id="kg" type="number" min="0" step="0.5" inputmode="decimal" value="${old.weight_kg}"><button id="pl" aria-label="Больше">+</button></div>
-        ${extras.length?`<h3>Дополнительная химия</h3><p class="hint">Количество указывается для этой машины.</p>${extras.map(x=>`<label>${esc(x.name)}${x.per_unit_unit==='g'?' (г)':' (мл)'}<input type="number" min="0" step="1" inputmode="numeric" data-x="${x.id}" value="${old.extras[x.id]||''}"></label>`).join('')}`:''}
-        <button class="go" id="doneMachine">Готово для машины ${machine}</button>`;
       let w = old.wash_type_id;
+      $('#ovl').innerHTML = `<div class="ov" id="bg"><section class="pn" role="dialog" aria-modal="true" aria-label="Машина ${machine}">
+        <div class="ph"><div><p class="eb">${state.has(machine) ? 'Настроена' : 'Новая настройка'}</p><h2>Машина ${hh(machine)}</h2><p class="hint">${dos(machine)}</p></div><button class="ib" id="cl" aria-label="Закрыть">✕</button></div>
+        <h3>Вид стирки</h3>
+        <div class="list" id="wg">${washTypes.map(x => `<button data-v="${x.id}" class="${+old.wash_type_id === x.id ? 'on' : ''}"><span>${esc(x.name)}</span>${x.minutes ? `<small>${x.minutes} мин</small>` : ''}</button>`).join('')}</div>
+        <h3>Вес, кг</h3>
+        <div class="kg"><button id="mi" aria-label="Меньше">−</button><input id="kg" type="number" min="0" step="0.5" inputmode="decimal" value="${old.weight_kg}"><button id="pl" aria-label="Больше">+</button></div>
+        ${extras.length ? `<h3>Дополнительно</h3><div class="acc">${extras.map(x => `<label>${esc(x.name)}, ${x.per_unit_unit === 'g' ? 'г' : 'мл'}<input type="number" min="0" step="1" inputmode="numeric" data-x="${x.id}" placeholder="0" value="${old.extras[x.id] || ''}"></label>`).join('')}</div>` : ''}
+        <button class="go" id="ok">Готово для машины ${machine}</button>
+        ${state.has(machine) ? '<button class="ghost danger" id="rm">Убрать из отправки</button>' : ''}</section></div>`;
+      const close = () => { $('#ovl').innerHTML = ''; document.onkeydown = null; };
+      document.onkeydown = e => { if (e.key === 'Escape') close(); };
+      $('#cl').onclick = close; $('#bg').onmousedown = e => { if (e.target.id === 'bg') close(); };
       pick('#wg', v => { w = +v; });
       $('#mi').onclick = () => $('#kg').value = Math.max(0, (+$('#kg').value || 0) - 1);
       $('#pl').onclick = () => $('#kg').value = (+$('#kg').value || 0) + 1;
-      $('#doneMachine').onclick = () => {
+      if ($('#rm')) $('#rm').onclick = () => { state.delete(machine); close(); render(); toast(`Машина ${machine} убрана`); };
+      $('#ok').onclick = () => {
         if (!w) { toast('Выберите вид стирки'); return; }
-        const ex = {}; document.querySelectorAll('[data-x]').forEach(i => { if (+i.value > 0) ex[i.dataset.x] = +i.value; });
-        state.set(machine, { wash_type_id: w, weight_kg: +$('#kg').value || 25, extras: ex });
-        render(); openMachine(machine);
-        toast(`Машина ${machine} настроена`);
+        const e2 = {}; document.querySelectorAll('[data-x]').forEach(i => { if (+i.value > 0) e2[i.dataset.x] = +i.value; });
+        state.set(machine, { wash_type_id: w, weight_kg: +$('#kg').value || 25, extras: e2 });
+        close(); render(); toast(`Машина ${machine} настроена`);
       };
-      if (scroll) $('#cfg').scrollIntoView({ behavior: smooth(), block: 'nearest' });
     }
 
     function showReview() {
       const rows = [...state.entries()].sort((a, b) => a[0] - b[0]);
-      app.innerHTML = head + `
-        <h2>Проверка перед отправкой</h2>
-        <p class="hint">Проверьте каждую машину. Пока не нажата кнопка ниже, записи в базу не отправлены.</p>
+      app.innerHTML = `<div class="top"><p class="eb">Загрузка белья</p><h1>Проверка перед отправкой</h1><p class="hint">Пока не нажата кнопка внизу, записи в базу не отправлены.</p></div>
         <div class="cards">${rows.map(([m, v]) => {
-          const w = washTypes.find(x => x.id === +v.wash_type_id);
           const chem = Object.entries(v.extras).map(([id, qty]) => {
             const c = extras.find(x => String(x.id) === String(id));
             return c ? `${esc(c.name)}: ${qty} ${c.per_unit_unit === 'g' ? 'г' : 'мл'}` : '';
           }).filter(Boolean).join(', ');
-          return `<div class="card"><div><span class="nm">Машина ${m} · ${dos(m)}</span><small>${esc(w?.name || 'Не выбран')} · ${v.weight_kg} кг${chem ? ' · ' + chem : ''}</small></div><button class="mini" data-edit="${m}">Изменить</button></div>`;
+          return `<div class="card"><div><span class="nm">Машина ${m} · ${m <= 10 ? 'основной дозатор' : 'отдельный дозатор'}</span><small>${esc(wname(v.wash_type_id))} · ${v.weight_kg} кг${chem ? ' · ' + chem : ''}</small></div><button class="mini" data-edit="${m}">Изменить</button></div>`;
         }).join('')}</div>
         <div class="box"><b>Итого машин: ${rows.length}</b><p class="hint" style="margin:.25rem 0 0">1–10: ${rows.filter(([m]) => m <= 10).length}; 11–12: ${rows.filter(([m]) => m >= 11).length}.</p></div>
-        <div class="bar"><button class="go" id="confirm">Все верно — отправить ${rows.length} ${mw(rows.length)}</button><button class="ghost" id="back">← Вернуться к настройке</button></div>`;
+        <div class="bar"><button class="go" id="confirm">Все верно — отправить ${rows.length} ${mw(rows.length)}</button><button class="ghost" id="back">← Вернуться к машинам</button></div><div id="ovl"></div>`;
       toTop();
-      app.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => { render(); openMachine(+b.dataset.edit, true); });
+      app.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => { render(); panel(+b.dataset.edit); });
       $('#back').onclick = () => { render(); toTop(); };
       $('#confirm').onclick = async () => {
         const payload = rows.map(([m, v]) => ({ form_id: f.id, machine: m, wash_type_id: +v.wash_type_id, weight_kg: +v.weight_kg || 25, extras: v.extras }));
@@ -106,46 +107,100 @@
         const { data, error } = await sb.from('loads').insert(payload).select('id,machine');
         if (error) { toast('Не сохранено: ' + error.message); $('#confirm').disabled = false; return; }
         toast(`Отправлено: ${data.length} ${mw(data.length)}`);
-        lastIds = data.map(x => x.id); state.clear(); openM = null; render(); toTop();
+        lastIds = data.map(x => x.id); state.clear(); render(); toTop();
       };
     }
 
     render();
   }
 
-  async function laundryChem(lastId) {
-    const { data: ch } = await sb.from('chemicals').select('id,name,bottle_l,bottle_kg').order('sort');
-    const groups = [['1_10', 'Машины 1–10 · основной дозатор'], ['11_12', 'Машины 11–12 · отдельный дозатор']];
-    app.innerHTML = head + `
-      <h3>Группа дозатора</h3>
-      <div class="list" id="cg">${groups.map(([v, n]) => `<button data-v="${v}">${n}</button>`).join('')}</div>
-      <h3>Какая химия закончилась</h3><div class="list" id="chem">${(ch || []).map(x => `<button data-v="${x.id}">${esc(x.name)}</button>`).join('')}</div>
-      <label>Остаток на дне, кг<input id="lf" type="number" min="0" step="0.1" inputmode="decimal"></label>
-      <p class="hint" id="lh">Если бутыль пустая, оставьте поле пустым.</p>
-      <button class="go" id="save">Проверить и заменить</button>
-      <button class="ghost" id="undo" hidden>Отменить последнюю запись</button>`;
-    let g = null, c = null; const show = undoBtn('chem_changes');
-    if (lastId) show(lastId);
-    const cur = () => (ch || []).find(x => x.id === +c);
-    const hint = () => {
-      const x = cur(), v = $('#lf').value; let t = 'Если бутыль пустая, оставьте поле пустым.';
-      if (x && !(+x.bottle_kg > 0)) t = 'Вес бутыли не задан в настройках, остаток не пересчитается в литры.';
-      else if (x && v !== '') {
-        if (+v > +x.bottle_kg) t = `Больше, чем в полной бутыли (${x.bottle_kg} кг). Проверьте.`;
-        else if (+x.bottle_l > 0) t = `≈ ${(+v * x.bottle_l / x.bottle_kg).toLocaleString('ru-RU', { maximumFractionDigits: 2 })} л`;
+  // ---------- новая химия (только суперадмин: так устроены права в базе) ----------
+  function addChemPanel(chems, onDone) {
+    $('#ovl').innerHTML = `<div class="ov" id="bg"><section class="pn" role="dialog" aria-modal="true" aria-label="Новый химикат">
+      <div class="ph"><div><p class="eb">Справочник химии</p><h2>Новый химикат</h2></div><button class="ib" id="cl" aria-label="Закрыть">✕</button></div>
+      <label>Название<input id="cn" autocomplete="off"></label>
+      <label>Тип<select id="ck"><option value="main">Основная (дозатор, по рецептам)</option><option value="extra">Дополнительная (вручную на машину)</option></select></label>
+      <div class="acc"><label>1 шт = литров<input id="cl2" type="number" min="0" step="0.1" inputmode="decimal"></label><label>1 шт = кг<input id="ckg" type="number" min="0" step="0.1" inputmode="decimal"></label></div>
+      <div class="acc" id="ex" hidden><label>Расход на единицу<input id="cu" type="number" min="0" step="1" inputmode="numeric"></label><label>Измеряется в<select id="cun"><option value="ml">мл</option><option value="g">г</option></select></label></div>
+      <button class="go" id="ok">Добавить химикат</button></section></div>`;
+    const close = () => { $('#ovl').innerHTML = ''; document.onkeydown = null; };
+    document.onkeydown = e => { if (e.key === 'Escape') close(); };
+    $('#cl').onclick = close; $('#bg').onmousedown = e => { if (e.target.id === 'bg') close(); };
+    $('#ck').onchange = () => $('#ex').hidden = $('#ck').value !== 'extra';
+    const num = v => v === '' ? null : +v;
+    $('#ok').onclick = async () => {
+      const name = $('#cn').value.trim();
+      if (!name) { toast('Укажите название'); return; }
+      if (chems.some(x => x.name.toLowerCase() === name.toLowerCase())) { toast('Такой химикат уже есть'); return; }
+      const kind = $('#ck').value, row = { name, kind, bottle_l: num($('#cl2').value), bottle_kg: num($('#ckg').value), sort: Math.max(0, ...chems.map(x => x.sort || 0)) + 1 };
+      if (kind === 'extra') { row.per_unit = num($('#cu').value); row.per_unit_unit = $('#cun').value; }
+      $('#ok').disabled = true;
+      const { data, error } = await sb.from('chemicals').insert(row).select('id').single();
+      if (error) { toast('Не сохранено: ' + error.message); $('#ok').disabled = false; return; }
+      if (kind === 'main') {
+        const { data: ws } = await sb.from('wash_types').select('id');
+        if (ws && ws.length) await sb.from('recipes').insert(ws.map(w => ({ wash_type_id: w.id, chemical_id: data.id, ml_per_l: 0 })));
       }
-      $('#lh').textContent = t;
+      close(); toast('Химикат добавлен'); onDone(data.id);
     };
-    pick('#cg', v => { g = v; }); pick('#chem', v => { c = v; hint(); }); $('#lf').oninput = hint;
+  }
+
+  async function laundryChem(lastId, preChem) {
+    const [{ data: ch }, { data: pr }] = await Promise.all([
+      sb.from('chemicals').select('id,name,kind,bottle_l,bottle_kg,sort').order('sort'),
+      sb.from('profiles').select('role').eq('id', ses.user.id).maybeSingle()
+    ]);
+    const chems = ch || [], isSuper = pr?.role === 'superadmin';
+    const groups = [['1_10', 'Основной дозатор', 'машины 1–10'], ['11_12', 'Отдельный дозатор', 'машины 11–12']];
+    let g = null, c = preChem ? String(preChem) : null, mode = 'empty';
+    app.innerHTML = head + `
+      <div class="box"><h2>Что заменили</h2>
+        <h3>Дозатор</h3>
+        <div class="list" id="cg">${groups.map(([v, n, s]) => `<button data-v="${v}"><span>${n}</span><small>${s}</small></button>`).join('')}</div>
+        <h3>Химия</h3>
+        <div class="list" id="chem">${chems.map(x => `<button data-v="${x.id}" class="${String(x.id) === c ? 'on' : ''}"><span>${esc(x.name)}</span>${x.kind === 'extra' ? '<small>дополнительная</small>' : ''}</button>`).join('')}</div>
+        ${isSuper ? '<button class="mini opt" id="addc" style="margin-top:.5rem">+ Добавить химикат</button>' : ''}</div>
+      <div class="box"><h2>Остаток в бутыли</h2>
+        <p class="hint">Сколько осталось в снятой бутыли. Остаток записывается вместе с заменой.</p>
+        <div class="seg" id="lm"><button data-v="empty" class="on">Бутыль пустая</button><button data-v="some">Остался остаток</button></div>
+        <div id="lw" hidden><label>Остаток, кг<input id="lf" type="number" min="0" step="0.1" inputmode="decimal"></label><div class="fill"><i id="fb"></i></div></div>
+        <p class="hint" id="lh"></p></div>
+      <div class="bar"><button class="go" id="save">Проверить и заменить</button>
+      <button class="ghost" id="undo" hidden>Отменить последнюю запись</button></div><div id="ovl"></div>`;
+    const show = undoBtn('chem_changes');
+    if (lastId) show(lastId);
+    const cur = () => chems.find(x => String(x.id) === c);
+    const hint = () => {
+      const x = cur(), v = $('#lf').value; let t = 'Бутыль будет записана как пустая.', pct = 0;
+      if (mode === 'some') {
+        t = 'Введите вес остатка в килограммах.';
+        if (!x) t = 'Сначала выберите химию выше.';
+        else if (!(+x.bottle_kg > 0)) t = 'Вес бутыли не задан в настройках, остаток не пересчитается в литры.';
+        else if (v !== '') {
+          pct = Math.min(100, +v / x.bottle_kg * 100);
+          if (+v > +x.bottle_kg) t = `Больше, чем в полной бутыли (${x.bottle_kg} кг). Проверьте.`;
+          else t = (+x.bottle_l > 0 ? `≈ ${(+v * x.bottle_l / x.bottle_kg).toLocaleString('ru-RU', { maximumFractionDigits: 2 })} л · ` : '') + `${Math.round(pct)}% полной бутыли`;
+        }
+      }
+      $('#lh').textContent = t; $('#fb').style.width = pct + '%';
+    };
+    pick('#cg', v => { g = v; }); pick('#chem', v => { c = v; hint(); });
+    pick('#lm', v => { mode = v; $('#lw').hidden = v === 'empty'; hint(); });
+    $('#lf').oninput = hint; hint();
+    if ($('#addc')) $('#addc').onclick = () => addChemPanel(chems, id => laundryChem(undefined, id));
     $('#save').onclick = () => {
-      if (!g) { toast('Выберите группу дозатора'); return; }
+      if (!g) { toast('Выберите дозатор'); return; }
       if (!c) { toast('Выберите, какая химия закончилась'); return; }
-      const x = cur(), lf = $('#lf').value;
-      if (lf !== '' && x && +x.bottle_kg > 0 && +lf > +x.bottle_kg) { toast('Остаток больше полной бутыли'); return; }
-      const gn = g === '1_10' ? 'Машины 1–10' : 'Машины 11–12';
-      app.innerHTML = head + `<h2>Проверка замены химии</h2><div class="box"><p><b>Дозатор:</b> ${gn}</p><p><b>Химия:</b> ${esc(x.name)}</p><p><b>Остаток:</b> ${lf === '' ? 'бутыль пустая' : esc(lf) + ' кг'}</p></div><div class="bar"><button class="go" id="confirm">Все верно — записать замену</button><button class="ghost" id="back">Изменить</button></div>`;
+      const x = cur(), lf = mode === 'empty' ? '' : $('#lf').value;
+      if (mode === 'some' && lf === '') { toast('Укажите остаток или выберите «Бутыль пустая»'); return; }
+      if (lf !== '' && +x.bottle_kg > 0 && +lf > +x.bottle_kg) { toast('Остаток больше полной бутыли'); return; }
+      const gn = groups.find(r => r[0] === g).slice(1).join(' · ');
+      app.innerHTML = head + `<div class="box"><h2>Проверка замены</h2>
+        <div class="acc"><span>Дозатор</span><b>${gn}</b></div><div class="acc"><span>Химия</span><b>${esc(x.name)}</b></div>
+        <div class="acc"><span>Остаток</span><b>${lf === '' ? 'бутыль пустая' : esc(lf) + ' кг'}</b></div></div>
+        <div class="bar"><button class="go" id="confirm">Все верно — записать замену</button><button class="ghost" id="back">Изменить</button></div>`;
       toTop();
-      $('#back').onclick = () => laundryChem();
+      $('#back').onclick = () => laundryChem(undefined, c);
       $('#confirm').onclick = async () => {
         $('#confirm').disabled = true;
         const { data, error } = await sb.from('chem_changes').insert({ form_id: f.id, chemical_id: +c, leftover_kg: lf === '' ? null : +lf, machine_group: g }).select('id').single();

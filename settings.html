@@ -16,6 +16,12 @@
 
 <h2>Химия</h2>
 <div class="box" id="chem"></div>
+<details class="box" id="nc"><summary><b>+ Новый химикат</b></summary>
+  <label>Название<input id="cn" autocomplete="off"></label>
+  <label>Тип<select id="ck"><option value="main">Основная (дозатор, по рецептам)</option><option value="extra">Дополнительная (вручную на машину)</option></select></label>
+  <div class="acc"><label>1 шт = литров<input id="cl2" type="number" min="0" step="0.1" inputmode="decimal"></label><label>1 шт = кг<input id="ckg" type="number" min="0" step="0.1" inputmode="decimal"></label></div>
+  <div class="acc" id="cex" hidden><label>Расход на единицу<input id="cu" type="number" min="0" step="1" inputmode="numeric"></label><label>Измеряется в<select id="cun"><option value="ml">мл</option><option value="g">г</option></select></label></div>
+  <button class="go" id="ca">Добавить химикат</button></details>
 
 <h2>Виды стирки и рецепты</h2>
 <div id="wt"></div>
@@ -102,6 +108,18 @@ $('#wt').onclick = async e => {
   let { error } = await sb.from('wash_types').update({ name, minutes: num(d.querySelector('[data-wf="minutes"]').value) }).eq('id', id);
   if (!error) ({ error } = await sb.from('recipes').upsert([...d.querySelectorAll('[data-r]')].map(i => ({ wash_type_id: id, chemical_id: +i.dataset.r, ml_per_l: +i.value || 0 }))));
   if (done(error)) load();
+};
+
+$('#ck').onchange = () => $('#cex').hidden = $('#ck').value !== 'extra';
+$('#ca').onclick = async () => {
+  const name = $('#cn').value.trim(); if (!name) { toast('Укажите название'); return; }
+  if (chems.some(c => c.name.toLowerCase() === name.toLowerCase())) { toast('Такой химикат уже есть'); return; }
+  const kind = $('#ck').value, row = { name, kind, bottle_l: num($('#cl2').value), bottle_kg: num($('#ckg').value), sort: Math.max(0, ...chems.map(x => x.sort || 0)) + 1 };
+  if (kind === 'extra') { row.per_unit = num($('#cu').value); row.per_unit_unit = $('#cun').value; }
+  const { data, error } = await sb.from('chemicals').insert(row).select('id').single();
+  if (error) { done(error); return; }
+  if (kind === 'main' && wts.length) await sb.from('recipes').insert(wts.map(w => ({ wash_type_id: w.id, chemical_id: data.id, ml_per_l: 0 })));
+  ['cn', 'cl2', 'ckg', 'cu'].forEach(i => $('#' + i).value = ''); toast('Химикат добавлен' + (kind === 'main' ? ', задайте рецепты' : '')); load();
 };
 
 $('#wa').onclick = async () => {

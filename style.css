@@ -156,6 +156,48 @@ details.box>summary small{margin-left:auto}
 #code{display:flex;justify-content:center;margin:1.25rem 0 1rem}
 #u{color:var(--mut);font-size:.8rem;word-break:break-all}
 
+/* ---------- панель машин и боковое окно (как на главной) ---------- */
+.mg{display:grid;grid-template-columns:repeat(2,1fr);gap:.75rem}
+.m{min-width:0;border:1px solid var(--ln);border-bottom:3px solid var(--ac);border-radius:var(--r);background:var(--card);padding:1rem;box-shadow:var(--sh)}
+.m .l{margin:0;font-size:.7rem;font-weight:800;text-transform:uppercase;color:var(--mut)}
+.m .v{margin:.25rem 0 0;font-family:Sora,sans-serif;font-size:1.5rem;font-weight:700}
+.m .v small{font-size:.875rem;font-weight:600;color:var(--mut)}
+.m .n{margin:.25rem 0 0;font-size:.75rem;color:var(--mut)}
+.m2{border-bottom-color:var(--ink)}.m3{border-bottom-color:oklch(.72 .11 174)}.m4{border-bottom-color:oklch(.69 .17 48)}
+.sh{margin:1.5rem 0 1rem;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.75rem}
+.sh h2{margin:0}.sh p{margin:.15rem 0 0;font-size:.875rem;color:var(--mut)}
+.sh .seg{margin-top:0}
+.mgr{display:grid;grid-template-columns:repeat(2,1fr);gap:.75rem}
+.mc{display:flex;flex-direction:column;gap:.6rem;min-width:0}
+.mc .btn{width:100%;min-height:2.25rem}
+.mv{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;min-height:0;aspect-ratio:4/4.5;padding:0;overflow:hidden;border:1px solid var(--ln);border-radius:var(--r);background:var(--card);transition:border-color .16s,box-shadow .16s,transform .12s}
+.mv:hover:not(:disabled){border-color:color-mix(in oklab,var(--ac) 55%,var(--ln));box-shadow:var(--sh2);background:var(--card)}
+.ct{position:absolute;top:.75rem;left:.75rem;right:.75rem;display:flex;align-items:center;gap:.25rem;padding-bottom:.55rem;border-bottom:1px solid var(--ln)}
+.ct i{display:block;width:.28rem;height:.28rem;border-radius:99px;background:var(--mut);opacity:.45}.ct i:first-child{width:1.15rem}
+.dr{position:relative;display:grid;width:clamp(4.4rem,7vw,6rem);aspect-ratio:1;place-items:center;border:.45rem solid var(--tint);border-radius:99px;background:var(--soft);box-shadow:inset 0 0 0 1px var(--ln)}
+.dr strong{font-family:Sora,sans-serif;font-size:clamp(1.7rem,3vw,2.3rem);line-height:1}
+.set .dr{border-color:color-mix(in oklab,var(--ac) 28%,#fff);background:color-mix(in oklab,var(--ac) 7%,#fff);color:var(--ac)}
+.set .mv{border-color:color-mix(in oklab,var(--ac) 45%,var(--ln))}
+.st{margin-top:.8rem;max-width:calc(100% - 1rem);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.68rem;font-weight:800;text-transform:uppercase;color:var(--mut)}
+.set .st{color:var(--ac)}
+.cur .mv{outline:2px solid var(--ac);outline-offset:2px}
+.ov{position:fixed;inset:0;z-index:50;display:flex;align-items:flex-end;justify-content:flex-end;background:rgb(10 40 55/.25)}
+.pn{width:100%;max-width:28rem;max-height:92vh;overflow:auto;padding:1.25rem;border-radius:1rem 1rem 0 0;background:var(--card);box-shadow:0 20px 50px rgb(0 0 0/.25)}
+.pn h2{margin:.25rem 0 0;font-size:1.5rem}
+.pn .hint{margin:.25rem 0 0}
+.ph{display:flex;justify-content:space-between;gap:1rem}
+.ib{width:2.25rem;min-height:2.25rem;height:2.25rem;padding:0;border:0;background:none;font-size:1.1rem}
+.ib:hover:not(:disabled){background:var(--tint);color:var(--ink)}
+.pn .go{margin-top:1.25rem}
+.pn .ghost.danger{display:flex;margin:.5rem auto 0}
+.opt{border-style:dashed;color:var(--ac-d)}
+.fill{height:.5rem;margin-top:.5rem;border-radius:99px;background:var(--tint);overflow:hidden}
+.fill i{display:block;height:100%;width:0;border-radius:99px;background:var(--ac);transition:width .2s}
+@media(min-width:640px){.mgr{grid-template-columns:repeat(3,1fr)}.pn{margin:1rem;border-radius:var(--r)}}
+@media(min-width:768px){.mg{grid-template-columns:repeat(4,1fr)}}
+@media(min-width:900px){.mgr{grid-template-columns:repeat(4,1fr)}}
+@media(min-width:1180px){.mgr{grid-template-columns:repeat(6,1fr)}}
+
 /* ---------- уведомление ---------- */
 #toast{position:fixed;left:50%;bottom:1.5rem;z-index:60;width:max-content;max-width:calc(100% - 2rem);text-align:center;padding:.75rem 1.4rem;border-radius:99px;background:var(--ink);color:#fff;font-size:.875rem;opacity:0;pointer-events:none;transform:translate(-50%,16px);transition:opacity .2s,transform .2s}
 #toast.show{opacity:1;transform:translate(-50%,0)}
