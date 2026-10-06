@@ -116,7 +116,7 @@ function chemEdit(x){
    <h3>Остаток в бутыли</h3>
    <div class="seg" id="eu"><button data-v="kg" class="${unit==='kg'?'on':''}">кг</button><button data-v="l" class="${unit==='l'?'on':''}">литры</button></div>
    <label>Остаток (пусто или 0 — бутыль пустая)<input id="ev" type="number" min="0" step="0.1" inputmode="decimal" value="${v0}"></label>
-   ${x.connect_id?'<p class="hint">Этот остаток уже подключён к дозатору. Если изменить количество, отчёт пересчитается, но само подключение останется прежним.</p>':''}
+   ${x.connect_id?'<p class="hint">Этот остаток уже подключён к дозатору. Если изменить количество, подключение и отчёт пересчитаются автоматически.</p>':''}
    <button class="go" id="ok">Сохранить исправление</button>
    <button class="ghost danger" id="rm">Удалить запись</button></section></div>`;
   const close=()=>{$('#ovl').innerHTML='';document.onkeydown=null;};
@@ -138,7 +138,7 @@ function chemEdit(x){
 async function delRec(k,id){
   const tbl=k==='ld'?'loads':'chem_changes',o=k==='ld'?byId[id]:byCh[id];
   let q=k==='ld'?'Удалить эту загрузку белья безвозвратно?':'Удалить эту замену химии безвозвратно?';
-  if(o&&o.connect_id)q+='\nЕё остаток уже подключён: подключение останется, а отчёт пересчитается.';
+  if(o&&o.connect_id)q+='\nЕё остаток уже подключён: подключение и отчёт пересчитаются автоматически.';
   if(!confirm(q+'\nВ журнале изменений останется след об удалении.'))return;
   const{data,error}=await sb.from(tbl).delete().eq('id',id).select('id');
   if(error||!data||!data.length){toast('Не удалено: '+(error?error.message:'нет прав или не выполнены stage5.sql и stage6.sql'));return;}
