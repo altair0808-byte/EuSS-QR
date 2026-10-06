@@ -134,7 +134,7 @@ function loginView(){
   <label>Пароль<input id="pw" type="password" autocomplete="current-password" required></label>
   <p class="err" id="er" role="alert"></p><button class="btn p" id="go" type="submit">Войти</button></form></div></div>`;
   $('#lf').onsubmit=async e=>{e.preventDefault();const b=$('#go');b.disabled=true;$('#er').textContent='';
-    const{error}=await sb.auth.signInWithPassword({email:loginToEmail($('#em').value),password:$('#pw').value});
+    const{error}=await sb.auth.signInWithPassword({email:loginToEmail($('#em').value),password:pwFix($('#em').value,$('#pw').value)});
     if(error){$('#er').textContent=/invalid/i.test(error.message)?'Неверный логин или пароль':error.message;b.disabled=false;return;}
     const n=nextUrl();if(n){location.href=n;return;}start();};
 }

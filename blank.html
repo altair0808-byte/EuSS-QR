@@ -63,7 +63,7 @@ details.det{margin-top:.75rem}
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="config.js"></script><script src="app.js"></script><script src="blanc.js"></script>
+<script src="config.js"></script><script src="app.js"></script><script src="report-calc.js"></script><script src="blanc.js"></script>
 <script>
 let refs = null, tz = 5, st = 6, seq = 0;
 const shiftToday = () => new Date(Date.now() + (tz - st) * 3600e3).toISOString().slice(0, 10);
@@ -292,14 +292,17 @@ async function download() {
     const zip = await JSZip.loadAsync(await res.arrayBuffer());
     const d2 = ymX + '-' + String(lastDay(ymX)).padStart(2, '0');
     const data = await loads(ymX + '-01', d2);
-    const { data: changes, error: chErr } = await sb.rpc('report_changes', { d1: ymX + '-01', d2 });
+    const back = addDaysISO(ymX + '-01', -60);                                              // запас назад: подключение могло быть в прошлом месяце
+    const { data: chAll, error: chErr } = await sb.rpc('report_changes', { d1: back, d2 });
     if (chErr) throw chErr;
-    const { data: connects } = await sb.rpc('report_connects', { d1: ymX + '-01', d2 });   // нужен stage6.sql; если его нет, подключения просто не учитываются
+    const { data: cnAll } = await sb.rpc('report_connects', { d1: back, d2 });              // нужен stage6.sql
+    const changes = (chAll || []).filter(x => x.shift_date >= ymX + '-01'), connects = (cnAll || []).filter(x => x.shift_date >= ymX + '-01');
+    const used = chemUsed(refs, chAll || [], cnAll || []).used;
     const byDay = {};
     data.forEach(l => (byDay[l.shift_date] = byDay[l.shift_date] || []).push(l));
     const days = {}, warn = new Set();
     Object.keys(byDay).forEach(d => { const mm = Blank.build(byDay[d], refs, d); days[+d.slice(8)] = mm; Blank.warnings(mm).forEach(w => warn.add(w)); });
-    await Blank.fillWorkbook(zip, days, refs, changes || [], connects || []);
+    await Blank.fillWorkbook(zip, days, refs, changes, connects, used);
     const blob = await zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'Blanc-' + ymX + '.xlsx';
     document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1e4);

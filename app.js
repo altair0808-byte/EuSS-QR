@@ -9,6 +9,8 @@ const normLogin = v => String(v || '').trim().toLowerCase();
 const loginToEmail = v => { v = normLogin(v); return v.includes('@') ? v : v + '@' + CFG.LOGIN_DOMAIN; };
 // для показа: «ivan@euss.local» -> «ivan», настоящую почту не трогаем
 const showLogin = e => { e = String(e || ''); const sfx = '@' + CFG.LOGIN_DOMAIN; return e.toLowerCase().endsWith(sfx) ? e.slice(0, -sfx.length) : e; };
+// пароль для Supabase: у сотрудников (вход по логину) короткий пароль дополняется скрытым хвостом, у почтовых аккаунтов пароль как есть
+const pwFix = (login, pw) => (!normLogin(login).includes('@') && String(pw).length < 6) ? pw + CFG.PW_PAD : pw;
 // текст ошибки или '' если логин подходит
 const loginError = v => { v = normLogin(v); if (v.length < LOGIN_MIN) return 'Логин: не меньше ' + LOGIN_MIN + ' символов'; if (v.length > 32) return 'Логин: не больше 32 символов'; if (!LOGIN_RE.test(v)) return 'Логин: только латинские буквы, цифры и символы . _ -'; return ''; };
 

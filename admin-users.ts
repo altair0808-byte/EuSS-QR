@@ -3,6 +3,10 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 // Должно совпадать с LOGIN_DOMAIN в config.js
 const LOGIN_DOMAIN = 'euss.local';
+// Supabase не принимает пароль короче 6 символов. Короткий пароль (4-5 знаков) у сотрудников дополняется
+// скрытым хвостом. Значение должно совпадать с PW_PAD в config.js.
+const PW_PAD = 'euss-pin';
+const fixPw = (p: string) => (p.length < 6 ? p + PW_PAD : p);
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type' };
 const out = (o: unknown, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { ...cors, 'Content-Type': 'application/json' } });
 
@@ -20,9 +24,9 @@ Deno.serve(async (req) => {
   if (b.action === 'create') {
     const login = String(b.login || '').trim().toLowerCase();
     if (login.length < 4 || login.length > 32 || !/^[a-z0-9._-]+$/.test(login)) return out({ error: 'Логин: от 4 до 32 символов, латинские буквы, цифры и . _ -' }, 400);
-    if ((b.password || '').length < 6) return out({ error: 'Пароль: не меньше 6 символов' }, 400);
+    if ((b.password || '').length < 4) return out({ error: 'Пароль: не меньше 4 символов' }, 400);
     const email = login + '@' + LOGIN_DOMAIN;
-    const { data, error } = await admin.auth.admin.createUser({ email, password: b.password, email_confirm: true });
+    const { data, error } = await admin.auth.admin.createUser({ email, password: fixPw(b.password), email_confirm: true });
     if (error) return out({ error: /already|registered|exists/i.test(error.message) ? 'Такой логин уже занят' : error.message }, 400);
     const id = data.user.id;
     const r1 = await admin.from('people').insert({ id, email, full_name: b.full_name || null });
@@ -31,8 +35,11 @@ Deno.serve(async (req) => {
     return out({ id });
   }
   if (b.action === 'password') {
-    if ((b.password || '').length < 6) return out({ error: 'Пароль: не меньше 6 символов' }, 400);
-    const { error } = await admin.auth.admin.updateUserById(b.id, { password: b.password });
+    if ((b.password || '').length < 4) return out({ error: 'Пароль: не меньше 4 символов' }, 400);
+    const { data: tu } = await admin.auth.admin.getUserById(b.id);
+    const isStaff = String(tu?.user?.email || '').toLowerCase().endsWith('@' + LOGIN_DOMAIN);
+    if (!isStaff && b.password.length < 6) return out({ error: 'Для входа по почте пароль не меньше 6 символов' }, 400);
+    const { error } = await admin.auth.admin.updateUserById(b.id, { password: isStaff ? fixPw(b.password) : b.password });
     return error ? out({ error: error.message }, 400) : out({ ok: true });
   }
   if (b.action === 'remove') {

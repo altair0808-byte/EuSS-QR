@@ -9,7 +9,7 @@
   <h2>Новый сотрудник</h2>
   <label>Имя<input id="nm" placeholder="Фамилия Имя" autocomplete="off"></label>
   <label>Логин <small>(от 4 символов: латиница, цифры, . _ -)</small><input id="em" type="text" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false"></label>
-  <label>Пароль <small>(от 6 символов)</small><input id="pw" autocomplete="off"></label>
+  <label>Пароль <small>(от 4 символов)</small><input id="pw" autocomplete="off"></label>
   <button class="mini" id="gen" type="button" style="margin-top:.5rem">Придумать пароль</button>
   <h3>Доступ к бланкам</h3><div id="fa"></div>
   <button class="go" id="mk">Создать сотрудника</button>
@@ -57,7 +57,7 @@ $('#gen').onclick = () => {
 $('#mk').onclick = async () => {
   const access = [...document.querySelectorAll('#fa select')].filter(s => s.value).map(s => ({ form_id: s.dataset.f, role: s.value }));
   const le = loginError($('#em').value); if (le) { toast(le); return; }
-  if ($('#pw').value.length < 6) { toast('Пароль: не меньше 6 символов'); return; }
+  if ($('#pw').value.length < 4) { toast('Пароль: не меньше 4 символов'); return; }
   const b = { action: 'create', login: normLogin($('#em').value), password: $('#pw').value, full_name: $('#nm').value.trim(), access };
   if (!await call(b)) return;
   $('#made').hidden = false;
@@ -83,8 +83,8 @@ $('#list').onclick = async e => {
     const { error } = await sb.from('people').update({ full_name: name.trim() || null }).eq('id', u);
     toast(error ? 'Не сохранено' : 'Сохранено'); load();
   } else if (b.dataset.act === 'pw') {
-    const password = prompt('Новый пароль (от 6 символов)'); if (!password) return;
-    if (password.length < 6) { toast('Пароль: не меньше 6 символов'); return; }
+    const password = prompt('Новый пароль (от 4 символов)'); if (!password) return;
+    if (password.length < 4) { toast('Пароль: не меньше 4 символов'); return; }
     if (await call({ action: 'password', id: u, password })) toast('Пароль изменён');
   } else if (b.dataset.act === 'del' && confirm('Удалить пользователя?')) {
     if (await call({ action: 'remove', id: u })) { toast('Удалён'); load(); }

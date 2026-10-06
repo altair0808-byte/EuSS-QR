@@ -1,9 +1,51 @@
+// Сколько химии реально ушло при каждой замене бутыли (в основной единице химии: литры или кг).
+// Правило: обычная замена = полная бутыль минус остаток. Если перед заменой подключали накопленный остаток,
+// то ёмкость, которая сейчас закончилась, была не полной бутылью, а именно этим остатком (его объём и есть «ёмкость»).
+// Замены и подключения идут по времени; подключение относится к ближайшей следующей замене той же химии и того же дозатора.
+// Для периода нужны замены и подключения с запасом назад (60 дней), чтобы подключение из прошлого периода не потерялось.
+function chemUsed(refs, changes, connects) {
+  const used = {}, noLeft = {};
+  const dens = c => (+c.bottle_l > 0 && +c.bottle_kg > 0) ? +c.bottle_kg / +c.bottle_l : null;
+  const conv = (c, v, from, to) => { if (from === to) return v; const d = dens(c); if (!d) return null; return from === 'l' ? v * d : v / d; };
+  const T = x => new Date(x.ts).getTime() || 0;
+  refs.chemicals.forEach(c => {
+    if (c.kind === 'extra') return;
+    const prim = +c.bottle_l > 0 ? 'l' : (+c.bottle_kg > 0 ? 'kg' : null); if (!prim) return;
+    const size = prim === 'l' ? +c.bottle_l : +c.bottle_kg;
+    const amt = x => prim === 'l'
+      ? (x.amount_l != null ? +x.amount_l : x.amount_kg != null ? conv(c, +x.amount_kg, 'kg', 'l') : null)
+      : (x.amount_kg != null ? +x.amount_kg : x.amount_l != null ? conv(c, +x.amount_l, 'l', 'kg') : null);
+    const leftOf = x => prim === 'l'
+      ? (x.leftover_l != null ? +x.leftover_l : x.leftover_kg != null ? conv(c, +x.leftover_kg, 'kg', 'l') : null)
+      : (x.leftover_kg != null ? +x.leftover_kg : x.leftover_l != null ? conv(c, +x.leftover_l, 'l', 'kg') : null);
+    ['1_10', '11_12'].forEach(g => {
+      const ev = [];
+      (changes || []).filter(x => +x.chemical_id === +c.id && (x.machine_group || '1_10') === g).forEach(x => ev.push({ k: 0, t: T(x), x }));
+      (connects || []).filter(x => +x.chemical_id === +c.id && (x.machine_group || '1_10') === g).forEach(x => ev.push({ k: 1, t: T(x), x }));
+      ev.sort((a, b) => a.t - b.t || a.k - b.k);            // при равном времени сначала замена, потом подключение
+      let pending = 0;
+      ev.forEach(e => {
+        if (e.k === 1) { const a = amt(e.x); if (a > 0) pending += a; return; }
+        let left = leftOf(e.x);
+        if (left == null || !isFinite(left)) { noLeft[e.x.id] = true; left = 0; }
+        const cap = pending > 0 ? pending : size;
+        used[e.x.id] = cap - Math.max(0, Math.min(cap, left));
+        pending = 0;
+      });
+    });
+  });
+  return { used, noLeft };
+}
+function addDaysISO(d, n) { const t = new Date(d + 'T00:00:00Z'); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); }
+
 // Теория и факт расхода химии с раздельными дозаторами.
 // Группа 1_10 = машины 1-10, группа 11_12 = машины 11-12.
 // connects: подключения остатка (report_connects). Они уменьшают факт: подключённый остаток уже был посчитан
 // как «не израсходованный» при замене, а следующая замена посчитает всю бутыль целиком.
-function calcReport(loads, changes, refs, connects) {
+// ctx (необязательно): { changes, connects } с запасом назад по времени, чтобы подключения из прошлого периода учитывались.
+function calcReport(loads, changes, refs, connects, ctx) {
   connects = connects || [];
+  const U = chemUsed(refs, ctx ? ctx.changes : changes, ctx ? ctx.connects : connects).used;
   const { water, washTypes, chemicals, recipes } = refs;
   const GROUPS = ['1_10','11_12'];
   const groupOfMachine = m => (+m <= 10 ? '1_10' : '11_12');
@@ -66,7 +108,7 @@ function calcReport(loads, changes, refs, connects) {
         mine.forEach(x=>{
           let left = leftOf(x);
           if(left==null){noLeft++;left=0;}
-          sum += size - Math.max(0,Math.min(size,left));
+          sum += U[x.id] != null ? U[x.id] : size - Math.max(0,Math.min(size,left));
           if(!x.connect_id && left>0) st += Math.min(size,left);          // остаток лежит в запасе, ещё не подключён
         });
         let conn=0;
@@ -76,9 +118,7 @@ function calcReport(loads, changes, refs, connects) {
             : (x.amount_kg != null ? +x.amount_kg : x.amount_l != null ? conv(c,+x.amount_l,'l','kg') : null);
           if(a==null||!(a>0))return;
           conn += a;
-          adj += Math.ceil(a/size - 1e-9)*size - a;                        // «недолив»: ёмкость минус то, что реально подключили
         });
-        sum -= adj;
         actual=both(c,sum,prim);
         stock=both(c,st,prim); connected=both(c,conn,prim);
         const theoryPrim=prim==='l'?theory.l:theory.kg;
@@ -99,4 +139,4 @@ function calcReport(loads, changes, refs, connects) {
     byWash: groups.all.byWash
   };
 }
-if (typeof module !== 'undefined') module.exports = { calcReport };
+if (typeof module !== 'undefined') module.exports = { calcReport, chemUsed, addDaysISO };

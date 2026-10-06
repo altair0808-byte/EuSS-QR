@@ -33,7 +33,7 @@ function chemTable(g){
     const ex=c.kind==='extra',has=c.stock&&(c.stock.l>0||c.stock.kg>0),con=c.connected&&(c.connected.l>0||c.connected.kg>0);
     return `<div class="cm"><div class="cmh"><b>${esc(c.name)}</b><small>${note(c)}</small></div><div class="cmg">
       <div><span>Теория</span><b>${two(c.theory)}</b></div>
-      <div><span>Факт</span><b>${c.changes?two(c.actual):'–'}</b>${c.adj>0?`<small>с учётом подключённого остатка</small>`:''}</div>
+      <div><span>Факт</span><b>${c.changes?two(c.actual):'–'}</b>${c.connected&&((c.connected.l||0)>0||(c.connected.kg||0)>0)?`<small>с учётом подключённого остатка</small>`:''}</div>
       <div><span>Разница</span><b>${dif(c)}</b></div>
       <div class="st"><span>Остаток</span>${ex?'<b>–</b>':`<b>${has?'в запасе: '+two(c.stock).replace('<br>',' · '):'в запасе: нет'}</b>${con?`<small>подключено: ${two(c.connected).replace('<br>',' · ')}</small>`:''}`}</div>
     </div></div>`;}).join('');
@@ -53,11 +53,11 @@ async function show(){
   const d1=$('#d1').value,d2=$('#d2').value,my=++seq;
   if(!d1||!d2||d1>d2){$('#out').innerHTML='<p class="hint">Укажите период: дата «с» не позже даты «по».</p>';return;}
   $('#rng').textContent=`Смена начинается в ${String(st).padStart(2,'0')}:00 и длится сутки. Расход считается отдельно по двум дозаторам.`;
-  const [{data,error},{data:chg,error:e2},{data:cn,error:e3},sn]=await Promise.all([sb.rpc('report_loads',{d1,d2}),sb.rpc('report_changes',{d1,d2}),sb.rpc('report_connects',{d1,d2}),sb.rpc('staff_names')]);
+  const [{data,error},{data:chg,error:e2},{data:cn,error:e3},sn]=await Promise.all([sb.rpc('report_loads',{d1,d2}),sb.rpc('report_changes',{d1:addDaysISO(d1,-60),d2}),sb.rpc('report_connects',{d1:addDaysISO(d1,-60),d2}),sb.rpc('staff_names')]);
   if(my!==seq)return;
   if(error||e2||e3){$('#out').innerHTML='<p class="err">Не удалось загрузить данные. Выполните supabase.sql, затем stage3.sql … stage6.sql.</p>';return;}
   nm=Object.fromEntries(((sn&&sn.data)||[]).map(x=>[x.id,x.name]));
-  const loads=data||[],changes=chg||[],conns=cn||[],r=calcReport(loads,changes,refs,conns);
+  const loads=data||[],chgAll=chg||[],cnAll=cn||[],changes=chgAll.filter(x=>x.shift_date>=d1),conns=cnAll.filter(x=>x.shift_date>=d1),r=calcReport(loads,changes,refs,conns,{changes:chgAll,connects:cnAll});
   cache={loads,changes,conns};
   $('#out').innerHTML=`
     <div class="kpi"><div><b>${r.total}</b><span>стирок всего</span></div><div><b>${f(r.kg,0)}</b><span>кг всего</span></div><div><b>${r.byPart.day}</b><span>день</span></div><div><b>${r.byPart.night}</b><span>ночь</span></div></div>
