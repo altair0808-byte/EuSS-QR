@@ -31,6 +31,9 @@
       sb.from('chemicals').select('id,name,per_unit,per_unit_unit').eq('kind','extra').order('sort')
     ]);
     const washTypes = washList(wt), extras = ex || [];
+    const { data: set } = await sb.from('settings').select('*');
+    const sv = k => { const r = (set || []).find(x => x.key === k); return r ? +r.value : null; };
+    const tzH = sv('tz_offset') ?? 5, stH = sv('shift_start') ?? 6;
     const state = new Map();
     let lastIds = null, tab = 'all';
     const hh = n => String(n).padStart(2, '0');
@@ -68,20 +71,24 @@
         <div class="list" id="wg">${washTypes.map(x => `<button data-v="${x.id}" class="${+old.wash_type_id === x.id ? 'on' : ''}"><span>${esc(x.name)}</span>${x.minutes ? `<small>${x.minutes} мин</small>` : ''}</button>`).join('')}</div>
         <h3>Вес, кг</h3>
         <div class="kg"><button id="mi" aria-label="Меньше">−</button><input id="kg" type="number" min="0" step="0.5" inputmode="decimal" value="${old.weight_kg}"><button id="pl" aria-label="Больше">+</button></div>
-        ${extras.length ? `<h3>Дополнительно</h3><div class="acc">${extras.map(x => `<label>${esc(x.name)}, ${x.per_unit_unit === 'g' ? 'г' : 'мл'}<input type="number" min="0" step="1" inputmode="numeric" data-x="${x.id}" placeholder="0" value="${old.extras[x.id] || ''}"></label>`).join('')}</div>` : ''}
+        ${extras.length ? `<h3>Дополнительно, количество (шт)</h3><div class="acc">${extras.map(x => `<label>${esc(x.name)}<input type="number" min="0" step="1" inputmode="numeric" data-x="${x.id}" data-u="${+x.per_unit || 0}" data-un="${x.per_unit_unit === 'g' ? 'г' : 'мл'}" placeholder="0" value="${old.extras[x.id] || ''}"><small class="hint" style="display:block;margin:.2rem 0 0;font-weight:500">1 шт = ${+x.per_unit || 0} ${x.per_unit_unit === 'g' ? 'г' : 'мл'}</small></label>`).join('')}</div>` : ''}
         <button class="go" id="ok">Готово для машины ${machine}</button>
         ${state.has(machine) ? '<button class="ghost danger" id="rm">Убрать из отправки</button>' : ''}</section></div>`;
       const close = () => { $('#ovl').innerHTML = ''; document.onkeydown = null; };
       document.onkeydown = e => { if (e.key === 'Escape') close(); };
       $('#cl').onclick = close; $('#bg').onmousedown = e => { if (e.target.id === 'bg') close(); };
       pick('#wg', v => { w = +v; });
+      document.querySelectorAll('[data-x]').forEach(i => i.oninput = () => { const n = +i.value || 0, u = +i.dataset.u; i.nextElementSibling.textContent = n > 0 ? `${n} шт × ${u} = ${fmt(n * u)} ${i.dataset.un}` : `1 шт = ${u} ${i.dataset.un}`; });
       $('#mi').onclick = () => $('#kg').value = Math.max(0, (+$('#kg').value || 0) - 1);
       $('#pl').onclick = () => $('#kg').value = (+$('#kg').value || 0) + 1;
       if ($('#rm')) $('#rm').onclick = () => { state.delete(machine); close(); render(); toast(`Машина ${machine} убрана`); };
       $('#ok').onclick = () => {
         if (!w) { toast('Выберите вид стирки'); return; }
+        const kgv = +$('#kg').value;
+        if (!(kgv > 0)) { toast('Укажите вес белья в килограммах'); return; }
+        if (kgv > 100 && !confirm('Вес ' + kgv + ' кг. Это точно верно?')) return;
         const e2 = {}; document.querySelectorAll('[data-x]').forEach(i => { if (+i.value > 0) e2[i.dataset.x] = +i.value; });
-        state.set(machine, { wash_type_id: w, weight_kg: +$('#kg').value || 25, extras: e2 });
+        state.set(machine, { wash_type_id: w, weight_kg: kgv, extras: e2 });
         close(); render(); toast(`Машина ${machine} настроена`);
       };
     }
@@ -92,17 +99,34 @@
         <div class="cards">${rows.map(([m, v]) => {
           const chem = Object.entries(v.extras).map(([id, qty]) => {
             const c = extras.find(x => String(x.id) === String(id));
-            return c ? `${esc(c.name)}: ${qty} ${c.per_unit_unit === 'g' ? 'г' : 'мл'}` : '';
+            return c ? `${esc(c.name)}: ${qty} шт` : '';
           }).filter(Boolean).join(', ');
           return `<div class="card"><div><span class="nm">Машина ${m} · ${m <= 10 ? 'основной дозатор' : 'отдельный дозатор'}</span><small>${esc(wname(v.wash_type_id))} · ${v.weight_kg} кг${chem ? ' · ' + chem : ''}</small></div><button class="mini" data-edit="${m}">Изменить</button></div>`;
         }).join('')}</div>
+        <div class="box"><h2>Когда стирки были запущены</h2><p class="hint">По умолчанию — сейчас. Если заполняете бланк позже, укажите время запуска: от него зависит, к дню или к ночи и к какой смене попадёт запись.</p>
+          <div class="seg" id="tm"><button data-v="now" class="on">Сейчас</button><button data-v="set">Указать время</button></div>
+          <div id="tw" hidden><label>Время запуска (в этой смене)<input id="tt" type="time"></label></div></div>
         <div class="box"><b>Итого машин: ${rows.length}</b><p class="hint" style="margin:.25rem 0 0">1–10: ${rows.filter(([m]) => m <= 10).length}; 11–12: ${rows.filter(([m]) => m >= 11).length}.</p></div>
         <div class="bar"><button class="go" id="confirm">Все верно — отправить ${rows.length} ${mw(rows.length)}</button><button class="ghost" id="back">← Вернуться к машинам</button></div><div id="ovl"></div>`;
       toTop();
       app.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => { render(); panel(+b.dataset.edit); });
       $('#back').onclick = () => { render(); toTop(); };
+      let when = 'now';
+      pick('#tm', v => { when = v; $('#tw').hidden = v === 'now'; });
+      const startedAt = () => {                                   // время запуска -> момент времени внутри текущей смены
+        if (when === 'now') return { ts: null };
+        const t = $('#tt').value; if (!t) return { err: 'Укажите время запуска' };
+        const [h, mi] = t.split(':').map(Number);
+        const sd = new Date(Date.now() + (tzH - stH) * 3600e3).toISOString().slice(0, 10).split('-').map(Number);
+        const start = Date.UTC(sd[0], sd[1] - 1, sd[2], stH) - tzH * 3600e3;
+        let at = Date.UTC(sd[0], sd[1] - 1, sd[2], h, mi) - tzH * 3600e3; if (h < stH) at += 864e5;
+        if (at > Date.now() + 60e3) return { err: 'Это время ещё не наступило' };
+        if (at < start) return { err: 'Это время раньше начала текущей смены' };
+        return { ts: new Date(at).toISOString() };
+      };
       $('#confirm').onclick = async () => {
-        const payload = rows.map(([m, v]) => ({ form_id: f.id, machine: m, wash_type_id: +v.wash_type_id, weight_kg: +v.weight_kg || 25, extras: v.extras }));
+        const w = startedAt(); if (w.err) { toast(w.err); return; }
+        const payload = rows.map(([m, v]) => ({ form_id: f.id, machine: m, wash_type_id: +v.wash_type_id, weight_kg: +v.weight_kg, extras: v.extras, ...(w.ts ? { ts: w.ts } : {}) }));
         $('#confirm').disabled = true;
         const { data, error } = await sb.from('loads').insert(payload).select('id,machine');
         if (error) { toast('Не сохранено: ' + error.message); $('#confirm').disabled = false; return; }
@@ -152,7 +176,7 @@
     ]);
     const chems = ch || [], isSuper = pr?.role === 'superadmin';
     const groups = [['1_10', 'Основной дозатор', 'машины 1–10'], ['11_12', 'Отдельный дозатор', 'машины 11–12']];
-    let g = null, c = preChem ? String(preChem) : null, mode = 'empty';
+    let g = null, c = preChem ? String(preChem) : null, mode = 'empty', unit = 'kg';
     app.innerHTML = head + `
       <div class="box"><h2>Что заменили</h2>
         <h3>Дозатор</h3>
@@ -163,29 +187,36 @@
       <div class="box"><h2>Остаток в бутыли</h2>
         <p class="hint">Сколько осталось в снятой бутыли. Остаток записывается вместе с заменой.</p>
         <div class="seg" id="lm"><button data-v="empty" class="on">Бутыль пустая</button><button data-v="some">Остался остаток</button></div>
-        <div id="lw" hidden><label>Остаток, кг<input id="lf" type="number" min="0" step="0.1" inputmode="decimal"></label><div class="fill"><i id="fb"></i></div></div>
+        <div id="lw" hidden><div class="seg" id="lu" aria-label="Единица"><button data-v="kg" class="on">кг</button><button data-v="l">литры</button></div>
+          <label>Остаток, <span id="lul">кг</span><input id="lf" type="number" min="0" step="0.1" inputmode="decimal"></label><div class="fill"><i id="fb"></i></div></div>
         <p class="hint" id="lh"></p></div>
       <div class="bar"><button class="go" id="save">Проверить и заменить</button>
       <button class="ghost" id="undo" hidden>Отменить последнюю запись</button></div><div id="ovl"></div>`;
     const show = undoBtn('chem_changes');
     if (lastId) show(lastId);
     const cur = () => chems.find(x => String(x.id) === c);
+    const sizeOf = x => x ? (unit === 'kg' ? +x.bottle_kg : +x.bottle_l) : 0;
+    const U = () => unit === 'kg' ? 'кг' : 'л';
     const hint = () => {
-      const x = cur(), v = $('#lf').value; let t = 'Бутыль будет записана как пустая.', pct = 0;
+      const x = cur(), v = $('#lf').value, size = sizeOf(x); let t = 'Бутыль будет записана как пустая.', pct = 0;
       if (mode === 'some') {
-        t = 'Введите вес остатка в килограммах.';
+        t = 'Введите, сколько осталось в бутыли.';
         if (!x) t = 'Сначала выберите химию выше.';
-        else if (!(+x.bottle_kg > 0)) t = 'Вес бутыли не задан в настройках, остаток не пересчитается в литры.';
+        else if (!(size > 0)) t = unit === 'kg' ? 'Вес полной бутыли не задан в настройках. Введите остаток в литрах или задайте вес.' : 'Объём бутыли не задан в настройках. Введите остаток в килограммах или задайте объём.';
         else if (v !== '') {
-          pct = Math.min(100, +v / x.bottle_kg * 100);
-          if (+v > +x.bottle_kg) t = `Больше, чем в полной бутыли (${x.bottle_kg} кг). Проверьте.`;
-          else t = (+x.bottle_l > 0 ? `≈ ${(+v * x.bottle_l / x.bottle_kg).toLocaleString('ru-RU', { maximumFractionDigits: 2 })} л · ` : '') + `${Math.round(pct)}% полной бутыли`;
+          pct = Math.min(100, +v / size * 100);
+          if (+v > size) t = `Больше, чем в полной бутыли (${size} ${U()}). Проверьте.`;
+          else {
+            const other = unit === 'kg' ? (+x.bottle_l > 0 ? `≈ ${(+v * x.bottle_l / x.bottle_kg).toLocaleString('ru-RU', { maximumFractionDigits: 2 })} л · ` : '') : (+x.bottle_kg > 0 ? `≈ ${(+v * x.bottle_kg / x.bottle_l).toLocaleString('ru-RU', { maximumFractionDigits: 2 })} кг · ` : '');
+            t = other + `${Math.round(pct)}% полной бутыли`;
+          }
         }
       }
-      $('#lh').textContent = t; $('#fb').style.width = pct + '%';
+      $('#lh').textContent = t; $('#fb').style.width = pct + '%'; $('#lul').textContent = unit === 'kg' ? 'кг' : 'литры';
     };
     pick('#cg', v => { g = v; }); pick('#chem', v => { c = v; hint(); });
     pick('#lm', v => { mode = v; $('#lw').hidden = v === 'empty'; hint(); });
+    pick('#lu', v => { unit = v; hint(); });
     $('#lf').oninput = hint; hint();
     if ($('#addc')) $('#addc').onclick = () => addChemPanel(chems, id => laundryChem(undefined, id));
     $('#save').onclick = () => {
@@ -193,17 +224,18 @@
       if (!c) { toast('Выберите, какая химия закончилась'); return; }
       const x = cur(), lf = mode === 'empty' ? '' : $('#lf').value;
       if (mode === 'some' && lf === '') { toast('Укажите остаток или выберите «Бутыль пустая»'); return; }
-      if (lf !== '' && +x.bottle_kg > 0 && +lf > +x.bottle_kg) { toast('Остаток больше полной бутыли'); return; }
+      if (mode === 'some' && !(sizeOf(x) > 0)) { toast(unit === 'kg' ? 'Для этой химии не задан вес бутыли: введите остаток в литрах' : 'Для этой химии не задан объём бутыли: введите остаток в килограммах'); return; }
+      if (lf !== '' && +lf > sizeOf(x)) { toast('Остаток больше полной бутыли'); return; }
       const gn = groups.find(r => r[0] === g).slice(1).join(' · ');
       app.innerHTML = head + `<div class="box"><h2>Проверка замены</h2>
         <div class="acc"><span>Дозатор</span><b>${gn}</b></div><div class="acc"><span>Химия</span><b>${esc(x.name)}</b></div>
-        <div class="acc"><span>Остаток</span><b>${lf === '' ? 'бутыль пустая' : esc(lf) + ' кг'}</b></div></div>
+        <div class="acc"><span>Остаток</span><b>${lf === '' ? 'бутыль пустая' : esc(lf) + ' ' + U()}</b></div></div>
         <div class="bar"><button class="go" id="confirm">Все верно — записать замену</button><button class="ghost" id="back">Изменить</button></div>`;
       toTop();
       $('#back').onclick = () => laundryChem(undefined, c);
       $('#confirm').onclick = async () => {
         $('#confirm').disabled = true;
-        const { data, error } = await sb.from('chem_changes').insert({ form_id: f.id, chemical_id: +c, leftover_kg: lf === '' ? null : +lf, machine_group: g }).select('id').single();
+        const { data, error } = await sb.from('chem_changes').insert({ form_id: f.id, chemical_id: +c, ...(lf === '' ? { leftover_kg: 0, leftover_l: 0 } : unit === 'kg' ? { leftover_kg: +lf } : { leftover_l: +lf }), machine_group: g }).select('id').single();
         if (error) { toast('Не сохранено: ' + error.message); $('#confirm').disabled = false; return; }
         toast('Замена записана'); laundryChem(data.id); toTop();
       };

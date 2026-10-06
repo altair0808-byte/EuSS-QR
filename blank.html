@@ -3,16 +3,15 @@
 <title>Бланк за смену — EuSS</title><link rel="icon" href="favicon.png" type="image/png"><link rel="stylesheet" href="style.css"></head>
 <body>
 <header class="hd"><div><a class="lg" href="index.html" aria-label="На панель смены"><img src="euss-logo.png" alt="EuSS"><span class="sep"></span><span class="sub">Отчёты</span></a><nav class="nav"><a class="btn s" href="index.html">← Панель</a></nav></div></header>
-<main class="wide full">
-<div class="top"><h1>Бланк за смену</h1></div>
+<main class="wide">
+<div class="top"><p class="eb">Смена</p><h1 id="ttl">Бланк за смену</h1></div>
 <div class="box">
-  <label>Дата смены<input type="date" id="d"></label>
+  <div class="dnav"><button class="btn" id="pv" aria-label="Предыдущая смена" title="Предыдущая смена">‹</button><label>Дата смены<input type="date" id="d"></label><button class="btn" id="nx" aria-label="Следующая смена" title="Следующая смена">›</button></div>
   <div class="seg" role="group" aria-label="Смена"><button id="t">Сегодня</button><button id="y">Вчера</button></div>
-  <button class="go" id="x" style="margin-top:1rem">⬇ Скачать Excel за месяц</button>
   <p class="hint" id="msg"></p>
+  <button class="go" id="x" style="margin-top:.5rem">⬇ Скачать Excel за месяц</button>
 </div>
-<div id="warn"></div>
-<div class="box blkwrap" id="out"><p class="hint">Загрузка…</p></div>
+<div id="out"><p class="hint">Загрузка…</p></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -22,6 +21,11 @@ let refs = null, tz = 5, st = 6, seq = 0;
 const shiftToday = () => new Date(Date.now() + (tz - st) * 3600e3).toISOString().slice(0, 10);
 const addDays = (d, n) => new Date(new Date(d + 'T00:00:00Z').getTime() + n * 864e5).toISOString().slice(0, 10);
 const lastDay = ym => new Date(Date.UTC(+ym.slice(0, 4), +ym.slice(5, 7), 0)).getUTCDate();
+const MON = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+const dmy = d => d.split('-').reverse().join('.');
+const longDate = d => `${+d.slice(8)} ${MON[+d.slice(5, 7) - 1]} ${d.slice(0, 4)}`;
+const E = Blank.esc, F = (n, d = 1) => (Math.round(n * 10 ** d) / 10 ** d).toLocaleString('ru-RU');
+const cell = (v, d = 1) => v ? F(v, d) : '<span class="z">–</span>';
 
 async function loads(d1, d2) {
   const { data, error } = await sb.rpc('report_loads', { d1, d2 });
@@ -29,16 +33,74 @@ async function loads(d1, d2) {
   return data || [];
 }
 
+// Проверки данных: всё, что может исказить итоги, показываем сразу, а не прячем.
+function checks(m, data) {
+  const out = [], mins = {}; refs.washTypes.forEach(w => mins[w.id] = +w.minutes || 0);
+  const byM = {}; data.forEach(l => (byM[l.machine] = byM[l.machine] || []).push(l));
+  const overlaps = [];
+  Object.entries(byM).forEach(([mach, arr]) => {
+    arr.sort((a, b) => new Date(a.ts) - new Date(b.ts));
+    for (let i = 1; i < arr.length; i++) {
+      const gap = (new Date(arr[i].ts) - new Date(arr[i - 1].ts)) / 60000, need = mins[arr[i - 1].wash_type_id] || 0;
+      if (need && gap < need * .5) overlaps.push(`машина ${mach}: интервал ${Math.round(gap)} мин при стирке ${need} мин`);
+    }
+  });
+  const odd = data.filter(l => !(+l.weight_kg > 0) || +l.weight_kg > 100);
+  const rawKg = data.reduce((x, l) => x + (+l.weight_kg || 0), 0), msN = Object.values(m.machineStats).reduce((x, y) => x + y.n, 0), msKg = Object.values(m.machineStats).reduce((x, y) => x + y.kg, 0);
+  const okSum = msN === data.length && Math.abs(msKg - rawKg) < 1e-6 && m.total.n + m.total.unknownN === data.length && Math.abs(m.total.kg - m.total.colSum.reduce((x, y) => x + y, 0)) < 1e-6;
+  out.push({ k: okSum ? 'ok' : 'bad', t: okSum ? `Итоги сходятся: ${data.length} записей, ${F(rawKg)} кг` : 'Итоги по машинам и по видам расходятся, сообщите администратору' });
+  if (m.total.unknownN) out.push({ k: 'warn', t: `Вид стирки не из шаблона: ${m.total.unknownN} (${Object.entries(m.unknown).map(([n, c]) => E(n) + ' ' + c).join(', ')})`, n: 'Они есть в итогах по машинам и химии, но в классический бланк и Excel-лист дня не попадают.' });
+  if (m.lost.length) out.push({ k: 'warn', t: `Не влезло в 5 строк бланка: ${m.lost.length}`, n: 'В итогах и в сумме по столбцам эти стирки учтены. В ячейки Excel помещаются первые 5 на вид и машину.' });
+  if (overlaps.length) out.push({ k: 'warn', t: `Слишком короткий интервал на машине: ${overlaps.length}`, n: overlaps.slice(0, 4).join('; ') + (overlaps.length > 4 ? '…' : '') });
+  if (odd.length) out.push({ k: 'bad', t: `Подозрительный вес: ${odd.length}`, n: odd.slice(0, 4).map(l => `машина ${l.machine}, ${F(l.weight_kg)} кг`).join('; ') });
+  if (m.skipped && m.skipped.length) out.push({ k: 'warn', t: 'Химия вне шаблона Excel: ' + m.skipped.map(E).join(', ') });
+  if (!overlaps.length && !odd.length && !m.total.unknownN && !m.lost.length) out.push({ k: 'ok', t: 'Подозрительных записей нет' });
+  return { out, overlapMachines: new Set(Object.keys(byM).filter(k => overlaps.some(o => o.startsWith('машина ' + k + ':')))) };
+}
+
+function view(m, data) {
+  const G = m.groups, T = m.total, ms = m.machineStats;
+  const day = Object.values(ms).reduce((a, x) => a + x.day, 0), night = Object.values(ms).reduce((a, x) => a + x.night, 0);
+  const used = Object.values(ms).filter(x => x.n).length, maxN = Math.max(1, ...Object.values(ms).map(x => x.n));
+  const ck = checks(m, data);
+  const kpi = [['Стирок', F(G.all.n, 0), '', `день ${day} · ночь ${night}`, ''], ['Общий вес', F(G.all.kg), 'кг', G.all.n ? `в среднем ${F(G.all.kg / G.all.n)} кг на стирку` : 'нет данных', 'm2'],
+    ['Машин задействовано', used + ' / 12', '', `дозатор 1: ${G['1_10'].n} · дозатор 2: ${G['11_12'].n}`, 'm3'], ['Время работы', F(T.time / 60), 'ч', 'по рецептуре, все виды стирки', 'm4']];
+  const mrow = n => { const x = ms[n], flag = ck.overlapMachines.has(String(n));
+    return `<tr class="${n === 1 || n === 11 ? 'gs' : ''}${flag ? ' flag' : ''}"><th class="l">Машина ${n}</th><td class="dim hs">${n <= 10 ? 'Дозатор 1' : 'Дозатор 2'}</td>
+      <td class="grp">${cell(x.day, 0)}</td><td>${cell(x.dayKg)}</td><td class="grp">${cell(x.night, 0)}</td><td>${cell(x.nightKg)}</td>
+      <td class="grp"><b>${cell(x.n, 0)}</b></td><td><b>${cell(x.kg)}</b></td><td>${x.n ? F(x.kg / x.n) : '<span class="z">–</span>'}</td>
+      <td class="l"><span class="mcell" style="justify-content:flex-start"><span class="meter" style="width:${Math.round(x.n / maxN * 100)}px"></span></span></td></tr>`; };
+  const sumRow = (label, rows) => { const a = rows.map(n => ms[n]), n = a.reduce((s, x) => s + x.n, 0), kg = a.reduce((s, x) => s + x.kg, 0);
+    return `<tr class="tot"><th class="l">${label}</th><td class="hs"></td><td class="grp">${a.reduce((s, x) => s + x.day, 0)}</td><td>${F(a.reduce((s, x) => s + x.dayKg, 0))}</td><td class="grp">${a.reduce((s, x) => s + x.night, 0)}</td><td>${F(a.reduce((s, x) => s + x.nightKg, 0))}</td><td class="grp">${n}</td><td>${F(kg)}</td><td>${n ? F(kg / n) : '–'}</td><td></td></tr>`; };
+  const all = Array.from({ length: 12 }, (_, i) => i + 1);
+  const machines = `<div class="box"><table class="tbl"><tr><th class="l">Машина</th><th class="l hs">Дозатор</th><th class="grp">День, ст.</th><th>День, кг</th><th class="grp">Ночь, ст.</th><th>Ночь, кг</th><th class="grp">Всего, ст.</th><th>Всего, кг</th><th>Ср. вес</th><th class="l">Нагрузка</th></tr>
+    ${all.map(mrow).join('')}${sumRow('Итого', all)}</table></div>`;
+  const types = `<div class="box"><table class="tbl"><tr><th class="l">Вид стирки</th><th>Стирок</th><th>Кг</th><th>Время, мин</th>${m.mains.map(c => `<th>${E(c.name)}, л</th>`).join('')}</tr>
+    ${m.types.filter(ty => ty.n).map(ty => `<tr><th class="l">${E(ty.name)}</th><td>${ty.n}</td><td>${F(ty.kg)}</td><td>${F(ty.time, 0)}</td>${m.mains.map((_, i) => `<td>${cell(ty.chem[i] / 1000, 2)}</td>`).join('')}</tr>`).join('') || `<tr><td class="l" colspan="${4 + m.mains.length}">Нет стирок</td></tr>`}
+    <tr class="tot"><th class="l">Итого</th><td>${T.n}</td><td>${F(T.kg)}</td><td>${F(T.time, 0)}</td>${m.mains.map((_, i) => `<td>${F(T.chem[i] / 1000, 2)}</td>`).join('')}</tr></table></div>`;
+  const unit = c => c.per_unit_unit === 'g' ? 'г' : 'мл';
+  const chemRows = [...m.mains.map((c, i) => [c.name, 'по рецепту', G['1_10'].chem[i] / 1000, G['11_12'].chem[i] / 1000, 'л']),
+    ...m.extras.map((c, i) => [c.name, `${F(G.all.exQty[i], 0)} шт × ${+c.per_unit || 0} ${unit(c)}`, G['1_10'].exTot[i] / 1000, G['11_12'].exTot[i] / 1000, c.per_unit_unit === 'g' ? 'кг' : 'л'])];
+  const chem = `<div class="box"><table class="tbl"><tr><th class="l">Химия</th><th class="l">Как посчитано</th><th>Дозатор 1</th><th>Дозатор 2</th><th>Всего</th></tr>
+    ${chemRows.map(([n, how, a, b, u]) => `<tr><th class="l">${E(n)}</th><td class="dim l">${how}</td><td>${cell(a, 2)} <span class="dim">${u}</span></td><td>${cell(b, 2)} <span class="dim">${u}</span></td><td><b>${cell(a + b, 2)}</b> <span class="dim">${u}</span></td></tr>`).join('')}</table>
+    <p class="note" style="padding:0 .5rem .5rem">Это теоретический расход по рецептам и отправленным загрузкам. Фактический расход по заменам бутылей смотрите в отчёте по сменам.</p></div>`;
+  return `<section class="mg" aria-label="Итоги смены">${kpi.map(([l, v, u, n, c]) => `<article class="m ${c}"><p class="l">${l}</p><p class="v">${v} ${u ? `<small>${u}</small>` : ''}</p><p class="n">${n}</p></article>`).join('')}</section>
+    <div class="box" role="list" aria-label="Проверка данных" style="margin-top:.75rem"><h3 style="margin-top:0">Проверка данных</h3>${ck.out.map(c => `<div class="chk ${c.k === 'ok' ? '' : 'w-' + c.k}" role="listitem"><div><b>${c.t}</b>${c.n ? `<span>${c.n}</span>` : ''}</div></div>`).join('')}</div>
+    <h2>Машины</h2><p class="hint">Сколько стирок и килограммов прошло на каждой машине днём и ночью.</p>${machines}
+    <h2>Виды стирки и химия</h2>${types}
+    <h2>Расход химии по дозаторам</h2>${chem}
+    <details class="box" style="margin-top:1.5rem"><summary><b>Классический бланк, как в Excel</b> <small>вес каждой стирки по машинам</small></summary><div class="blkwrap" style="margin-bottom:.5rem">${Blank.html(m)}</div></details>`;
+}
+
 async function show() {
   const date = $('#d').value, my = ++seq;
   if (!date) return;
-  $('#msg').textContent = `Смена ${date.split('-').reverse().join('.')} с ${String(st).padStart(2, '0')}:00, сутки.`;
+  $('#ttl').textContent = 'Смена ' + longDate(date);
+  $('#msg').textContent = `Смена начинается в ${String(st).padStart(2, '0')}:00 и длится сутки: день ${String(st).padStart(2, '0')}:00–${String((st + 12) % 24).padStart(2, '0')}:00, ночь до ${String(st).padStart(2, '0')}:00.`;
   try {
     const data = await loads(date, date);
     if (my !== seq) return;
-    const m = Blank.build(data, refs, date);
-    $('#out').innerHTML = Blank.html(m);
-    $('#warn').innerHTML = Blank.warnings(m).map(w => `<p class="err">${Blank.esc(w)}</p>`).join('');
+    $('#out').innerHTML = view(Blank.build(data, refs, date), data);
   } catch (e) {
     $('#out').innerHTML = '<p class="err">Не удалось загрузить данные. Проверьте, что выполнены report.sql и stage2.sql.</p>';
   }
@@ -51,34 +113,40 @@ async function download() {
     const res = await fetch('Blanc.xlsx', { cache: 'no-store' });
     if (!res.ok) throw new Error('Файл Blanc.xlsx не найден на сайте. Положите его в корень репозитория рядом с index.html.');
     const zip = await JSZip.loadAsync(await res.arrayBuffer());
-    const data = await loads(ym + '-01', ym + '-' + String(lastDay(ym)).padStart(2, '0'));
-    const { data: changes, error: chErr } = await sb.rpc('report_changes', { d1: ym + '-01', d2: ym + '-' + String(lastDay(ym)).padStart(2, '0') });
+    const d2 = ym + '-' + String(lastDay(ym)).padStart(2, '0');
+    const data = await loads(ym + '-01', d2);
+    const { data: changes, error: chErr } = await sb.rpc('report_changes', { d1: ym + '-01', d2 });
     if (chErr) throw chErr;
     const byDay = {};
     data.forEach(l => (byDay[l.shift_date] = byDay[l.shift_date] || []).push(l));
-    const days = {};
-    Object.keys(byDay).forEach(d => { days[+d.slice(8)] = Blank.build(byDay[d], refs, d); });
+    const days = {}, warn = new Set();
+    Object.keys(byDay).forEach(d => { const mm = Blank.build(byDay[d], refs, d); days[+d.slice(8)] = mm; Blank.warnings(mm).forEach(w => warn.add(w)); });
     await Blank.fillWorkbook(zip, days, refs, changes || []);
     const blob = await zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'Blanc-' + ym + '.xlsx';
     document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1e4);
-    $('#msg').textContent = 'Файл готов: ' + a.download;
+    $('#msg').textContent = 'Файл готов: ' + a.download + (warn.size ? '. Есть замечания, они показаны ниже.' : '');
     toast('Файл скачан');
-  } catch (e) { $('#msg').textContent = ''; $('#warn').innerHTML = `<p class="err">${Blank.esc(e.message || e)}</p>`; }
+    document.querySelectorAll('.xw').forEach(n => n.remove());
+    $('#msg').insertAdjacentHTML('afterend', [...warn].map(w => `<p class="err xw">${E(w)}</p>`).join(''));
+  } catch (e) { $('#msg').textContent = ''; $('#msg').insertAdjacentHTML('afterend', `<p class="err xw">${E(e.message || e)}</p>`); }
   b.disabled = false;
 }
 
 const mark = () => { const d = $('#d').value, t = shiftToday(), y = addDays(t, -1);
   [['t', d === t], ['y', d === y]].forEach(([id, on]) => { $('#' + id).classList.toggle('on', on); $('#' + id).setAttribute('aria-pressed', on); }); };
+const go = d => { $('#d').value = d; mark(); show(); };
 $('#d').onchange = () => { mark(); show(); };
-$('#t').onclick = () => { $('#d').value = shiftToday(); mark(); show(); };
-$('#y').onclick = () => { $('#d').value = addDays(shiftToday(), -1); mark(); show(); };
+$('#t').onclick = () => go(shiftToday());
+$('#y').onclick = () => go(addDays(shiftToday(), -1));
+$('#pv').onclick = () => $('#d').value && go(addDays($('#d').value, -1));
+$('#nx').onclick = () => $('#d').value && go(addDays($('#d').value, 1));
 $('#x').onclick = download;
 
 (async () => {
   if (!await need()) return;
   const { data: ok } = await sb.rpc('can_report');
-  if (!ok) { $('#out').innerHTML = '<p>Нет доступа. Обратитесь к администратору.</p>'; return; }
+  if (!ok) { $('#out').innerHTML = '<p class="hint">Нет доступа. Обратитесь к администратору.</p>'; return; }
   const [s, c, w, r] = await Promise.all([
     sb.from('settings').select('*'), sb.from('chemicals').select('*').order('sort'),
     sb.from('wash_types').select('*').order('sort'), sb.from('recipes').select('*')
@@ -86,6 +154,6 @@ $('#x').onclick = download;
   const g = k => { const x = (s.data || []).find(y => y.key === k); return x ? +x.value : null; };
   tz = g('tz_offset') ?? 5; st = g('shift_start') ?? 6;
   refs = { water: g('water_l') ?? 55, washTypes: w.data || [], chemicals: c.data || [], recipes: r.data || [] };
-  $('#d').value = shiftToday(); mark(); show();
+  go(shiftToday());
 })();
 </script></body></html>

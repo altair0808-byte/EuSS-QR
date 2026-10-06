@@ -14,51 +14,55 @@ const Blank = (() => {
   const fmt = (n, d = 1) => (Math.round(n * 10 ** d) / 10 ** d).toLocaleString('ru-RU');
 
   function setup(refs) {
-    const mains = refs.chemicals.filter(c => c.kind === 'main').sort(bySort).slice(0, 5);
-    const extras = refs.chemicals.filter(c => c.kind === 'extra').sort(bySort).slice(0, 3);
+    const allMain = refs.chemicals.filter(c => c.kind === 'main').sort(bySort), allExtra = refs.chemicals.filter(c => c.kind === 'extra').sort(bySort);
+    const mains = allMain.slice(0, 5), extras = allExtra.slice(0, 3);
+    const skipped = [...allMain.slice(5), ...allExtra.slice(3)].map(c => c.name);
     const typeOf = {}, wt = Array(7).fill(null), rec = {}, other = {};
     refs.washTypes.forEach(w => { const t = TYPES.indexOf(norm(w.name)); if (t >= 0) { typeOf[w.id] = t; wt[t] = w; } else other[w.id] = w.name; });
     refs.recipes.forEach(r => rec[r.wash_type_id + ':' + r.chemical_id] = +r.ml_per_l || 0);
-    return { mains, extras, typeOf, wt, rec, other, water: +refs.water || 55 };
+    return { mains, extras, skipped, typeOf, wt, rec, other, water: +refs.water || 55 };
   }
 
   // Раскладка одного дня: loads уже отфильтрованы по shift_date
   function build(loads, refs, date) {
     const S = setup(refs);
     const grid = TYPES.map(() => Array.from({ length: 12 }, () => [[], []]));
-    const ex = TYPES.map(() => [0, 0, 0]);
+    const agg = TYPES.map(() => ({ n: 0, kg: 0, ex: [0, 0, 0] }));          // всё, что записано, даже если не влезло в 5 строк
+    const colAll = Array(24).fill(0);
     const lost = [], unknown = {};
     const machineStats = {};
-    for (let machine = 1; machine <= 12; machine++) machineStats[machine] = { n: 0, kg: 0, chem: Array(S.mains.length).fill(0), exQty: Array(S.extras.length).fill(0), exTot: Array(S.extras.length).fill(0) };
+    for (let machine = 1; machine <= 12; machine++) machineStats[machine] = { n: 0, kg: 0, day: 0, night: 0, dayKg: 0, nightKg: 0, chem: Array(S.mains.length).fill(0), exQty: Array(S.extras.length).fill(0), exTot: Array(S.extras.length).fill(0) };
     loads.slice().sort((a, b) => (a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0)).forEach(l => {
-      const t = S.typeOf[l.wash_type_id];
-      if (t === undefined) { const n = S.other[l.wash_type_id] || ('вид ' + l.wash_type_id); unknown[n] = (unknown[n] || 0) + 1; return; }
+      const t = S.typeOf[l.wash_type_id], w = +l.weight_kg || 0, part = l.part === 'night' ? 1 : 0;
       const ms = machineStats[+l.machine];
-      if (ms) {
-        ms.n++; ms.kg += +l.weight_kg || 0;
+      if (ms) {                                                              // машина считается всегда, даже если вид стирки неизвестен шаблону
+        ms.n++; ms.kg += w; ms[part ? 'night' : 'day']++; ms[part ? 'nightKg' : 'dayKg'] += w;
         S.mains.forEach((c, i) => { ms.chem[i] += S.water * (S.rec[l.wash_type_id + ':' + c.id] || 0); });
         Object.entries(l.extras || {}).forEach(([id, q]) => {
           const i = S.extras.findIndex(c => String(c.id) === String(id));
           if (i >= 0) { ms.exQty[i] += +q || 0; ms.exTot[i] += (+q || 0) * (+S.extras[i].per_unit || 0); }
         });
       }
-      const cell = grid[t][l.machine - 1][l.part === 'night' ? 1 : 0];
-      if (cell.length >= SLOTS) lost.push({ type: S.wt[t].name, machine: l.machine, part: l.part === 'night' ? 'ночь' : 'день' });
-      else cell.push(+l.weight_kg || 0);
-      Object.entries(l.extras || {}).forEach(([id, q]) => { const i = S.extras.findIndex(c => String(c.id) === String(id)); if (i >= 0) ex[t][i] += +q || 0; });
+      if (t === undefined) { const n = S.other[l.wash_type_id] || ('вид ' + l.wash_type_id); unknown[n] = (unknown[n] || 0) + 1; return; }
+      agg[t].n++; agg[t].kg += w;
+      colAll[(l.machine - 1) * 2 + part] += w;
+      Object.entries(l.extras || {}).forEach(([id, q]) => { const i = S.extras.findIndex(c => String(c.id) === String(id)); if (i >= 0) agg[t].ex[i] += +q || 0; });
+      const cell = grid[t][l.machine - 1][part];
+      if (cell.length >= SLOTS) lost.push({ type: S.wt[t].name, machine: l.machine, part: part ? 'ночь' : 'день' });
+      else cell.push(w);
     });
     const types = TYPES.map((_, t) => {
-      const w = S.wt[t], cells = grid[t].flat();
-      const n = cells.reduce((a, c) => a + c.length, 0), kg = cells.flat().reduce((a, x) => a + x, 0);
+      const w = S.wt[t], n = agg[t].n, kg = agg[t].kg;
       const minutes = w ? +w.minutes || 0 : 0;
       const chem = S.mains.map(c => w ? n * S.water * (S.rec[w.id + ':' + c.id] || 0) : 0);
       while (chem.length < 5) chem.push(0);
-      const exTot = S.extras.map((c, i) => ex[t][i] * (+c.per_unit || 0));
+      const exTot = S.extras.map((c, i) => agg[t].ex[i] * (+c.per_unit || 0));
       while (exTot.length < 3) exTot.push(0);
-      return { t, name: w ? w.name : TYPES[t], n, kg, minutes, time: n * minutes, chem, exQty: ex[t], exTot };
+      return { t, name: w ? w.name : TYPES[t], n, kg, minutes, time: n * minutes, chem, exQty: agg[t].ex, exTot };
     });
-    const colSum = Array.from({ length: 24 }, (_, i) => r6(types.reduce((a, ty) => a + grid[ty.t][i >> 1][i & 1].reduce((x, y) => x + y, 0), 0)));
+    const colSum = colAll.map(r6);
     const total = {
+      unknownN: Object.values(unknown).reduce((a, x) => a + x, 0),
       n: types.reduce((a, x) => a + x.n, 0), kg: r6(types.reduce((a, x) => a + x.kg, 0)), time: types.reduce((a, x) => a + x.time, 0),
       chem: [0, 1, 2, 3, 4].map(i => r6(types.reduce((a, x) => a + x.chem[i], 0))),
       exQty: [0, 1, 2].map(i => types.reduce((a, x) => a + x.exQty[i], 0)),
@@ -91,7 +95,7 @@ const Blank = (() => {
       exQty: groups['1_10'].exQty.map((v,i) => v + groups['11_12'].exQty[i]),
       exTot: groups['1_10'].exTot.map((v,i) => r6(v + groups['11_12'].exTot[i]))
     };
-    return { date, grid, types, total, groups, machineStats, lost, unknown, mains: S.mains, extras: S.extras };
+    return { date, grid, types, total, groups, machineStats, lost, unknown, skipped: S.skipped, mains: S.mains, extras: S.extras };
   }
 
   // ---------- просмотр на странице ----------
@@ -134,7 +138,8 @@ const Blank = (() => {
 
   function warnings(m) {
     const w = [];
-    if (m.lost.length) w.push(`Не поместилось в бланк (больше ${SLOTS} стирок одного вида на машину за смену): ${m.lost.length} шт. Они не попали в таблицу и файл: ` + m.lost.map(x => `машина ${x.machine} ${x.part}, ${x.type}`).join('; ') + '.');
+    if (m.lost.length) w.push(`Не поместилось в бланк (больше ${SLOTS} стирок одного вида на машину за смену): ${m.lost.length} шт. В таблице на экране и в итогах они учтены, но в ячейки Excel не поместились: ` + m.lost.map(x => `машина ${x.machine} ${x.part}, ${x.type}`).join('; ') + '.');
+    if (m.skipped && m.skipped.length) w.push('В шаблоне Blanc.xlsx места только для 5 основных и 3 дополнительных видов химии. Не попадут в Excel: ' + m.skipped.join(', ') + '.');
     const u = Object.entries(m.unknown);
     if (u.length) w.push('Вида стирки нет в шаблоне Blanc.xlsx, эти записи пропущены: ' + u.map(([n, c]) => `${n} (${c})`).join(', ') + '.');
     return w;
@@ -149,13 +154,40 @@ const Blank = (() => {
   // ---------- xlsx: правка xml внутри файла ----------
   const F_RE = /<f\b[^>]*\/>|<f\b[^>]*>[\s\S]*?<\/f>/;
   const cellRe = ref => new RegExp('<c r="' + ref + '"([^>]*?)(?:/>|>([\\s\\S]*?)</c>)');
-  function setCell(xml, ref, val) {                       // val: число или '' ; стиль и формула сохраняются
+  const colNum = ref => { let n = 0; for (const ch of /^[A-Z]+/.exec(ref)[0]) n = n * 26 + ch.charCodeAt(0) - 64; return n; };
+  const xesc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  // Вставляет ячейку в нужное место строки; если строки нет, создаёт её. Так шаблон может быть «пустым».
+  function insertCell(xml, ref, cellXml) {
+    const row = +/\d+$/.exec(ref)[0], col = colNum(ref);
+    const rowRe = new RegExp('<row r="' + row + '"([^>]*?)(?:/>|>([\\s\\S]*?)</row>)');
+    const m = rowRe.exec(xml);
+    if (m) {
+      const attrs = m[1].replace(/\/$/, ''), cells = m[2] || '';
+      const parts = cells.match(/<c\b[^>]*?(?:\/>|>[\s\S]*?<\/c>)/g) || [];
+      let at = parts.length;
+      for (let i = 0; i < parts.length; i++) if (colNum(/r="([A-Z]+\d+)"/.exec(parts[i])[1]) > col) { at = i; break; }
+      parts.splice(at, 0, cellXml);
+      return xml.replace(rowRe, () => '<row r="' + row + '"' + attrs + '>' + parts.join('') + '</row>');
+    }
+    const rows = [...xml.matchAll(/<row r="(\d+)"/g)];
+    const next = rows.find(x => +x[1] > row);
+    const rowXml = '<row r="' + row + '">' + cellXml + '</row>';
+    if (next) return xml.slice(0, next.index) + rowXml + xml.slice(next.index);
+    if (/<sheetData\s*\/>/.test(xml)) return xml.replace(/<sheetData\s*\/>/, '<sheetData>' + rowXml + '</sheetData>');
+    return xml.replace('</sheetData>', rowXml + '</sheetData>');
+  }
+  // val: число, '' (очистить) или строка. Стиль и формула существующей ячейки сохраняются.
+  function setCell(xml, ref, val) {
+    const isStr = typeof val === 'string' && val !== '';
     const m = cellRe(ref).exec(xml);
-    if (!m) throw new Error('В шаблоне нет ячейки ' + ref);
+    if (!m) {
+      if (val === '') return xml;
+      return insertCell(xml, ref, isStr ? `<c r="${ref}" t="inlineStr"><is><t>${xesc(val)}</t></is></c>` : `<c r="${ref}"><v>${r6(val)}</v></c>`);
+    }
     const attrs = m[1].replace(/\s+t="[^"]*"/, '');
     const f = m[2] ? (F_RE.exec(m[2]) || [''])[0] : '';
-    const body = val === '' ? { t: ' t="str"', v: '<v></v>' } : { t: '', v: '<v>' + r6(val) + '</v>' };
-    return xml.replace(cellRe(ref), () => `<c r="${ref}"${attrs}${body.t}>${f}${body.v}</c>`);
+    const body = val === '' ? { t: ' t="str"', v: '<v></v>' } : isStr ? { t: ' t="inlineStr"', v: '<is><t>' + xesc(val) + '</t></is>' } : { t: '', v: '<v>' + r6(val) + '</v>' };
+    return xml.replace(cellRe(ref), () => `<c r="${ref}"${attrs}${body.t}>${isStr ? '' : f}${body.v}</c>`);
   }
   function setFormula(xml, ref, text) {                   // только для обычных (не общих) формул
     const m = cellRe(ref).exec(xml);
@@ -331,7 +363,9 @@ const Blank = (() => {
               actual += Math.max(0, Math.min(size, left) >= 0 ? size - Math.max(0,Math.min(size,left)) : 0);
             });
             const actualOut = prim ? r6(actual) : '';
-            const theoryOut = prim ? r6(prim==='l' ? theory : theory) : r6(theory);
+            let theoryPrim = theory;
+            if (prim && theoryUnit !== prim) { const d = density(c); theoryPrim = d ? (theoryUnit === 'l' ? theory * d : theory / d) : null; }
+            const theoryOut = theoryPrim == null ? '' : r6(theoryPrim);
             const diff = prim && theoryOut ? r6(actualOut-theoryOut) : '';
             const pct = prim && theoryOut ? r6((actualOut-theoryOut)/theoryOut*100) : '';
             xml=setCell(xml,'A'+row,serial(date)); xml=setCell(xml,'B'+row,group); xml=setCell(xml,'C'+row,c.name); xml=setCell(xml,'D'+row,c.kind==='main'?'основная':'дополнительная');

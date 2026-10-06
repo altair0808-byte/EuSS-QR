@@ -198,11 +198,43 @@ details.box>summary small{margin-left:auto}
 @media(min-width:900px){.mgr{grid-template-columns:repeat(4,1fr)}}
 @media(min-width:1180px){.mgr{grid-template-columns:repeat(6,1fr)}}
 
+/* ---------- бланк за смену: понятная сводка ---------- */
+.dnav{display:flex;align-items:flex-end;gap:.5rem}
+.dnav label{flex:1;margin-top:0}
+.dnav .btn{min-height:2.75rem;width:2.75rem;padding:0;font-size:1.1rem}
+.chips{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.75rem}
+.chip{display:inline-flex;align-items:center;gap:.4rem;padding:.35rem .7rem;border:1px solid var(--ln);border-radius:99px;background:var(--card);font-size:.8rem;font-weight:600}
+.chip::before{content:"";width:.5rem;height:.5rem;border-radius:50%;background:var(--good)}
+.chip.warn{border-color:color-mix(in oklab,oklch(.69 .17 48) 50%,var(--ln));background:color-mix(in oklab,oklch(.69 .17 48) 8%,#fff)}
+.chip.warn::before{background:oklch(.69 .17 48)}
+.chip.bad{border-color:color-mix(in oklab,var(--bad) 40%,var(--ln));background:color-mix(in oklab,var(--bad) 6%,#fff)}
+.chip.bad::before{background:var(--bad)}
+.chk{display:flex;gap:.6rem;padding:.6rem 0;border-top:1px solid var(--ln)}.chk:first-child{border-top:0}
+.chk::before{content:"";flex:none;width:.6rem;height:.6rem;margin-top:.4rem;border-radius:50%;background:var(--good)}
+.chk.w-warn::before{background:oklch(.69 .17 48)}.chk.w-bad::before{background:var(--bad)}
+.chk b{display:block;font-size:.9rem}.chk span{display:block;font-size:.8rem;color:var(--mut)}
+.note{margin:.5rem 0 0;font-size:.8rem;color:var(--mut)}
+.meter{display:inline-block;height:.5rem;min-width:2px;border-radius:99px;background:var(--ac);vertical-align:middle}
+.meter.n{background:var(--ink);opacity:.55}
+.mcell{display:flex;align-items:center;justify-content:flex-end;gap:.5rem}
+.tbl .z{color:color-mix(in oklab,var(--mut) 50%,#fff)}
+.tbl tr.gs td,.tbl tr.gs th{border-top:2px solid var(--ln)}
+.tbl tr:not(:first-child)>th{padding:.6rem .5rem;border-top:1px solid var(--ln);font-size:.875rem;font-weight:700;color:var(--ink);text-transform:none;white-space:nowrap}
+.tbl tr.tot td,.tbl tr.tot th{border-top:2px solid var(--ink);font-weight:700}
+.tbl th.l,.tbl td.l{text-align:left}
+.tbl td.grp,.tbl th.grp{border-left:1px solid var(--ln)}
+.tbl .dim{color:var(--mut);font-weight:500}
+.tbl tr.flag td,.tbl tr.flag th{background:color-mix(in oklab,oklch(.69 .17 48) 9%,#fff)}
+.two{display:grid;gap:.75rem}
+@media(min-width:900px){.two.c2{grid-template-columns:1fr 1fr}}
+
 /* ---------- уведомление ---------- */
 #toast{position:fixed;left:50%;bottom:1.5rem;z-index:60;width:max-content;max-width:calc(100% - 2rem);text-align:center;padding:.75rem 1.4rem;border-radius:99px;background:var(--ink);color:#fff;font-size:.875rem;opacity:0;pointer-events:none;transform:translate(-50%,16px);transition:opacity .2s,transform .2s}
 #toast.show{opacity:1;transform:translate(-50%,0)}
 
 @media(min-width:640px){.hd>div{padding:0 1.5rem}main{padding-left:1.5rem;padding-right:1.5rem}.bar{margin-left:-1.5rem;margin-right:-1.5rem;padding-left:1.5rem;padding-right:1.5rem}.top h1,h1{font-size:1.875rem}}
+@media(max-width:640px){.tbl .hs{display:none}}
+.tbl td.dim{white-space:nowrap}
 @media(max-width:480px){.sep,.sub{display:none}.grid{grid-template-columns:repeat(4,1fr)}.acc{grid-template-columns:1fr}}
 @media print{.hd,.noprint,.btn,.go{display:none!important}body{background:#fff;color:#000}.qrc .box{border:0;box-shadow:none}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}button:active:not(:disabled),.btn:active{transform:none}}
