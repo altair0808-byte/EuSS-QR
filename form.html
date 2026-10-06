@@ -1,11 +1,11 @@
 <!doctype html>
-<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#2aa3b5">
 <title>Бланк — EuSS</title><link rel="icon" href="favicon.png" type="image/png"><link rel="stylesheet" href="style.css"></head>
 <body>
 <header class="hd"><div><a class="lg" href="index.html" aria-label="На панель смены"><img src="euss-logo.png" alt="EuSS"><span class="sep"></span><span class="sub">Бланки</span></a><nav class="nav"><a class="btn s" href="index.html">← Панель</a></nav></div></header>
 <main id="app"><p class="hint">Загрузка…</p></main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="config.js"></script><script src="app.js"></script>
+<script src="config.js"></script><script src="app.js"></script><script src="leftover.js"></script>
 <script>
 (async () => {
   const ses = await need(); if (!ses) return;
@@ -19,7 +19,9 @@
   }
   document.title = f.name + ' — EuSS';
   const kind = { laundry_load: 'Загрузка белья', laundry_chem: 'Замена химии' }[f.type] || 'Бланк';
-  const head = `<div class="top"><p class="eb">${kind}</p><h1>${esc(f.name)}</h1></div>`;
+  document.body.classList.add(f.type === 'laundry_chem' ? 'k-chem' : 'k-load');
+  const bannerHtml = f.type === 'laundry_chem' ? '<div class="kind">⚗ Замена химии</div>' : f.type === 'laundry_load' ? '<div class="kind">🧺 Загрузка белья</div>' : '';
+  const head = `${bannerHtml}<div class="top"><p class="eb">${kind}</p><h1>${esc(f.name)}</h1></div>`;
   const washList = w => w || [];
   const toTop = () => window.scrollTo({ top: 0 });
   const smooth = () => matchMedia('(prefers-reduced-motion:reduce)').matches ? 'auto' : 'smooth';
@@ -48,7 +50,7 @@
       const T = [['all', 'Все машины'], ['main', 'Дозатор 1 · 1–10'], ['extra', 'Дозатор 2 · 11–12']];
       const M = [['Настроено', state.size + ' / 12', '', 'машин в этой отправке', ''], ['Общий вес', fmt(kg), 'кг', 'по настроенным', 'm2'], ['Дозатор 1', nMain + ' / 10', '', 'машины 1–10', 'm3'], ['Дозатор 2', nExtra + ' / 2', '', 'машины 11–12', 'm4']];
       app.innerHTML = `
-        <div class="top"><p class="eb">Загрузка белья</p><h1>${esc(f.name)}</h1></div>
+        ${bannerHtml}<div class="top"><p class="eb">Загрузка белья</p><h1>${esc(f.name)}</h1></div>
         <section class="mg" aria-label="Итоги">${M.map(([l, v, u, n, c]) => `<article class="m ${c}"><p class="l">${l}</p><p class="v">${v} ${u ? `<small>${u}</small>` : ''}</p><p class="n">${n}</p></article>`).join('')}</section>
         <div class="sh"><div><h2>Стиральные машины</h2><p>Выберите машину, задайте вид стирки и вес, затем проверьте всё и отправьте</p></div>
           <div class="seg" role="tablist">${T.map(([id, l]) => `<button role="tab" aria-selected="${tab === id}" class="${tab === id ? 'on' : ''}" data-t="${id}">${l}</button>`).join('')}</div></div>
@@ -95,7 +97,7 @@
 
     function showReview() {
       const rows = [...state.entries()].sort((a, b) => a[0] - b[0]);
-      app.innerHTML = `<div class="top"><p class="eb">Загрузка белья</p><h1>Проверка перед отправкой</h1><p class="hint">Пока не нажата кнопка внизу, записи в базу не отправлены.</p></div>
+      app.innerHTML = `${bannerHtml}<div class="top"><p class="eb">Загрузка белья</p><h1>Проверка перед отправкой</h1><p class="hint">Пока не нажата кнопка внизу, записи в базу не отправлены.</p></div>
         <div class="cards">${rows.map(([m, v]) => {
           const chem = Object.entries(v.extras).map(([id, qty]) => {
             const c = extras.find(x => String(x.id) === String(id));
@@ -192,6 +194,11 @@
       sb.from('profiles').select('role').eq('id', ses.user.id).maybeSingle()
     ]);
     const chems = (ch || []).filter(x => x.kind === 'main');          // Ваниш, Ленор, Порошок здесь не нужны
+    const { data: setC } = await sb.from('settings').select('*');
+    const svC = k => { const r = (setC || []).find(x => x.key === k); return r ? +r.value : null; };
+    const tzH = svC('tz_offset') ?? 5, stH = svC('shift_start') ?? 6;
+    const lo = await Leftover.fetch();                                  // остатки в запасе (после stage6.sql)
+    const canConn = true;   // права окончательно проверяет база (can_fill_chem)
     const isSuper = pr?.role === 'superadmin';
     const groups = [['1_10', 'Основной дозатор', 'машины 1–10', '1–10'], ['11_12', 'Отдельный дозатор', 'машины 11–12', '11–12']];
     let g = preG || null, c = preChem ? String(preChem) : null, mode = 'empty', unit = 'kg';
@@ -201,14 +208,16 @@
       <div class="box"><div class="sh2"><h2>2 · Какая химия закончилась</h2>${isSuper ? '<button type="button" class="mini opt" id="addc">+ Добавить</button>' : ''}</div>
         <div class="chg" id="chem">${chems.map(x => `<div class="cw"><button type="button" class="cc ${String(x.id) === c ? 'sel' : ''}" data-v="${x.id}" aria-pressed="${String(x.id) === c}">${chemImg(x)}<span class="cn">${esc(x.name)}</span><small>${sizeTxt(x)}</small><i class="ck" aria-hidden="true">✓</i></button>${isSuper ? `<button type="button" class="ed" data-e="${x.id}" aria-label="Изменить ${esc(x.name)}" title="Изменить">✎</button>` : ''}</div>`).join('') || '<p class="hint">Химия пока не добавлена.</p>'}</div></div>
       <div class="box"><h2>3 · Остаток в бутыли</h2>
-        <p class="hint">Сколько осталось в снятой бутыли. Остаток записывается вместе с заменой.</p>
+        <p class="hint">Сколько осталось в снятой бутыли. Остаток запишется вместе с заменой и попадёт в запас: он виден на панели смены, там же его отмечают подключённым.</p>
         <div class="seg" id="lm"><button data-v="empty" class="on">Бутыль пустая</button><button data-v="some">Остался остаток</button></div>
         <div id="lw" hidden><div class="seg" id="lu" aria-label="Единица"><button data-v="kg" class="on">кг</button><button data-v="l">литры</button></div>
           <label>Остаток, <span id="lul">кг</span><input id="lf" type="number" min="0" step="0.1" inputmode="decimal"></label><div class="fill"><i id="fb"></i></div></div>
         <p class="hint" id="lh"></p></div>
+      ${lo.rows ? `<div class="box"><h2>Остатки в запасе</h2><p class="hint">Остаток из бутылей, которые сняли не пустыми. Когда подключите его к дозатору, нажмите «Подключили остаток».</p><div id="lov">${Leftover.html(lo.rows, chems, lo.names, { can: canConn, today: new Date(Date.now() + (tzH - stH) * 3600e3).toISOString().slice(0, 10) })}</div></div>` : ''}
       <div class="bar"><button class="go" id="save">Проверить и заменить</button>
       <button class="ghost" id="undo" hidden>Отменить последнюю запись</button></div><div id="ovl"></div>`;
     imgFallback(app);
+    if (lo.rows && $('#lov')) Leftover.bind($('#lov'), lo.rows, chems, lo.names, { can: canConn, today: new Date(Date.now() + (tzH - stH) * 3600e3).toISOString().slice(0, 10) }, () => laundryChem(undefined, c, g));
     const show = undoBtn('chem_changes');
     if (lastId) show(lastId);
     const cur = () => chems.find(x => String(x.id) === c);
@@ -229,6 +238,8 @@
           }
         }
       }
+      const stk = lo.rows && x ? Leftover.summary(lo.rows, chems).find(z => String(z.c.id) === String(x.id)) : null;
+      if (stk) t += ` В запасе уже: ${Leftover.N(stk.total)} ${Leftover.U(stk.p)}.`;
       $('#lh').textContent = t; $('#fb').style.width = pct + '%'; $('#lul').textContent = unit === 'kg' ? 'кг' : 'литры';
     };
     $('#cg').onclick = e => {

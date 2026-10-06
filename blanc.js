@@ -245,7 +245,7 @@ const Blank = (() => {
   }
 
   // zip: JSZip с шаблоном; days: {номер дня: модель}; refs как в отчёте
-  async function fillWorkbook(zip, days, refs, changes = []) {
+  async function fillWorkbook(zip, days, refs, changes = [], connects = []) {
     const S = setup(refs);
     const wb = await zip.file('xl/workbook.xml').async('string');
     const rels = await zip.file('xl/_rels/workbook.xml.rels').async('string');
@@ -334,7 +334,7 @@ const Blank = (() => {
     }
     { const gp=path['Сводка по машинам']; if(!gp) throw new Error('В шаблоне нет листа «Сводка по машинам»'); zip.file(gp, fillMachineSummary(await zip.file(gp).async('string'), days)); }
 
-    function fillChemistryDetail(xml, days, refs, changes) {
+    function fillChemistryDetail(xml, days, refs, changes, connects) {
       const chemicals = (refs.chemicals || []).slice().sort(bySort);
       const water = +refs.water || 55;
       const rec = {}; (refs.recipes || []).forEach(r => rec[r.wash_type_id + ':' + r.chemical_id] = +r.ml_per_l || 0);
@@ -362,6 +362,13 @@ const Blank = (() => {
               if (left == null || !isFinite(left)) { noLeft++; left = 0; }
               actual += Math.max(0, Math.min(size, left) >= 0 ? size - Math.max(0,Math.min(size,left)) : 0);
             });
+            if (prim) {                                   // подключённый остаток: «недолив» бутыли вычитается в день подключения
+              const size0 = prim === 'l' ? +c.bottle_l : +c.bottle_kg;
+              (connects || []).filter(k => k.shift_date === date && +k.chemical_id === +c.id && (k.machine_group || '1_10') === group).forEach(k => {
+                const am = prim === 'l' ? (k.amount_l != null ? +k.amount_l : (k.amount_kg != null ? toL(c, +k.amount_kg, 'kg') : null)) : (k.amount_kg != null ? +k.amount_kg : (k.amount_l != null ? toKg(c, +k.amount_l, 'l') : null));
+                if (am > 0 && size0 > 0) actual -= Math.ceil(am / size0 - 1e-9) * size0 - am;
+              });
+            }
             const actualOut = prim ? r6(actual) : '';
             let theoryPrim = theory;
             if (prim && theoryUnit !== prim) { const d = density(c); theoryPrim = d ? (theoryUnit === 'l' ? theory * d : theory / d) : null; }
@@ -375,7 +382,7 @@ const Blank = (() => {
       }
       return xml;
     }
-    { const gp=path['Химия по дозаторам']; if(!gp) throw new Error('В шаблоне нет листа «Химия по дозаторам»'); zip.file(gp, fillChemistryDetail(await zip.file(gp).async('string'), days, refs, changes)); }
+    { const gp=path['Химия по дозаторам']; if(!gp) throw new Error('В шаблоне нет листа «Химия по дозаторам»'); zip.file(gp, fillChemistryDetail(await zip.file(gp).async('string'), days, refs, changes, connects)); }
     if (!/fullCalcOnLoad/.test(wb)) zip.file('xl/workbook.xml', wb.replace(/<calcPr\b([^>]*?)\/>/, '<calcPr$1 fullCalcOnLoad="1"/>'));
     return zip;
   }

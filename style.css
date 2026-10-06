@@ -293,3 +293,43 @@ button.ed{position:absolute;top:.5rem;left:.5rem;z-index:2;width:2rem;min-height
 .tbl th a{color:var(--ac-d);text-decoration:underline;text-underline-offset:2px}
 .grplab{margin:1.25rem 0 .25rem;font-size:.75rem;font-weight:800;text-transform:uppercase;color:var(--mut)}
 @media(max-width:480px){.dz{grid-template-columns:1fr 1fr}.cal{gap:.2rem}.cal button.dc{min-height:3.8rem;padding:.25rem}.cal .dc small{font-size:.58rem}}
+
+/* ---------- этап 6: загрузка и замена химии выглядят по-разному, журнал, телефон ---------- */
+:root{--ch:oklch(.66 .16 48);--ch-d:oklch(.52 .15 48);--ch-t:oklch(.955 .04 70)}
+html{-webkit-text-size-adjust:100%}
+button,a,select,input{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+body{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
+.hd>div{padding-top:env(safe-area-inset-top);height:calc(4rem + env(safe-area-inset-top))}
+#toast{bottom:calc(1.5rem + env(safe-area-inset-bottom))}
+.pn{max-height:92dvh;overscroll-behavior:contain;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom))}
+/* замена химии: оранжевая тема, загрузка белья: бирюзовая */
+body.k-chem{--ac:var(--ch);--ac-d:var(--ch-d);--tint:var(--ch-t);--soft:oklch(.975 .015 70)}
+.kind{display:flex;align-items:center;gap:.5rem;margin-bottom:.75rem;padding:.6rem .85rem;border-radius:var(--r);background:var(--tint);color:var(--ac-d);font-size:.8rem;font-weight:800;text-transform:uppercase}
+.tg{display:inline-flex;align-items:center;gap:.3rem;height:1.5rem;padding:0 .55rem;border-radius:99px;font-size:.68rem;font-weight:800;white-space:nowrap}
+.tg.ld{background:color-mix(in oklab,oklch(.62 .125 208) 14%,#fff);color:oklch(.5 .125 208)}
+.tg.ch{background:var(--ch-t);color:var(--ch-d)}
+.tg.ad{background:oklch(.95 .06 150);color:oklch(.4 .12 150)}.tg.up{background:oklch(.96 .07 95);color:oklch(.45 .1 80)}.tg.rm{background:oklch(.95 .04 27);color:oklch(.5 .2 27)}
+.tg.cn{background:oklch(.94 .04 300);color:oklch(.45 .12 300)}
+.ops{display:grid;gap:.5rem}
+.op{display:grid;gap:.3rem;padding:.8rem .9rem;border:1px solid var(--ln);border-left:5px solid oklch(.62 .125 208);border-radius:var(--r);background:#fff;box-shadow:var(--sh)}
+.op.ch{border-left-color:var(--ch)}.op.cn{border-left-color:oklch(.6 .14 300)}
+.op.gone{background:var(--soft);border-left-color:var(--bad)}.op.gone .tt{text-decoration:line-through;text-decoration-color:color-mix(in oklab,var(--bad) 60%,transparent)}
+.op .r1{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:.4rem}
+.op .tm{font-size:.8rem;font-weight:700;color:var(--mut)}
+.op .tt{font-weight:700;font-size:.95rem;word-break:break-word}
+.op .mt{font-size:.8rem;color:var(--mut)}
+.op .df{margin:0;padding:.4rem .6rem;border-radius:.4rem;background:var(--soft);font-size:.8rem;list-style:none;display:grid;gap:.15rem}
+.op .df s{color:var(--mut)}
+.op .act{display:flex;gap:.5rem;margin-top:.35rem}.op .act button{flex:1;min-height:2.6rem}
+.day{margin:1.25rem 0 .5rem;font-size:.75rem;font-weight:800;text-transform:uppercase;color:var(--mut)}
+.flt{display:flex;flex-wrap:wrap;gap:.5rem}.flt .seg{flex:1 1 14rem;margin-top:.5rem}
+.cm{padding:.8rem .9rem;border:1px solid var(--ln);border-radius:var(--r);background:#fff;box-shadow:var(--sh)}
+.cm+.cm{margin-top:.5rem}
+.cm .cmh{display:flex;justify-content:space-between;gap:.5rem;align-items:baseline}.cm .cmh b{font-size:.95rem}.cm .cmh small{text-align:right}
+.cm .cmg{display:grid;grid-template-columns:repeat(2,1fr);gap:.6rem .8rem;margin-top:.6rem}
+.cm .cmg span{display:block;font-size:.66rem;font-weight:800;text-transform:uppercase;color:var(--mut)}
+.cm .cmg b{display:block;font-size:.95rem}.cm .cmg small{display:block}
+.cm .cmg .st b{color:var(--ch-d)}
+@media(min-width:640px){.cm .cmg{grid-template-columns:repeat(4,1fr)}}
+@media(max-width:639px){.top .btn{flex:1}.kpi{grid-template-columns:repeat(2,1fr)}main.wide{padding-left:.75rem;padding-right:.75rem}.box{padding:.85rem}.seg button{min-height:2.5rem}.op .act button{min-height:2.75rem}}
+.nav .btn.s{min-height:2.5rem}

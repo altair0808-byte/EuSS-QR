@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#2aa3b5">
+<title>Журнал изменений — EuSS</title><link rel="icon" href="favicon.png" type="image/png"><link rel="stylesheet" href="style.css"></head>
+<body>
+<header class="hd"><div><a class="lg" href="index.html" aria-label="На панель смены"><img src="euss-logo.png" alt="EuSS"><span class="sep"></span><span class="sub">Журнал изменений</span></a><nav class="nav"><a class="btn s" href="index.html">← Панель</a></nav></div></header>
+<main class="wide">
+<div class="top"><p class="eb">Только просмотр</p><h1>Журнал изменений</h1><p class="hint">Кто и когда добавил, исправил или удалил запись. Журнал ведёт база данных, из приложения его нельзя стереть.</p></div>
+<div class="box">
+  <h3 style="margin-top:0">Период</h3>
+  <div class="seg" id="pf" role="group" aria-label="Период"><button data-v="0">Эта смена</button><button data-v="3">3 дня</button><button data-v="7">7 дней</button><button data-v="30">30 дней</button></div>
+  <h3>Что показывать</h3>
+  <div class="seg" id="ef" role="group" aria-label="Тип записи"><button data-v="all">Все</button><button data-v="load">🧺 Загрузки</button><button data-v="chem">⚗ Химия</button></div>
+  <div class="seg" id="af" role="group" aria-label="Действие"><button data-v="all">Любое действие</button><button data-v="insert">Добавлено</button><button data-v="update">Исправлено</button><button data-v="delete">Удалено</button></div>
+</div>
+<div id="out"><p class="hint">Загрузка…</p></div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script><script src="app.js"></script>
+<script>
+const esc=t=>String(t??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const f=(n,d=1)=>(Math.round(n*10**d)/10**d).toLocaleString('ru-RU');
+let tz=5,st=6,refs=null,nm={},rows=[],per='0',ent='all',act='all',seq=0;
+const who=id=>(id&&nm[id])||'система';
+const dmy=d=>d.split('-').reverse().join('.');
+const loc=ts=>new Date(new Date(ts).getTime()+tz*3600e3).toISOString();      // местное время как ISO-строка
+const hhmm=ts=>loc(ts).slice(11,16);
+const shiftOf=ts=>new Date(new Date(ts).getTime()+(tz-st)*3600e3).toISOString().slice(0,10);
+const wn=id=>refs.washTypes.find(x=>x.id===+id)?.name||('вид '+id);
+const cn=id=>refs.chemicals.find(x=>+x.id===+id)?.name||'Химия';
+const grp=g=>g==='11_12'?'11–12':'1–10';
+const leftTxt=d=>+d.leftover_l>0?f(d.leftover_l)+' л':+d.leftover_kg>0?f(d.leftover_kg)+' кг':'бутыль пустая';
+const exTxt=e=>Object.entries(e||{}).map(([id,q])=>{const c=refs.chemicals.find(x=>String(x.id)===String(id));return(c?c.name:'доп. '+id)+' '+q+' шт'}).join(', ')||'нет';
+
+// краткое описание записи
+function describe(entity,d){
+  if(!d)return'';
+  if(entity==='load')return`Машина ${d.machine} · ${esc(wn(d.wash_type_id))} · ${f(d.weight_kg)} кг`+(Object.keys(d.extras||{}).length?' · '+esc(exTxt(d.extras)):'')+` · ${hhmm(d.ts)}`;
+  if(entity==='chem')return`${esc(cn(d.chemical_id))} · дозатор ${grp(d.machine_group)} · остаток: ${leftTxt(d)}`;
+  const a=+d.amount_l>0?f(d.amount_l)+' л':+d.amount_kg>0?f(d.amount_kg)+' кг':'';
+  return`${esc(cn(d.chemical_id))} · ${a} → дозатор ${grp(d.machine_group)} · объединено остатков: ${d.n}`;
+}
+// что именно изменилось при правке
+function diff(entity,o,n){
+  const L=[],add=(t,a,b)=>{if(String(a)!==String(b))L.push(`<span>${t}: <s>${a}</s> → <b>${b}</b></span>`)};
+  if(entity==='load'){
+    add('Машина',o.machine,n.machine);add('Вид стирки',esc(wn(o.wash_type_id)),esc(wn(n.wash_type_id)));
+    add('Вес',f(o.weight_kg)+' кг',f(n.weight_kg)+' кг');
+    if(JSON.stringify(o.extras||{})!==JSON.stringify(n.extras||{}))add('Допы',esc(exTxt(o.extras)),esc(exTxt(n.extras)));
+    add('Время',dmy(shiftOf(o.ts))+' '+hhmm(o.ts),dmy(shiftOf(n.ts))+' '+hhmm(n.ts));
+  }else if(entity==='chem'){
+    add('Дозатор',grp(o.machine_group),grp(n.machine_group));add('Остаток',leftTxt(o),leftTxt(n));
+  }
+  return L.length?`<ul class="df">${L.map(x=>'<li>'+x+'</li>').join('')}</ul>`:'';
+}
+function card(r){
+  const e=r.entity,isL=e==='load',isC=e==='chem';
+  const tg=isL?'<span class="tg ld">🧺 Загрузка белья</span>':isC?'<span class="tg ch">⚗ Замена химии</span>':'<span class="tg cn">🔗 Остаток подключён</span>';
+  const ac={insert:['ad','Добавлено'],update:['up','Исправлено'],delete:['rm','Удалено']}[r.action]||['up',r.action];
+  const d=r.action==='delete'?r.old_data:r.new_data;
+  const cls=isL?'ld':isC?'ch':'cn';
+  return`<article class="op ${cls}${r.action==='delete'?' gone':''}"><div class="r1"><span style="display:flex;gap:.35rem;flex-wrap:wrap">${tg}<span class="tg ${ac[0]}">${ac[1]}</span></span><span class="tm">${hhmm(r.ts)}</span></div>
+    <div class="tt">${describe(e,d)}</div>
+    ${r.action==='update'?diff(e,r.old_data,r.new_data):''}
+    <div class="mt">${r.action==='insert'?'Внёс':r.action==='update'?'Исправил':'Удалил'}: <b>${esc(who(r.actor))}</b>${r.action!=='insert'&&d&&d.created_by&&d.created_by!==r.actor?' · записал изначально: '+esc(who(d.created_by)):''}</div></article>`;
+}
+function render(){
+  document.querySelectorAll('#pf button').forEach(b=>b.classList.toggle('on',b.dataset.v===per));
+  document.querySelectorAll('#ef button').forEach(b=>b.classList.toggle('on',b.dataset.v===ent));
+  document.querySelectorAll('#af button').forEach(b=>b.classList.toggle('on',b.dataset.v===act));
+  const list=rows.filter(r=>(ent==='all'||(ent==='load'?r.entity==='load':r.entity!=='load'))&&(act==='all'||r.action===act));
+  let day='',h='';
+  list.forEach(r=>{const d=loc(r.ts).slice(0,10);if(d!==day){day=d;h+=`<p class="day">${dmy(d)}</p>`;}h+=card(r);});
+  $('#out').innerHTML=list.length?`<div class="ops">${h}</div>`+(rows.length>=1000?'<p class="hint">Показаны последние 1000 записей.</p>':''):'<p class="hint">За выбранный период записей нет.</p>';
+}
+async function load(){
+  const my=++seq;
+  const t=new Date(Date.now()+(tz-st)*3600e3).toISOString().slice(0,10).split('-').map(Number);
+  const shiftStart=Date.UTC(t[0],t[1]-1,t[2],st)-tz*3600e3;
+  const since=new Date(per==='0'?shiftStart:shiftStart-(+per)*864e5).toISOString();
+  $('#out').innerHTML='<p class="hint">Загрузка…</p>';
+  const {data,error}=await sb.from('audit_log').select('*').gte('ts',since).order('ts',{ascending:false}).limit(1000);
+  if(my!==seq)return;
+  if(error){$('#out').innerHTML='<p class="err">Не удалось загрузить журнал. Выполните stage6.sql в Supabase.</p>';return;}
+  rows=data||[];render();
+}
+document.getElementById('pf').onclick=e=>{const b=e.target.closest('button');if(b){per=b.dataset.v;load();}};
+document.getElementById('ef').onclick=e=>{const b=e.target.closest('button');if(b){ent=b.dataset.v;render();}};
+document.getElementById('af').onclick=e=>{const b=e.target.closest('button');if(b){act=b.dataset.v;render();}};
+(async()=>{
+  const ses=await need();if(!ses)return;
+  const {data:ok}=await sb.rpc('can_report');
+  if(!ok){$('#out').innerHTML='<p>Нет доступа к журналу. Обратитесь к администратору.</p>';return;}
+  const [s,c,w,n]=await Promise.all([sb.from('settings').select('*'),sb.from('chemicals').select('*').order('sort'),sb.from('wash_types').select('id,name').order('sort'),sb.rpc('staff_names')]);
+  const g=k=>{const x=(s.data||[]).find(y=>y.key===k);return x?+x.value:null};
+  tz=g('tz_offset')??5;st=g('shift_start')??6;
+  refs={washTypes:w.data||[],chemicals:c.data||[]};
+  nm=Object.fromEntries(((n&&n.data)||[]).map(x=>[x.id,x.name]));
+  load();
+})();
+</script></body></html>

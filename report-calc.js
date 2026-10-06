@@ -1,6 +1,9 @@
 // Теория и факт расхода химии с раздельными дозаторами.
 // Группа 1_10 = машины 1-10, группа 11_12 = машины 11-12.
-function calcReport(loads, changes, refs) {
+// connects: подключения остатка (report_connects). Они уменьшают факт: подключённый остаток уже был посчитан
+// как «не израсходованный» при замене, а следующая замена посчитает всю бутыль целиком.
+function calcReport(loads, changes, refs, connects) {
+  connects = connects || [];
   const { water, washTypes, chemicals, recipes } = refs;
   const GROUPS = ['1_10','11_12'];
   const groupOfMachine = m => (+m <= 10 ? '1_10' : '11_12');
@@ -54,21 +57,34 @@ function calcReport(loads, changes, refs) {
       const tu = c.kind === 'extra' && c.per_unit_unit === 'g' ? 'kg' : 'l';
       const theory = both(c, groups[groupKey].chem[c.id] || 0, tu);
       const mine = changes.filter(x => x.chemical_id === c.id && (groupKey === 'all' || (x.machine_group || '1_10') === groupKey));
-      let actual=null, noLeft=0, diff=null, pct=null;
+      let actual=null, noLeft=0, diff=null, pct=null, stock=null, connected=null, adj=0;
+      const leftOf = x => prim==='l'
+        ? (x.leftover_l != null ? +x.leftover_l : x.leftover_kg != null ? conv(c,+x.leftover_kg,'kg','l') : null)
+        : (x.leftover_kg != null ? +x.leftover_kg : x.leftover_l != null ? conv(c,+x.leftover_l,'l','kg') : null);
       if (prim) {
-        let sum=0;
+        let sum=0, st=0;
         mine.forEach(x=>{
-          let left = prim==='l'
-            ? (x.leftover_l != null ? +x.leftover_l : x.leftover_kg != null ? conv(c,+x.leftover_kg,'kg','l') : null)
-            : (x.leftover_kg != null ? +x.leftover_kg : x.leftover_l != null ? conv(c,+x.leftover_l,'l','kg') : null);
+          let left = leftOf(x);
           if(left==null){noLeft++;left=0;}
           sum += size - Math.max(0,Math.min(size,left));
+          if(!x.connect_id && left>0) st += Math.min(size,left);          // остаток лежит в запасе, ещё не подключён
         });
+        let conn=0;
+        connects.filter(x => +x.chemical_id === +c.id && (groupKey === 'all' || (x.machine_group || '1_10') === groupKey)).forEach(x=>{
+          const a = prim==='l'
+            ? (x.amount_l != null ? +x.amount_l : x.amount_kg != null ? conv(c,+x.amount_kg,'kg','l') : null)
+            : (x.amount_kg != null ? +x.amount_kg : x.amount_l != null ? conv(c,+x.amount_l,'l','kg') : null);
+          if(a==null||!(a>0))return;
+          conn += a;
+          adj += Math.ceil(a/size - 1e-9)*size - a;                        // «недолив»: ёмкость минус то, что реально подключили
+        });
+        sum -= adj;
         actual=both(c,sum,prim);
+        stock=both(c,st,prim); connected=both(c,conn,prim);
         const theoryPrim=prim==='l'?theory.l:theory.kg;
         if(theoryPrim!=null){diff=sum-theoryPrim;pct=theoryPrim>0?diff/theoryPrim*100:null;}
       }
-      return {id:c.id,name:c.name,kind:c.kind,prim,size,theory,actual,changes:mine.length,noLeft,diff,pct};
+      return {id:c.id,name:c.name,kind:c.kind,prim,size,theory,actual,changes:mine.length,noLeft,diff,pct,stock,connected,adj};
     });
   }
 

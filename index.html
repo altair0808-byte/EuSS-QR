@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#2aa3b5">
 <title>Панель смены — EuSS</title>
 <link rel="icon" href="favicon.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -80,6 +80,34 @@ main{max-width:1440px;margin:0 auto;padding:1.25rem 1rem}
 #toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,16px);background:var(--fg);color:#fff;padding:.75rem 1.4rem;border-radius:99px;opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;z-index:60}#toast.show{opacity:1;transform:translate(-50%,0)}
 @media(min-width:640px){.pn{border-radius:var(--r)}}
 @keyframes sp{to{transform:rotate(360deg)}}
+/* ---- этап 6: типы записей, остатки, телефон ---- */
+:root{--ch:oklch(.66 .16 48);--chd:oklch(.52 .15 48);--cht:oklch(.955 .04 70)}
+html{-webkit-text-size-adjust:100%}button,a{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+body{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
+.hd>div{padding-top:env(safe-area-inset-top);height:calc(4rem + env(safe-area-inset-top))}
+#toast{bottom:calc(24px + env(safe-area-inset-bottom))}
+.pn{max-height:92dvh;overscroll-behavior:contain;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom))}
+.top .acts{display:flex;gap:.5rem;flex-wrap:wrap}
+.btn.c{background:var(--ch);border-color:var(--ch);color:#fff}
+.btn.p,.btn.c{min-height:2.75rem}
+.qa.ch .qi{background:var(--cht);color:var(--chd)}
+.tg{display:inline-flex;align-items:center;gap:.3rem;height:1.5rem;padding:0 .55rem;border-radius:99px;font-size:.68rem;font-weight:800;white-space:nowrap}
+.tg.ld{background:color-mix(in oklab,var(--pri) 14%,#fff);color:oklch(.5 .125 208)}.tg.ch{background:var(--cht);color:var(--chd)}
+.ops{display:grid;gap:.5rem;margin-top:.25rem}
+.op{display:grid;gap:.3rem;padding:.75rem .9rem;border:1px solid var(--bd);border-left:5px solid var(--pri);border-radius:var(--r);background:var(--card);box-shadow:0 1px 2px rgb(0 0 0/.05)}
+.op.ch{border-left-color:var(--ch)}
+.op .r1{display:flex;justify-content:space-between;align-items:center;gap:.5rem}.op .tm{font-size:.8rem;font-weight:700;color:var(--mf)}
+.op .tt{font-weight:700;font-size:.92rem}.op .mt{font-size:.78rem;color:var(--mf)}
+.lnk{display:inline-flex;align-items:center;min-height:2.5rem;font-size:.85rem;font-weight:700;color:var(--pri)}
+.cur.ld{border-left:5px solid var(--pri)}
+@media(max-width:639px){
+  .top{align-items:stretch}.top>div:first-child{width:100%}.top .acts{width:100%}.top .acts .btn{flex:1}
+  .m{padding:.8rem}.m .v{font-size:1.3rem}
+  .tabs{width:100%}.tabs button{flex:1;height:2.5rem}
+  .qa{min-height:3.5rem}
+  .pn{margin:0}
+}
+
 @media(min-width:640px){main,.hd>div{padding-left:1.5rem;padding-right:1.5rem}.mgr{grid-template-columns:repeat(3,1fr)}.pn{border-radius:var(--r);margin:1rem}.top h1{font-size:1.875rem}}
 @media(min-width:768px){.mg{grid-template-columns:repeat(4,1fr)}.qg{grid-template-columns:1fr 1fr}}
 @media(min-width:900px){.mgr{grid-template-columns:repeat(4,1fr)}}
@@ -89,13 +117,14 @@ main{max-width:1440px;margin:0 auto;padding:1.25rem 1rem}
 </style></head>
 <body><div id="app"><p class="hint" style="padding:1rem">Загрузка…</p></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="config.js"></script><script src="app.js"></script><script src="report-calc.js"></script>
+<script src="config.js"></script><script src="app.js"></script><script src="report-calc.js"></script><script src="leftover.js"></script>
 <script>
 const esc=t=>String(t??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const fmt=(n,d=0)=>(Math.round(n*10**d)/10**d).toLocaleString('ru-RU');
 const app=$('#app');
 const MON=['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
 let S=null,tab='all',timer=null,sel=null;
+const who=id=>(id&&S.names[id])||'';
 const nextUrl=()=>{const n=q.get('next')||'';return /^[a-z0-9_-]+\.html(\?[^#]*)?$/i.test(n)?n:null;};
 
 function loginView(){
@@ -123,14 +152,16 @@ async function loadAll(session){
     sb.from('recipes').select('*')]);
   const g=k=>{const x=(set||[]).find(y=>y.key===k);return x?+x.value:null};
   S={session,isSuper:pr?.role==='superadmin',forms:forms||[],acc:acc||[],can:!!can,tz:g('tz_offset')??5,st:g('shift_start')??6,
-     refs:{water:g('water_l')??55,washTypes:wt||[],chemicals:ch||[],recipes:rc||[]},loads:[]};
+     refs:{water:g('water_l')??55,washTypes:wt||[],chemicals:ch||[],recipes:rc||[]},loads:[],changes:[],pool:null,names:{}};
   await loadLoads();
 }
 const shiftDate=()=>new Date(Date.now()+(S.tz-S.st)*3600e3).toISOString().slice(0,10);
 async function loadLoads(){
   const d=shiftDate();
-  const r=S.can?await sb.rpc('report_loads',{d1:d,d2:d}):await sb.from('loads').select('id,ts,shift_date,part,machine,wash_type_id,weight_kg,extras,finished_at').eq('shift_date',d).order('ts');
+  const r=S.can?await sb.rpc('report_loads',{d1:d,d2:d}):await sb.from('loads').select('id,ts,shift_date,part,machine,wash_type_id,weight_kg,extras,finished_at,created_by').eq('shift_date',d).order('ts');
   S.loads=r.data||[];
+  if(S.can){const c=await sb.rpc('report_changes',{d1:d,d2:d});S.changes=c.data||[];}
+  const lo=await Leftover.fetch();S.pool=lo.rows;S.names=lo.names;S.poolErr=lo.error;
 }
 const roleOf=id=>S.isSuper?'admin':S.acc.find(a=>a.form_id===id)?.role;
 const canFill=f=>S.isSuper||(f.type==='laundry_load'?['worker','admin'].includes(roleOf(f.id)):['foreman','admin'].includes(roleOf(f.id)));
@@ -157,12 +188,35 @@ function metrics(ms){
   return{blocks:[mk('1_10',1,10,'Дозатор 1 · машины 1–10'),mk('11_12',11,12,'Дозатор 2 · машины 11–12')],total:{n:r.total,kg:r.kg}};
 }
 
+
+// ---------- остатки химии и лента операций ----------
+const canConnect=()=>S.isSuper||S.forms.some(f=>f.type==='laundry_chem'&&canFill(f));
+function leftoverBlock(){
+  if(S.pool==null)return S.poolErr?'<p class="hint" style="margin:1rem 0 0">Остатки химии появятся после выполнения stage6.sql.</p>':'';
+  return `<section aria-label="Остатки химии"><p class="gl" style="color:var(--chd)">Остатки химии · в запасе</p><div id="lov">${Leftover.html(S.pool,S.refs.chemicals,S.names,{can:canConnect(),today:shiftDate()})}</div></section>`;
+}
+function bindLeftover(){
+  const el=document.getElementById('lov');if(!el||S.pool==null)return;
+  Leftover.bind(el,S.pool,S.refs.chemicals,S.names,{can:canConnect(),today:shiftDate()},async()=>{await loadLoads();dashView();});
+}
+function feedBlock(){
+  const hhmm=ts=>new Date(new Date(ts).getTime()+S.tz*3600e3).toISOString().slice(11,16);
+  const wn=id=>S.refs.washTypes.find(x=>x.id===id)?.name||'Вид '+id,cn=id=>S.refs.chemicals.find(x=>+x.id===+id)?.name||'Химия';
+  const items=[
+    ...S.loads.map(l=>({ts:l.ts,k:'ld',t:`Машина ${String(l.machine).padStart(2,'0')} · ${wn(l.wash_type_id)}`,m:`${fmt(l.weight_kg,1)} кг`,by:l.created_by})),
+    ...S.changes.map(x=>{const left=x.leftover_l>0?fmt(+x.leftover_l,1)+' л':x.leftover_kg>0?fmt(+x.leftover_kg,1)+' кг':'бутыль пустая';return{ts:x.ts,k:'ch',t:`${cn(x.chemical_id)} · дозатор ${x.machine_group==='11_12'?'11–12':'1–10'}`,m:'остаток: '+left+(x.connect_id?' · подключён':''),by:x.created_by};})
+  ].sort((a,b)=>new Date(b.ts)-new Date(a.ts)).slice(0,10);
+  if(!items.length)return'';
+  return `<section aria-label="Последние операции"><div class="sh"><div><h2>Последние операции</h2><p>Синие — загрузка белья, оранжевые — замена химии</p></div>${S.can?'<a class="lnk" href="journal.html">Весь журнал →</a>':''}</div>
+   <div class="ops">${items.map(i=>`<article class="op ${i.k}"><div class="r1"><span class="tg ${i.k}">${i.k==='ld'?'🧺 Загрузка белья':'⚗ Замена химии'}</span><span class="tm">${hhmm(i.ts)}</span></div><div class="tt">${esc(i.t)}</div><div class="mt">${esc(i.m)}${who(i.by)?' · внёс: '+esc(who(i.by)):''}</div></article>`).join('')}</div></section>`;
+}
+
 function dashView(){
   const ms=machines(),em=S.session.user.email||'',ini=em.slice(0,2).toUpperCase();
-  const loc=new Date(Date.now()+S.tz*3600e3),first=S.forms.find(f=>f.type==='laundry_load'&&canFill(f));
+  const loc=new Date(Date.now()+S.tz*3600e3),first=S.forms.find(f=>f.type==='laundry_load'&&canFill(f)),firstChem=S.forms.find(f=>f.type==='laundry_chem'&&canFill(f));
   const hh=n=>String(n).padStart(2,'0'),acts=[];
-  S.forms.filter(canFill).forEach(f=>acts.push([f.type==='laundry_chem'?'⚗':'▤',f.name,'Открыть бланк','form.html?f='+encodeURIComponent(f.slug)]));
-  if(S.can){acts.push(['▦','Бланк за смену','Проверить и подготовить отчёт','blank.html']);acts.push(['▥','Отчёт по сменам','Теория и факт по химии','report.html']);}
+  S.forms.filter(canFill).forEach(f=>acts.push([f.type==='laundry_chem'?'⚗':'▤',f.name,f.type==='laundry_chem'?'Замена химии':'Загрузка белья','form.html?f='+encodeURIComponent(f.slug),f.type==='laundry_chem'?'ch':'']));
+  if(S.can){acts.push(['▦','Бланк за смену','Проверить и подготовить отчёт','blank.html']);acts.push(['▥','Отчёт по сменам','Теория и факт по химии','report.html']);acts.push(['☰','Журнал изменений','Кто что добавил, исправил и удалил','journal.html']);}
   if(S.isSuper){acts.push(['⚙','Настройки','Химия, рецепты, бланки','settings.html']);acts.push(['☺','Пользователи','Создать и выдать доступ','admin.html']);
     S.forms.forEach(f=>acts.push(['▣','QR: '+f.name,'Печать QR-кода','qr.html?f='+encodeURIComponent(f.slug)]));}
   const vis=ms.filter(m=>tab==='all'||(tab==='main'?m.id<=10:m.id>=11));
@@ -172,18 +226,20 @@ function dashView(){
    <div class="me"><div class="t hide-s"><p class="eb">Смена ${hh(S.st)}:00–${hh(S.st)}:00</p><p>${esc(em)}${S.isSuper?' · суперадмин':''}</p></div>
    <div class="av">${esc(ini)}</div><button class="ib" id="out" aria-label="Выйти" title="Выйти">⎋</button></div></div></header>
   <main><div class="top"><div><p class="eb">Сегодня, ${loc.getUTCDate()} ${MON[loc.getUTCMonth()]}</p><h1>Обзор текущей смены</h1></div>
-   ${first?`<a class="btn p" href="form.html?f=${encodeURIComponent(first.slug)}">+ Новая запись</a>`:''}</div>
-  ${(()=>{const M=metrics(ms);return M.blocks.map(b=>`<section aria-label="${esc(b.title)}"><p class="gl">${esc(b.title)}</p><div class="mg">${b.cards.map(([l,v,u,n,c])=>`<article class="m ${c}"><p class="l">${l}</p><p class="v">${v} ${u?`<small>${u}</small>`:''}</p><p class="n">${n}</p></article>`).join('')}</div></section>`).join('')+`<p class="hint" style="margin:.75rem 0 0">Всего по двум дозаторам: ${fmt(M.total.n)} стирок · ${fmt(M.total.kg)} кг</p>`;})()}
+   <div class="acts">${first?`<a class="btn p" href="form.html?f=${encodeURIComponent(first.slug)}">🧺 Загрузка белья</a>`:''}${firstChem?`<a class="btn c" href="form.html?f=${encodeURIComponent(firstChem.slug)}">⚗ Замена химии</a>`:''}</div></div>
+  ${(()=>{const M=metrics(ms);return leftoverBlock()+M.blocks.map(b=>`<section aria-label="${esc(b.title)}"><p class="gl">${esc(b.title)}</p><div class="mg">${b.cards.map(([l,v,u,n,c])=>`<article class="m ${c}"><p class="l">${l}</p><p class="v">${v} ${u?`<small>${u}</small>`:''}</p><p class="n">${n}</p></article>`).join('')}</div></section>`).join('')+`<p class="hint" style="margin:.75rem 0 0">Всего по двум дозаторам: ${fmt(M.total.n)} стирок · ${fmt(M.total.kg)} кг</p>`;})()}
   <section><div class="sh"><div><h2>Стиральные машины</h2><p>Выберите машину, чтобы открыть запись</p></div>
    <div class="tabs" role="tablist">${T.map(([id,l])=>`<button role="tab" aria-selected="${tab===id}" data-t="${id}">${l}</button>`).join('')}</div></div>
    <div class="mgr">${vis.map(m=>`<article class="mc ${m.status==='working'?'on':''}"><button class="mv" data-m="${m.id}" aria-label="Машина ${m.id}">
     <span class="ct"><i></i><i></i><i></i></span><span class="dr"><strong>${hh(m.id)}</strong></span>
     <span class="st">${m.status==='working'?'Стирка · '+m.left+' мин':'Свободна'}</span></button>
     <button class="btn s ${m.status==='working'?'p':''}" data-m="${m.id}">${m.status==='working'?'Открыть':'Добавить загрузку'} →</button></article>`).join('')}</div></section>
-  ${acts.length?`<section class="qg" aria-label="Быстрые действия">${acts.map(a=>`<a class="qa" href="${a[3]}"><span class="qi">${a[0]}</span><span><b>${esc(a[1])}</b><small>${esc(a[2])}</small></span><span>→</span></a>`).join('')}</section>`
+  ${feedBlock()}
+  ${acts.length?`<section class="qg" aria-label="Быстрые действия">${acts.map(a=>`<a class="qa ${a[4]||''}" href="${a[3]}"><span class="qi">${a[0]}</span><span><b>${esc(a[1])}</b><small>${esc(a[2])}</small></span><span>→</span></a>`).join('')}</section>`
    :'<p class="hint">Вам пока не выдан доступ ни к одному бланку. Обратитесь к суперадмину.</p>'}
   </main><div id="ovl"></div>`;
   $('#out').onclick=async()=>{await sb.auth.signOut();loginView();};
+  bindLeftover();
   document.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{tab=b.dataset.t;dashView();});
   document.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{sel=+b.dataset.m;panel(ms.find(m=>m.id===sel),first);});
   if(sel){const m=ms.find(m=>m.id===sel);if(m)panel(m,first);}
@@ -195,7 +251,7 @@ function panel(m,first){
   let w=null;
   $('#ovl').innerHTML=`<div class="ov" id="bg"><section class="pn" role="dialog" aria-modal="true" aria-label="Машина ${m.id}">
    <div class="ph"><div><p class="eb">${busy?'Стирка идёт':'Свободна'}</p><h2>Машина ${String(m.id).padStart(2,'0')}</h2><p>${m.id<=10?'Основной дозатор · 1–10':'Отдельный дозатор · 11–12'}</p></div><button class="ib" id="cl" aria-label="Закрыть">✕</button></div>
-   ${busy?`<div class="cur"><div><b>${esc(m.w?.name||'Загрузка')}</b><span>${fmt(l.weight_kg,1)} кг · с ${hhmm(l.ts)} · осталось ${m.left} мин</span></div><button class="btn p" id="fin">✓ Постиралось</button></div>`:''}
+   ${busy?`<div class="cur ld"><div><b>🧺 ${esc(m.w?.name||'Загрузка')}</b><span>${fmt(l.weight_kg,1)} кг · с ${hhmm(l.ts)} · осталось ${m.left} мин${who(l.created_by)?'<br>Загрузил: '+esc(who(l.created_by)):''}</span></div><button class="btn p" id="fin">✓ Постиралось</button></div>`:''}
    ${first?`<h3>${busy?'Следующая стирка':'Вид стирки'}</h3>
    <div class="wl" id="wl">${wt.map(x=>`<button data-v="${x.id}"><span>${esc(x.name)}</span>${x.minutes?`<small>${x.minutes} мин</small>`:''}</button>`).join('')}</div>
    <h3>Вес, кг</h3><div class="kgr"><button id="mi" aria-label="Меньше">−</button><input id="kg" type="number" inputmode="decimal" min="0" step="0.5" value="25"><button id="pl" aria-label="Больше">+</button></div>

@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#2aa3b5">
 <title>Отчёт по сменам — EuSS</title><link rel="icon" href="favicon.png" type="image/png"><link rel="stylesheet" href="style.css"></head>
 <body>
 <header class="hd"><div><a class="lg" href="index.html" aria-label="На панель смены"><img src="euss-logo.png" alt="EuSS"><span class="sep"></span><span class="sub">Отчёты</span></a><nav class="nav"><a class="btn s" href="index.html">← Панель</a></nav></div></header>
 <main class="wide">
-<div class="top"><h1>Отчёт по сменам</h1></div>
+<div class="top" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.75rem"><h1>Отчёт по сменам</h1><a class="btn" href="journal.html">☰ Журнал изменений</a></div>
 <div class="box">
   <div class="acc"><label>С даты смены<input type="date" id="d1"></label><label>По дату смены<input type="date" id="d2"></label></div>
   <div class="seg" role="group" aria-label="Период"><button id="t">Сегодня</button><button id="y">Вчера</button><button id="w">7 дней</button><button id="mo">Этот месяц</button><button id="pm">Прошлый месяц</button></div>
@@ -18,7 +18,8 @@
 <script>
 const esc=t=>String(t??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const f=(n,d=1)=>(Math.round(n*10**d)/10**d).toLocaleString('ru-RU');
-let refs=null,tz=5,st=6,seq=0,isSuper=false,byId={};
+let refs=null,tz=5,st=6,seq=0,isSuper=false,byId={},byCh={},nm={},cache={loads:[],changes:[],conns:[]},kindF='all';
+const who=id=>(id&&nm[id])||'';
 const shiftToday=()=>new Date(Date.now()+(tz-st)*3600e3).toISOString().slice(0,10);
 const addDays=(d,n)=>new Date(new Date(d+'T00:00:00Z').getTime()+n*864e5).toISOString().slice(0,10);
 const hhmm=ts=>new Date(new Date(ts).getTime()+tz*3600e3).toISOString().slice(11,16);
@@ -28,8 +29,15 @@ function two(o){return o?[o.l!=null?f(o.l)+' л':'',o.kg!=null?f(o.kg)+' кг':'
 function dif(c){if(c.diff==null||!c.changes)return'–';const u=c.prim==='l'?'л':'кг',cls=c.pct!=null&&c.pct>10?' class="bad"':c.pct!=null&&c.pct<-10?' class="good"':'';return `<span${cls}>${c.diff>0?'+':''}${f(c.diff)} ${u}${c.pct==null?'':'<br>'+(c.pct>0?'+':'')+f(c.pct,0)+'%'}</span>`}
 function note(c){if(c.kind==='extra')return'по загрузкам, замены бутылей не отмечаются';return c.prim==null?'Задайте литры и кг в настройках':c.diff==null?'Задайте и литры, и кг в настройках':`замен: ${c.changes}${c.noLeft?`, без остатка: ${c.noLeft}`:''}`}
 function chemTable(g){
-  return `<div class="box"><table class="tbl"><tr><th>Химия</th><th>Теория</th><th>Факт</th><th>Разница</th></tr>
-  ${g.chem.map(c=>`<tr><td>${esc(c.name)}<br><small>${note(c)}</small></td><td>${two(c.theory)}</td><td>${c.changes?two(c.actual):'–'}</td><td>${dif(c)}</td></tr>`).join('')}</table></div>`;
+  const body=g.chem.map(c=>{
+    const ex=c.kind==='extra',has=c.stock&&(c.stock.l>0||c.stock.kg>0),con=c.connected&&(c.connected.l>0||c.connected.kg>0);
+    return `<div class="cm"><div class="cmh"><b>${esc(c.name)}</b><small>${note(c)}</small></div><div class="cmg">
+      <div><span>Теория</span><b>${two(c.theory)}</b></div>
+      <div><span>Факт</span><b>${c.changes?two(c.actual):'–'}</b>${c.adj>0?`<small>с учётом подключённого остатка</small>`:''}</div>
+      <div><span>Разница</span><b>${dif(c)}</b></div>
+      <div class="st"><span>Остаток</span>${ex?'<b>–</b>':`<b>${has?'в запасе: '+two(c.stock).replace('<br>',' · '):'в запасе: нет'}</b>${con?`<small>подключено: ${two(c.connected).replace('<br>',' · ')}</small>`:''}`}</div>
+    </div></div>`;}).join('');
+  return `<div>${body}</div>`;
 }
 function washTable(g){
   return `<div class="box"><table class="tbl"><tr><th>Вид стирки</th><th>Стирок</th><th>Кг</th></tr>
@@ -45,24 +53,96 @@ async function show(){
   const d1=$('#d1').value,d2=$('#d2').value,my=++seq;
   if(!d1||!d2||d1>d2){$('#out').innerHTML='<p class="hint">Укажите период: дата «с» не позже даты «по».</p>';return;}
   $('#rng').textContent=`Смена начинается в ${String(st).padStart(2,'0')}:00 и длится сутки. Расход считается отдельно по двум дозаторам.`;
-  const [{data,error},{data:chg,error:e2}]=await Promise.all([sb.rpc('report_loads',{d1,d2}),sb.rpc('report_changes',{d1,d2})]);
+  const [{data,error},{data:chg,error:e2},{data:cn,error:e3},sn]=await Promise.all([sb.rpc('report_loads',{d1,d2}),sb.rpc('report_changes',{d1,d2}),sb.rpc('report_connects',{d1,d2}),sb.rpc('staff_names')]);
   if(my!==seq)return;
-  if(error||e2){$('#out').innerHTML='<p class="err">Не удалось загрузить данные. Выполните supabase.sql и затем stage3.sql.</p>';return;}
-  const loads=data||[],changes=chg||[],r=calcReport(loads,changes,refs),wn={},cn={};
-  refs.washTypes.forEach(w=>wn[w.id]=w.name);refs.chemicals.forEach(c=>cn[c.id]=c.name);
-  const rows=loads.slice().reverse().slice(0,300), chRows=changes.slice().reverse().slice(0,300);
-  byId={};rows.forEach(l=>byId[l.id]=l);
+  if(error||e2||e3){$('#out').innerHTML='<p class="err">Не удалось загрузить данные. Выполните supabase.sql, затем stage3.sql … stage6.sql.</p>';return;}
+  nm=Object.fromEntries(((sn&&sn.data)||[]).map(x=>[x.id,x.name]));
+  const loads=data||[],changes=chg||[],conns=cn||[],r=calcReport(loads,changes,refs,conns);
+  cache={loads,changes,conns};
   $('#out').innerHTML=`
     <div class="kpi"><div><b>${r.total}</b><span>стирок всего</span></div><div><b>${f(r.kg,0)}</b><span>кг всего</span></div><div><b>${r.byPart.day}</b><span>день</span></div><div><b>${r.byPart.night}</b><span>ночь</span></div></div>
     ${groupBlock('Дозатор 1 · машины 1–10',r.groups['1_10'])}
     ${groupBlock('Дозатор 2 · машины 11–12',r.groups['11_12'])}
     <section><h2>Общий итог · оба дозатора</h2>${groupBlock('Стирки и химия вместе',r.groups.all)}</section>
-    <h2>Записи загрузок${loads.length>rows.length?` (последние ${rows.length})`:''}</h2>
-    <div class="box"><table class="tbl"><tr><th>Смена</th><th>Время</th><th>Машина</th><th>Дозатор</th><th>Вид</th><th>Кг</th>${isSuper?'<th></th>':''}</tr>
-    ${rows.map(l=>`<tr><td>${dmy(l.shift_date)} ${l.part==='night'?'ночь':'день'}</td><td>${hhmm(l.ts)}</td><td>${l.machine}</td><td>${l.machine<=10?'1–10':'11–12'}</td><td>${esc(wn[l.wash_type_id])}${l.edited_at?' <small title="Исправлено суперадмином">· испр.</small>':''}</td><td>${f(l.weight_kg)}</td>${isSuper?`<td><button class="mini" data-ed="${l.id}" aria-label="Исправить запись" title="Исправить">✎</button></td>`:''}</tr>`).join('')||`<tr><td colspan="${isSuper?7:6}">Нет записей</td></tr>`}</table></div>
-    <h2>Замены химии${changes.length>chRows.length?` (последние ${chRows.length})`:''}</h2>
-    <div class="box"><table class="tbl"><tr><th>Смена</th><th>Время</th><th>Дозатор</th><th>Химия</th><th>Остаток</th></tr>
-    ${chRows.map(x=>`<tr><td>${dmy(x.shift_date)}</td><td>${hhmm(x.ts)}</td><td>${x.machine_group==='11_12'?'11–12':'1–10'}</td><td>${esc(cn[x.chemical_id])}</td><td>${x.leftover_kg!=null?f(x.leftover_kg)+' кг':x.leftover_l!=null?f(x.leftover_l)+' л':'пусто'}</td></tr>`).join('')||'<tr><td colspan="5">Нет замен</td></tr>'}</table></div>`;
+    <h2>Журнал операций</h2>
+    <p class="hint">Синие записи — загрузка белья, оранжевые — замена химии, фиолетовые — подключение остатка.</p>
+    <div class="seg" id="kf" role="group" aria-label="Что показывать"><button data-v="all">Все</button><button data-v="ld">🧺 Загрузки</button><button data-v="ch">⚗ Химия</button></div>
+    <div class="ops" id="opsw" style="margin-top:.75rem"></div>`;
+  renderOps();
+}
+function renderOps(){
+  const wn={},cn2={};refs.washTypes.forEach(w=>wn[w.id]=w.name);refs.chemicals.forEach(c=>cn2[c.id]=c.name);
+  const {loads,changes,conns}=cache;byId={};byCh={};
+  const all=[...loads.map(o=>({k:'ld',ts:o.ts,o})),...changes.map(o=>({k:'ch',ts:o.ts,o})),...conns.map(o=>({k:'cn',ts:o.ts,o}))]
+    .filter(i=>kindF==='all'||(kindF==='ld'?i.k==='ld':i.k!=='ld')).sort((a,b)=>new Date(b.ts)-new Date(a.ts));
+  const shown=all.slice(0,300);
+  document.querySelectorAll('#kf button').forEach(b=>{const on=b.dataset.v===kindF;b.classList.toggle('on',on);b.setAttribute('aria-pressed',on);});
+  const act=(k,id,ed)=>isSuper?`<div class="act"><button class="mini" data-${ed}="${id}">✎ Изменить</button><button class="mini danger" data-del="${id}" data-k="${k}">🗑 Удалить</button></div>`:'';
+  let day='';
+  const html=shown.map(i=>{
+    const o=i.o,by=who(o.created_by),byT=by?' · внёс: '+esc(by):'',sd=o.shift_date;
+    let head='';if(sd!==day){day=sd;head=`<p class="day">Смена ${dmy(sd)}</p>`;}
+    if(i.k==='ld'){
+      byId[o.id]=o;
+      const ex=Object.entries(o.extras||{}).map(([id,q])=>{const c=refs.chemicals.find(x=>String(x.id)===String(id));return c?esc(c.name)+': '+q+' шт':''}).filter(Boolean).join(', ');
+      return head+`<article class="op ld"><div class="r1"><span class="tg ld">🧺 Загрузка белья</span><span class="tm">${o.part==='night'?'ночь':'день'} · ${hhmm(o.ts)}</span></div>
+        <div class="tt">Машина ${o.machine} · ${esc(wn[o.wash_type_id]||'вид '+o.wash_type_id)} · ${f(o.weight_kg)} кг</div>
+        <div class="mt">дозатор ${o.machine<=10?'1–10':'11–12'}${ex?' · '+ex:''}${byT}${o.edited_at?' · <b>исправлено</b>':''}</div>${act('ld',o.id,'ed')}</article>`;
+    }
+    if(i.k==='ch'){
+      byCh[o.id]=o;
+      const left=+o.leftover_l>0?f(o.leftover_l)+' л':+o.leftover_kg>0?f(o.leftover_kg)+' кг':'бутыль пустая';
+      const has=+o.leftover_l>0||+o.leftover_kg>0;
+      return head+`<article class="op ch"><div class="r1"><span class="tg ch">⚗ Замена химии</span><span class="tm">${hhmm(o.ts)}</span></div>
+        <div class="tt">${esc(cn2[o.chemical_id]||'Химия')} · дозатор ${o.machine_group==='11_12'?'11–12':'1–10'}</div>
+        <div class="mt">остаток: ${left}${has?(o.connect_id?' · <b>подключён</b>':' · в запасе'):''}${byT}</div>${act('ch',o.id,'edc')}</article>`;
+    }
+    const amt=+o.amount_l>0?f(o.amount_l)+' л':+o.amount_kg>0?f(o.amount_kg)+' кг':'';
+    return head+`<article class="op cn"><div class="r1"><span class="tg cn">🔗 Остаток подключён</span><span class="tm">${hhmm(o.ts)}</span></div>
+      <div class="tt">${esc(cn2[o.chemical_id]||'Химия')} · ${amt} → дозатор ${o.machine_group==='11_12'?'11–12':'1–10'}</div>
+      <div class="mt">объединено остатков: ${o.n}${byT}</div></article>`;
+  }).join('');
+  $('#opsw').innerHTML=(html||'<p class="hint">Нет записей за период.</p>')+(all.length>shown.length?`<p class="hint">Показаны последние ${shown.length} из ${all.length}.</p>`:'');
+}
+
+// ---------- удаление и правка замен химии (только суперадмин; права закрыты и в базе) ----------
+function chemEdit(x){
+  const c=refs.chemicals.find(z=>+z.id===+x.chemical_id)||{name:'Химия'};
+  let unit=+x.leftover_l>0?'l':(+x.leftover_kg>0?'kg':(+c.bottle_kg>0?'kg':'l'));
+  const v0=+x.leftover_l>0?+x.leftover_l:(+x.leftover_kg>0?+x.leftover_kg:'');
+  $('#ovl').innerHTML=`<div class="ov" id="bg"><section class="pn" role="dialog" aria-modal="true" aria-label="Исправить замену химии">
+   <div class="ph"><div><p class="eb">Только суперадмин</p><h2>${esc(c.name)}</h2><p class="hint">Замена от ${dmy(x.shift_date)}, ${hhmm(x.ts)}</p></div><button class="ib" id="cl" aria-label="Закрыть">✕</button></div>
+   <label>Дозатор<select id="eg"><option value="1_10"${x.machine_group!=='11_12'?' selected':''}>1–10 · основной</option><option value="11_12"${x.machine_group==='11_12'?' selected':''}>11–12 · отдельный</option></select></label>
+   <h3>Остаток в бутыли</h3>
+   <div class="seg" id="eu"><button data-v="kg" class="${unit==='kg'?'on':''}">кг</button><button data-v="l" class="${unit==='l'?'on':''}">литры</button></div>
+   <label>Остаток (пусто или 0 — бутыль пустая)<input id="ev" type="number" min="0" step="0.1" inputmode="decimal" value="${v0}"></label>
+   ${x.connect_id?'<p class="hint">Этот остаток уже подключён к дозатору. Если изменить количество, отчёт пересчитается, но само подключение останется прежним.</p>':''}
+   <button class="go" id="ok">Сохранить исправление</button>
+   <button class="ghost danger" id="rm">Удалить запись</button></section></div>`;
+  const close=()=>{$('#ovl').innerHTML='';document.onkeydown=null;};
+  document.onkeydown=e=>{if(e.key==='Escape')close();};
+  $('#cl').onclick=close;$('#bg').onmousedown=e=>{if(e.target.id==='bg')close();};
+  pick('#eu',v=>{unit=v;});
+  $('#ok').onclick=async()=>{
+    const raw=$('#ev').value,v=raw===''?0:+raw,size=unit==='kg'?+c.bottle_kg:+c.bottle_l;
+    if(!(v>=0)){toast('Остаток указан неверно');return;}
+    if(v>0&&size>0&&v>size){toast('Остаток больше полной бутыли ('+size+' '+(unit==='kg'?'кг':'л')+')');return;}
+    const upd={machine_group:$('#eg').value,...(v===0?{leftover_kg:0,leftover_l:0}:unit==='kg'?{leftover_kg:v,leftover_l:null}:{leftover_l:v,leftover_kg:null})};
+    $('#ok').disabled=true;
+    const{data,error}=await sb.from('chem_changes').update(upd).eq('id',x.id).select('id');
+    if(error||!data||!data.length){toast('Не сохранено: '+(error?error.message:'нет прав или не выполнен stage6.sql'));$('#ok').disabled=false;return;}
+    close();toast('Запись исправлена');show();
+  };
+  $('#rm').onclick=()=>{close();delRec('ch',x.id);};
+}
+async function delRec(k,id){
+  const tbl=k==='ld'?'loads':'chem_changes',o=k==='ld'?byId[id]:byCh[id];
+  let q=k==='ld'?'Удалить эту загрузку белья безвозвратно?':'Удалить эту замену химии безвозвратно?';
+  if(o&&o.connect_id)q+='\nЕё остаток уже подключён: подключение останется, а отчёт пересчитается.';
+  if(!confirm(q+'\nВ журнале изменений останется след об удалении.'))return;
+  const{data,error}=await sb.from(tbl).delete().eq('id',id).select('id');
+  if(error||!data||!data.length){toast('Не удалено: '+(error?error.message:'нет прав или не выполнены stage5.sql и stage6.sql'));return;}
+  toast('Запись удалена');show();
 }
 
 // ---------- правка истории загрузок (только суперадмин; права закрыты и в базе) ----------
@@ -100,14 +180,14 @@ function editPanel(l){
     if(error||!data||!data.length){toast('Не сохранено: '+(error?error.message:'нет прав или не выполнен stage5.sql'));$('#ok').disabled=false;return;}
     close();toast('Запись исправлена');show();
   };
-  $('#rm').onclick=async()=>{
-    if(!confirm('Удалить эту запись безвозвратно?'))return;
-    const{data,error}=await sb.from('loads').delete().eq('id',l.id).select('id');
-    if(error||!data||!data.length){toast('Не удалено: '+(error?error.message:'нет прав или не выполнен stage5.sql'));return;}
-    close();toast('Запись удалена');show();
-  };
+  $('#rm').onclick=()=>{close();delRec('ld',l.id);};
 }
-$('#out').onclick=e=>{const b=e.target.closest('[data-ed]');if(b&&byId[b.dataset.ed])editPanel(byId[b.dataset.ed]);};
+$('#out').onclick=e=>{
+  const k=e.target.closest('#kf [data-v]');if(k){kindF=k.dataset.v;renderOps();return;}
+  const b=e.target.closest('[data-ed]');if(b&&byId[b.dataset.ed]){editPanel(byId[b.dataset.ed]);return;}
+  const c=e.target.closest('[data-edc]');if(c&&byCh[c.dataset.edc]){chemEdit(byCh[c.dataset.edc]);return;}
+  const d=e.target.closest('[data-del]');if(d)delRec(d.dataset.k,d.dataset.del);
+};
 
 const mr=n=>{const t=shiftToday(),d=new Date(Date.UTC(+t.slice(0,4),+t.slice(5,7)-1+n,1)),ym=d.toISOString().slice(0,7),last=new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+1,0)).getUTCDate();return[ym+'-01',ym+'-'+String(last).padStart(2,'0')]};
 function mark(){const a=$('#d1').value,b=$('#d2').value,t=shiftToday(),y=addDays(t,-1),w=addDays(t,-6);

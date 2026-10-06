@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Бланк за смену — EuSS</title><link rel="icon" href="favicon.png" type="image/png"><link rel="stylesheet" href="style.css"></head>
 <body>
 <header class="hd"><div><a class="lg" href="index.html" aria-label="На панель смены"><img src="euss-logo.png" alt="EuSS"><span class="sep"></span><span class="sub">Отчёты</span></a><nav class="nav"><a class="btn s" href="index.html">← Панель</a></nav></div></header>
@@ -243,11 +243,12 @@ async function download() {
     const data = await loads(ymX + '-01', d2);
     const { data: changes, error: chErr } = await sb.rpc('report_changes', { d1: ymX + '-01', d2 });
     if (chErr) throw chErr;
+    const { data: connects } = await sb.rpc('report_connects', { d1: ymX + '-01', d2 });   // нужен stage6.sql; если его нет, подключения просто не учитываются
     const byDay = {};
     data.forEach(l => (byDay[l.shift_date] = byDay[l.shift_date] || []).push(l));
     const days = {}, warn = new Set();
     Object.keys(byDay).forEach(d => { const mm = Blank.build(byDay[d], refs, d); days[+d.slice(8)] = mm; Blank.warnings(mm).forEach(w => warn.add(w)); });
-    await Blank.fillWorkbook(zip, days, refs, changes || []);
+    await Blank.fillWorkbook(zip, days, refs, changes || [], connects || []);
     const blob = await zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'Blanc-' + ymX + '.xlsx';
     document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1e4);
