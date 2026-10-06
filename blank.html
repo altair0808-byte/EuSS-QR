@@ -4,10 +4,17 @@
 <body>
 <header class="hd"><div><a class="lg" href="index.html" aria-label="На панель смены"><img src="euss-logo.png" alt="EuSS"><span class="sep"></span><span class="sub">Отчёты</span></a><nav class="nav"><a class="btn s" href="index.html">← Панель</a></nav></div></header>
 <main class="wide">
-<div class="top"><p class="eb">Смена</p><h1 id="ttl">Бланк за смену</h1></div>
+<div class="top"><p class="eb" id="eb">Смена</p><h1 id="ttl">Бланк за смену</h1></div>
 <div class="box">
-  <div class="dnav"><button class="btn" id="pv" aria-label="Предыдущая смена" title="Предыдущая смена">‹</button><label>Дата смены<input type="date" id="d"></label><button class="btn" id="nx" aria-label="Следующая смена" title="Следующая смена">›</button></div>
-  <div class="seg" role="group" aria-label="Смена"><button id="t">Сегодня</button><button id="y">Вчера</button></div>
+  <div class="seg" id="md" role="group" aria-label="Режим отчёта"><button data-v="day" class="on" aria-pressed="true">Одна смена</button><button data-v="month" aria-pressed="false">Месяц</button></div>
+  <div id="dayc">
+    <div class="dnav" style="margin-top:.75rem"><button class="btn" id="pv" aria-label="Предыдущая смена" title="Предыдущая смена">‹</button><label>Дата смены<input type="date" id="d"></label><button class="btn" id="nx" aria-label="Следующая смена" title="Следующая смена">›</button></div>
+    <div class="seg" role="group" aria-label="Смена"><button id="t">Сегодня</button><button id="y">Вчера</button></div>
+  </div>
+  <div id="monc" hidden>
+    <div class="dnav" style="margin-top:.75rem"><button class="btn" id="mpv" aria-label="Предыдущий месяц" title="Предыдущий месяц">‹</button><label>Месяц<select id="mm"></select></label><label>Год<select id="yy"></select></label><button class="btn" id="mnx" aria-label="Следующий месяц" title="Следующий месяц">›</button></div>
+    <div class="seg" role="group" aria-label="Период"><button id="mt">Этот месяц</button><button id="mp">Прошлый месяц</button></div>
+  </div>
   <p class="hint" id="msg"></p>
   <button class="go" id="x" style="margin-top:.5rem">⬇ Скачать Excel за месяц</button>
 </div>
@@ -58,44 +65,163 @@ function checks(m, data) {
   return { out, overlapMachines: new Set(Object.keys(byM).filter(k => overlaps.some(o => o.startsWith('машина ' + k + ':')))) };
 }
 
+const all12 = Array.from({ length: 12 }, (_, i) => i + 1);
+const WD = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+const MONN = ['январь', 'февраль', 'март', 'апрель', 'май', 'июнь', 'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь'];
+const wdOf = d => WD[(new Date(d + 'T00:00:00Z').getUTCDay() + 6) % 7];
+const addMonth = (ym, n) => { const d = new Date(Date.UTC(+ym.slice(0, 4), +ym.slice(5, 7) - 1 + n, 1)); return d.toISOString().slice(0, 7); };
+const ymLabel = ym => MONN[+ym.slice(5, 7) - 1] + ' ' + ym.slice(0, 4);
+let mode = 'day', ym = null;
+
+// ---------- общие блоки: машины, виды стирки по дозаторам, химия ----------
+function machTable(ms, flags) {
+  const maxN = Math.max(1, ...Object.values(ms).map(x => x.n));
+  const mrow = n => { const x = ms[n], flag = flags.has(String(n));
+    return `<tr class="${flag ? 'flag' : ''}"><th class="l">Машина ${n}</th><td class="dim hs">${n <= 10 ? 'Дозатор 1' : 'Дозатор 2'}</td>
+      <td class="grp">${cell(x.day, 0)}</td><td>${cell(x.dayKg)}</td><td class="grp">${cell(x.night, 0)}</td><td>${cell(x.nightKg)}</td>
+      <td class="grp"><b>${cell(x.n, 0)}</b></td><td><b>${cell(x.kg)}</b></td><td>${x.n ? F(x.kg / x.n) : '<span class="z">–</span>'}</td>
+      <td class="l"><span class="mcell" style="justify-content:flex-start"><span class="meter${n > 10 ? ' b' : ''}" style="width:${Math.round(x.n / maxN * 100)}px"></span></span></td></tr>`; };
+  const sumRow = (label, rows) => { const a = rows.map(n => ms[n]), n = a.reduce((s, x) => s + x.n, 0), kg = a.reduce((s, x) => s + x.kg, 0);
+    return `<tr class="tot"><th class="l">${label}</th><td class="hs"></td><td class="grp">${a.reduce((s, x) => s + x.day, 0)}</td><td>${F(a.reduce((s, x) => s + x.dayKg, 0))}</td><td class="grp">${a.reduce((s, x) => s + x.night, 0)}</td><td>${F(a.reduce((s, x) => s + x.nightKg, 0))}</td><td class="grp">${n}</td><td>${F(kg)}</td><td>${n ? F(kg / n) : '–'}</td><td></td></tr>`; };
+  return `<div class="box"><table class="tbl"><tr><th class="l">Машина</th><th class="l hs">Дозатор</th><th class="grp">День, ст.</th><th>День, кг</th><th class="grp">Ночь, ст.</th><th>Ночь, кг</th><th class="grp">Всего, ст.</th><th>Всего, кг</th><th>Ср. вес</th><th class="l">Нагрузка</th></tr>
+    ${all12.slice(0, 10).map(mrow).join('')}${sumRow('Итого 1–10', all12.slice(0, 10))}${all12.slice(10).map(mrow).join('')}${sumRow('Итого 11–12', [11, 12])}${sumRow('Итого, оба дозатора', all12)}</table></div>`;
+}
+
+// виды стирки: дозатор 1 (машины 1–10) и дозатор 2 (11–12) отдельно
+function typeGroupTable(data) {
+  const rows = {}, order = [];
+  const get = id => rows[id] || (order.push(id), rows[id] = { name: 'вид ' + id, a: { n: 0, kg: 0 }, b: { n: 0, kg: 0 } });
+  refs.washTypes.forEach(w => { get(w.id).name = w.name; });
+  data.forEach(l => { const g = +l.machine <= 10 ? get(l.wash_type_id).a : get(l.wash_type_id).b; g.n++; g.kg += +l.weight_kg || 0; });
+  const list = order.map(id => rows[id]).filter(r => r.a.n || r.b.n);
+  const T = list.reduce((t, r) => ({ an: t.an + r.a.n, ak: t.ak + r.a.kg, bn: t.bn + r.b.n, bk: t.bk + r.b.kg }), { an: 0, ak: 0, bn: 0, bk: 0 });
+  return `<div class="box"><table class="tbl"><tr><th class="l">Вид стирки</th><th class="grp">1–10, ст.</th><th>1–10, кг</th><th class="grp">11–12, ст.</th><th>11–12, кг</th><th class="grp">Всего, ст.</th><th>Всего, кг</th></tr>
+    ${list.map(r => `<tr><th class="l">${E(r.name)}</th><td class="grp">${cell(r.a.n, 0)}</td><td>${cell(r.a.kg)}</td><td class="grp">${cell(r.b.n, 0)}</td><td>${cell(r.b.kg)}</td><td class="grp"><b>${r.a.n + r.b.n}</b></td><td><b>${F(r.a.kg + r.b.kg)}</b></td></tr>`).join('') || '<tr><td class="l" colspan="7">Нет стирок</td></tr>'}
+    <tr class="tot"><th class="l">Итого</th><td class="grp">${T.an}</td><td>${F(T.ak)}</td><td class="grp">${T.bn}</td><td>${F(T.bk)}</td><td class="grp">${T.an + T.bn}</td><td>${F(T.ak + T.bk)}</td></tr></table></div>`;
+}
+
+// расход химии по дозаторам за одну или несколько смен (list: модели Blank.build)
+function chemBlock(list) {
+  const base = list[0] || Blank.build([], refs, '2000-01-01');
+  const sum = (k, i, key) => list.reduce((s, m) => s + (m.groups[key][k][i] || 0), 0);
+  const unit = c => c.per_unit_unit === 'g' ? 'г' : 'мл';
+  const rows = [...base.mains.map((c, i) => [c.name, 'по рецепту', sum('chem', i, '1_10') / 1000, sum('chem', i, '11_12') / 1000, 'л']),
+    ...base.extras.map((c, i) => [c.name, `${F(sum('exQty', i, 'all'), 0)} шт × ${+c.per_unit || 0} ${unit(c)}`, sum('exTot', i, '1_10') / 1000, sum('exTot', i, '11_12') / 1000, c.per_unit_unit === 'g' ? 'кг' : 'л'])];
+  return `<div class="box"><table class="tbl"><tr><th class="l">Химия</th><th class="l">Как посчитано</th><th>Дозатор 1</th><th>Дозатор 2</th><th>Всего</th></tr>
+    ${rows.map(([n, how, a, b, u]) => `<tr><th class="l">${E(n)}</th><td class="dim l">${how}</td><td>${cell(a, 2)} <span class="dim">${u}</span></td><td>${cell(b, 2)} <span class="dim">${u}</span></td><td><b>${cell(a + b, 2)}</b> <span class="dim">${u}</span></td></tr>`).join('')}</table>
+    <p class="note" style="padding:0 .5rem .5rem">Это теоретический расход по рецептам и отправленным загрузкам. Фактический расход по заменам бутылей смотрите в отчёте по сменам.</p></div>`;
+}
+
+const kpiHtml = k => `<section class="mg">${k.map(([l, v, u, n, c]) => `<article class="m ${c}"><p class="l">${l}</p><p class="v">${v} ${u ? `<small>${u}</small>` : ''}</p><p class="n">${n}</p></article>`).join('')}</section>`;
+const chkHtml = out => `<div class="box" role="list" aria-label="Проверка данных" style="margin-top:.75rem"><h3 style="margin-top:0">Проверка данных</h3>${out.map(c => `<div class="chk ${c.k === 'ok' ? '' : 'w-' + c.k}" role="listitem"><div><b>${c.t}</b>${c.n ? `<span>${c.n}</span>` : ''}</div></div>`).join('')}</div>`;
+
+// ---------- одна смена ----------
 function view(m, data) {
   const G = m.groups, T = m.total, ms = m.machineStats;
   const day = Object.values(ms).reduce((a, x) => a + x.day, 0), night = Object.values(ms).reduce((a, x) => a + x.night, 0);
-  const used = Object.values(ms).filter(x => x.n).length, maxN = Math.max(1, ...Object.values(ms).map(x => x.n));
+  const used = Object.values(ms).filter(x => x.n).length;
   const ck = checks(m, data);
   const kpi = [['Стирок', F(G.all.n, 0), '', `день ${day} · ночь ${night}`, ''], ['Общий вес', F(G.all.kg), 'кг', G.all.n ? `в среднем ${F(G.all.kg / G.all.n)} кг на стирку` : 'нет данных', 'm2'],
-    ['Машин задействовано', used + ' / 12', '', `дозатор 1: ${G['1_10'].n} · дозатор 2: ${G['11_12'].n}`, 'm3'], ['Время работы', F(T.time / 60), 'ч', 'по рецептуре, все виды стирки', 'm4']];
-  const mrow = n => { const x = ms[n], flag = ck.overlapMachines.has(String(n));
-    return `<tr class="${n === 1 || n === 11 ? 'gs' : ''}${flag ? ' flag' : ''}"><th class="l">Машина ${n}</th><td class="dim hs">${n <= 10 ? 'Дозатор 1' : 'Дозатор 2'}</td>
-      <td class="grp">${cell(x.day, 0)}</td><td>${cell(x.dayKg)}</td><td class="grp">${cell(x.night, 0)}</td><td>${cell(x.nightKg)}</td>
-      <td class="grp"><b>${cell(x.n, 0)}</b></td><td><b>${cell(x.kg)}</b></td><td>${x.n ? F(x.kg / x.n) : '<span class="z">–</span>'}</td>
-      <td class="l"><span class="mcell" style="justify-content:flex-start"><span class="meter" style="width:${Math.round(x.n / maxN * 100)}px"></span></span></td></tr>`; };
-  const sumRow = (label, rows) => { const a = rows.map(n => ms[n]), n = a.reduce((s, x) => s + x.n, 0), kg = a.reduce((s, x) => s + x.kg, 0);
-    return `<tr class="tot"><th class="l">${label}</th><td class="hs"></td><td class="grp">${a.reduce((s, x) => s + x.day, 0)}</td><td>${F(a.reduce((s, x) => s + x.dayKg, 0))}</td><td class="grp">${a.reduce((s, x) => s + x.night, 0)}</td><td>${F(a.reduce((s, x) => s + x.nightKg, 0))}</td><td class="grp">${n}</td><td>${F(kg)}</td><td>${n ? F(kg / n) : '–'}</td><td></td></tr>`; };
-  const all = Array.from({ length: 12 }, (_, i) => i + 1);
-  const machines = `<div class="box"><table class="tbl"><tr><th class="l">Машина</th><th class="l hs">Дозатор</th><th class="grp">День, ст.</th><th>День, кг</th><th class="grp">Ночь, ст.</th><th>Ночь, кг</th><th class="grp">Всего, ст.</th><th>Всего, кг</th><th>Ср. вес</th><th class="l">Нагрузка</th></tr>
-    ${all.map(mrow).join('')}${sumRow('Итого', all)}</table></div>`;
-  const types = `<div class="box"><table class="tbl"><tr><th class="l">Вид стирки</th><th>Стирок</th><th>Кг</th><th>Время, мин</th>${m.mains.map(c => `<th>${E(c.name)}, л</th>`).join('')}</tr>
-    ${m.types.filter(ty => ty.n).map(ty => `<tr><th class="l">${E(ty.name)}</th><td>${ty.n}</td><td>${F(ty.kg)}</td><td>${F(ty.time, 0)}</td>${m.mains.map((_, i) => `<td>${cell(ty.chem[i] / 1000, 2)}</td>`).join('')}</tr>`).join('') || `<tr><td class="l" colspan="${4 + m.mains.length}">Нет стирок</td></tr>`}
-    <tr class="tot"><th class="l">Итого</th><td>${T.n}</td><td>${F(T.kg)}</td><td>${F(T.time, 0)}</td>${m.mains.map((_, i) => `<td>${F(T.chem[i] / 1000, 2)}</td>`).join('')}</tr></table></div>`;
-  const unit = c => c.per_unit_unit === 'g' ? 'г' : 'мл';
-  const chemRows = [...m.mains.map((c, i) => [c.name, 'по рецепту', G['1_10'].chem[i] / 1000, G['11_12'].chem[i] / 1000, 'л']),
-    ...m.extras.map((c, i) => [c.name, `${F(G.all.exQty[i], 0)} шт × ${+c.per_unit || 0} ${unit(c)}`, G['1_10'].exTot[i] / 1000, G['11_12'].exTot[i] / 1000, c.per_unit_unit === 'g' ? 'кг' : 'л'])];
-  const chem = `<div class="box"><table class="tbl"><tr><th class="l">Химия</th><th class="l">Как посчитано</th><th>Дозатор 1</th><th>Дозатор 2</th><th>Всего</th></tr>
-    ${chemRows.map(([n, how, a, b, u]) => `<tr><th class="l">${E(n)}</th><td class="dim l">${how}</td><td>${cell(a, 2)} <span class="dim">${u}</span></td><td>${cell(b, 2)} <span class="dim">${u}</span></td><td><b>${cell(a + b, 2)}</b> <span class="dim">${u}</span></td></tr>`).join('')}</table>
-    <p class="note" style="padding:0 .5rem .5rem">Это теоретический расход по рецептам и отправленным загрузкам. Фактический расход по заменам бутылей смотрите в отчёте по сменам.</p></div>`;
-  return `<section class="mg" aria-label="Итоги смены">${kpi.map(([l, v, u, n, c]) => `<article class="m ${c}"><p class="l">${l}</p><p class="v">${v} ${u ? `<small>${u}</small>` : ''}</p><p class="n">${n}</p></article>`).join('')}</section>
-    <div class="box" role="list" aria-label="Проверка данных" style="margin-top:.75rem"><h3 style="margin-top:0">Проверка данных</h3>${ck.out.map(c => `<div class="chk ${c.k === 'ok' ? '' : 'w-' + c.k}" role="listitem"><div><b>${c.t}</b>${c.n ? `<span>${c.n}</span>` : ''}</div></div>`).join('')}</div>
-    <h2>Машины</h2><p class="hint">Сколько стирок и килограммов прошло на каждой машине днём и ночью.</p>${machines}
-    <h2>Виды стирки и химия</h2>${types}
-    <h2>Расход химии по дозаторам</h2>${chem}
+    ['Дозатор 1 · 1–10', F(G['1_10'].n, 0), 'стирок', `${F(G['1_10'].kg)} кг`, 'm3'], ['Дозатор 2 · 11–12', F(G['11_12'].n, 0), 'стирок', `${F(G['11_12'].kg)} кг`, 'm4']];
+  return `${kpiHtml(kpi)}<p class="hint" style="margin:.75rem 0 0">Машин задействовано: ${used} / 12 · время работы по рецептуре: ${F(T.time / 60)} ч</p>
+    ${chkHtml(ck.out)}
+    <h2>Машины</h2><p class="hint">Сколько стирок и килограммов прошло на каждой машине днём и ночью. Машины 1–10 и 11–12 считаются отдельно.</p>${machTable(ms, ck.overlapMachines)}
+    <h2>Стирки по дозаторам</h2>${typeGroupTable(data)}
+    <h2>Виды стирки и химия</h2>${types(m)}
+    <h2>Расход химии по дозаторам</h2>${chemBlock([m])}
     <details class="box" style="margin-top:1.5rem"><summary><b>Классический бланк, как в Excel</b> <small>вес каждой стирки по машинам</small></summary><div class="blkwrap" style="margin-bottom:.5rem">${Blank.html(m)}</div></details>`;
 }
+function types(m) {
+  const T = m.total;
+  return `<div class="box"><table class="tbl"><tr><th class="l">Вид стирки</th><th>Стирок</th><th>Кг</th><th>Время, мин</th>${m.mains.map(c => `<th>${E(c.name)}, л</th>`).join('')}</tr>
+    ${m.types.filter(ty => ty.n).map(ty => `<tr><th class="l">${E(ty.name)}</th><td>${ty.n}</td><td>${F(ty.kg)}</td><td>${F(ty.time, 0)}</td>${m.mains.map((_, i) => `<td>${cell(ty.chem[i] / 1000, 2)}</td>`).join('')}</tr>`).join('') || `<tr><td class="l" colspan="${4 + m.mains.length}">Нет стирок</td></tr>`}
+    <tr class="tot"><th class="l">Итого</th><td>${T.n}</td><td>${F(T.kg)}</td><td>${F(T.time, 0)}</td>${m.mains.map((_, i) => `<td>${F(T.chem[i] / 1000, 2)}</td>`).join('')}</tr></table></div>`;
+}
 
-async function show() {
+// ---------- месяц ----------
+function monthDays(ym, data) {
+  const byDay = {}; data.forEach(l => (byDay[l.shift_date] = byDay[l.shift_date] || []).push(l));
+  return Array.from({ length: lastDay(ym) }, (_, i) => { const date = ym + '-' + String(i + 1).padStart(2, '0'); return { d: i + 1, date, data: byDay[date] || [], m: byDay[date] ? Blank.build(byDay[date], refs, date) : null }; });
+}
+
+function viewMonth(ym, data, days) {
+  const today = shiftToday(), live = days.filter(x => x.m);
+  const g = key => live.reduce((a, x) => ({ n: a.n + x.m.groups[key].n, kg: a.kg + x.m.groups[key].kg }), { n: 0, kg: 0 });
+  const g1 = g('1_10'), g2 = g('11_12'), n = g1.n + g2.n, kg = g1.kg + g2.kg;
+  const part = k => live.reduce((a, x) => a + Object.values(x.m.machineStats).reduce((s, y) => s + y[k], 0), 0);
+  const best = live.reduce((b, x) => !b || x.m.groups.all.kg > b.m.groups.all.kg ? x : b, null);
+  const kpi = [['Стирок за месяц', F(n, 0), '', `день ${part('day')} · ночь ${part('night')}`, ''],
+    ['Общий вес', F(kg, 0), 'кг', live.length ? `в среднем ${F(kg / live.length, 0)} кг в смену` : 'нет данных', 'm2'],
+    ['Дозатор 1 · 1–10', F(g1.n, 0), 'стирок', `${F(g1.kg, 0)} кг`, 'm3'], ['Дозатор 2 · 11–12', F(g2.n, 0), 'стирок', `${F(g2.kg, 0)} кг`, 'm4']];
+
+  // проверки
+  const out = [], rawKg = data.reduce((s, l) => s + (+l.weight_kg || 0), 0);
+  const ok = n === data.length && Math.abs(kg - rawKg) < 1e-6;
+  out.push({ k: ok ? 'ok' : 'bad', t: ok ? `Итоги сходятся: ${data.length} записей, ${F(rawKg)} кг` : 'Итоги по дням не совпадают с числом записей, сообщите администратору' });
+  const missing = days.filter(x => !x.m && x.date < today).map(x => x.d);
+  if (live.length && missing.length) out.push({ k: 'warn', t: `Дни без записей: ${missing.length}`, n: 'Числа: ' + missing.join(', ') + '. Если в эти дни стирки были, бланк не заполнили.' });
+  const odd = data.filter(l => !(+l.weight_kg > 0) || +l.weight_kg > 100);
+  if (odd.length) out.push({ k: 'bad', t: `Подозрительный вес: ${odd.length}`, n: odd.slice(0, 4).map(l => `${dmy(l.shift_date)}, машина ${l.machine}, ${F(l.weight_kg)} кг`).join('; ') + (odd.length > 4 ? '…' : '') });
+  const unk = live.reduce((s, x) => s + x.m.total.unknownN, 0);
+  if (unk) out.push({ k: 'warn', t: `Вид стирки не из шаблона: ${unk}`, n: 'Они есть в итогах, но в листы дней Excel не попадают.' });
+  if (live.length && !odd.length && !unk && !missing.length) out.push({ k: 'ok', t: 'Пропусков и подозрительных записей нет' });
+  if (best) out.push({ k: 'ok', t: `Самая загруженная смена: ${dmy(best.date)} (${wdOf(best.date)}), ${F(best.m.groups.all.kg, 0)} кг, ${best.m.groups.all.n} стирок` });
+
+  // календарь
+  const maxKg = Math.max(1, ...live.map(x => x.m.groups.all.kg));
+  const lead = (new Date(ym + '-01T00:00:00Z').getUTCDay() + 6) % 7;
+  const cal = `<div class="box"><div class="cal" role="list">${WD.map(w => `<div class="wd">${w}</div>`).join('')}${'<span class="ep"></span>'.repeat(lead)}${days.map(x => {
+    if (x.m) { const a = x.m.groups['1_10'], b = x.m.groups['11_12'], k = x.m.groups.all.kg, p = Math.round(12 + k / maxKg * 55);
+      return `<button class="dc${x.date === today ? ' now' : ''}" style="--p:${p}%" data-day="${x.date}" title="${dmy(x.date)}: дозатор 1 — ${a.n} ст., ${F(a.kg, 0)} кг; дозатор 2 — ${b.n} ст., ${F(b.kg, 0)} кг"><b>${x.d}</b><span>${F(k, 0)} кг</span><small>${a.n} | ${b.n}</small></button>`; }
+    const fut = x.date > today, now = x.date === today;
+    return `<button class="dc ${fut || now ? 'no' : 'miss'}${fut ? ' fut' : ''}${now ? ' now' : ''}" data-day="${x.date}"><b>${x.d}</b><span>–</span><small>${fut ? '' : 'нет записей'}</small></button>`; }).join('')}</div>
+    <div class="lgd"><span>В ячейке: вес за смену и стирок «дозатор 1 | дозатор 2». Чем темнее, тем больше белья.</span><span><i style="background:color-mix(in oklab,oklch(.69 .17 48) 25%,#fff)"></i>прошедший день без записей</span><span>Нажмите на день, чтобы открыть его бланк.</span></div></div>`;
+
+  // таблица по дням
+  const maxDay = Math.max(1, ...live.map(x => x.m.groups.all.kg));
+  const drow = x => { const m = x.m, a = m && m.groups['1_10'], b = m && m.groups['11_12'];
+    if (!m) { const miss = x.date < today; return `<tr class="go-day${miss ? ' miss' : ''}" data-day="${x.date}"><th class="l"><a href="#" data-day="${x.date}">${dmy(x.date).slice(0, 5)}</a> <span class="dim">${wdOf(x.date)}</span></th><td class="grp"><span class="z">–</span></td><td><span class="z">–</span></td><td class="grp"><span class="z">–</span></td><td><span class="z">–</span></td><td class="grp"><span class="z">–</span></td><td><span class="z">–</span></td><td class="grp hs"><span class="z">–</span></td><td class="l hs"></td></tr>`; }
+    const dn = Object.values(m.machineStats), d = dn.reduce((s, y) => s + y.day, 0), nt = dn.reduce((s, y) => s + y.night, 0);
+    return `<tr class="go-day" data-day="${x.date}"><th class="l"><a href="#" data-day="${x.date}">${dmy(x.date).slice(0, 5)}</a> <span class="dim">${wdOf(x.date)}</span></th>
+      <td class="grp">${cell(a.n, 0)}</td><td>${cell(a.kg)}</td><td class="grp">${cell(b.n, 0)}</td><td>${cell(b.kg)}</td><td class="grp"><b>${a.n + b.n}</b></td><td><b>${F(a.kg + b.kg)}</b></td>
+      <td class="grp hs">${d} / ${nt}</td><td class="l hs"><span class="mcell" style="justify-content:flex-start"><span class="meter" style="width:${Math.round(a.kg / maxDay * 120)}px"></span><span class="meter b" style="width:${Math.round(b.kg / maxDay * 120)}px"></span></span></td></tr>`; };
+  const dayTbl = `<div class="box"><table class="tbl"><tr><th class="l">Смена</th><th class="grp">1–10, ст.</th><th>1–10, кг</th><th class="grp">11–12, ст.</th><th>11–12, кг</th><th class="grp">Всего, ст.</th><th>Всего, кг</th><th class="grp hs">День / ночь</th><th class="l hs">Нагрузка</th></tr>
+    ${days.map(drow).join('')}
+    <tr class="tot"><th class="l">Итого за месяц</th><td class="grp">${g1.n}</td><td>${F(g1.kg)}</td><td class="grp">${g2.n}</td><td>${F(g2.kg)}</td><td class="grp">${n}</td><td>${F(kg)}</td><td class="grp hs">${part('day')} / ${part('night')}</td><td class="hs"></td></tr></table>
+    <p class="note" style="padding:0 .5rem .5rem"><span class="meter" style="width:18px"></span> дозатор 1 &nbsp; <span class="meter b" style="width:18px"></span> дозатор 2</p></div>`;
+
+  // машины за месяц
+  const agg = {}; all12.forEach(i => agg[i] = { n: 0, kg: 0, day: 0, night: 0, dayKg: 0, nightKg: 0 });
+  live.forEach(x => all12.forEach(i => { const s = x.m.machineStats[i]; Object.keys(agg[i]).forEach(k => { agg[i][k] += s[k]; }); }));
+
+  return `${kpiHtml(kpi)}${chkHtml(out)}
+    <h2>Календарь смен</h2>${cal}
+    <h2>Смены по дням</h2><p class="hint">Дозатор 1 (машины 1–10) и дозатор 2 (машины 11–12) посчитаны отдельно.</p>${dayTbl}
+    <h2>Машины за месяц</h2>${machTable(agg, new Set())}
+    <h2>Стирки по дозаторам</h2>${typeGroupTable(data)}
+    <h2>Расход химии по дозаторам за месяц</h2>${chemBlock(live.map(x => x.m))}`;
+}
+
+async function showMonth() {
+  const my = ++seq; if (!ym) return;
+  $('#ttl').textContent = 'Отчёт за ' + ymLabel(ym);
+  $('#x').textContent = '⬇ Скачать Excel за ' + ymLabel(ym);
+  $('#msg').textContent = `Смена начинается в ${String(st).padStart(2, '0')}:00 и длится сутки; ночная часть после полуночи входит в смену предыдущего дня. Машины 1–10 и 11–12 считаются отдельно.`;
+  $('#out').innerHTML = '<p class="hint">Загрузка…</p>';
+  try {
+    const data = await loads(ym + '-01', ym + '-' + String(lastDay(ym)).padStart(2, '0'));
+    if (my !== seq) return;
+    $('#out').innerHTML = viewMonth(ym, data, monthDays(ym, data));
+  } catch (e) {
+    $('#out').innerHTML = '<p class="err">Не удалось загрузить данные. Проверьте, что выполнены report.sql, stage2.sql и stage5.sql.</p>';
+  }
+}
+
+async function showDay() {
   const date = $('#d').value, my = ++seq;
   if (!date) return;
   $('#ttl').textContent = 'Смена ' + longDate(date);
+  $('#x').textContent = '⬇ Скачать Excel за месяц';
   $('#msg').textContent = `Смена начинается в ${String(st).padStart(2, '0')}:00 и длится сутки: день ${String(st).padStart(2, '0')}:00–${String((st + 12) % 24).padStart(2, '0')}:00, ночь до ${String(st).padStart(2, '0')}:00.`;
   try {
     const data = await loads(date, date);
@@ -107,15 +233,15 @@ async function show() {
 }
 
 async function download() {
-  const date = $('#d').value; if (!date) return;
-  const ym = date.slice(0, 7), b = $('#x'); b.disabled = true; $('#msg').textContent = 'Собираю файл…';
+  const ymX = mode === 'month' ? ym : $('#d').value.slice(0, 7); if (!ymX) return;
+  const b = $('#x'); b.disabled = true; $('#msg').textContent = 'Собираю файл…';
   try {
     const res = await fetch('Blanc.xlsx', { cache: 'no-store' });
     if (!res.ok) throw new Error('Файл Blanc.xlsx не найден на сайте. Положите его в корень репозитория рядом с index.html.');
     const zip = await JSZip.loadAsync(await res.arrayBuffer());
-    const d2 = ym + '-' + String(lastDay(ym)).padStart(2, '0');
-    const data = await loads(ym + '-01', d2);
-    const { data: changes, error: chErr } = await sb.rpc('report_changes', { d1: ym + '-01', d2 });
+    const d2 = ymX + '-' + String(lastDay(ymX)).padStart(2, '0');
+    const data = await loads(ymX + '-01', d2);
+    const { data: changes, error: chErr } = await sb.rpc('report_changes', { d1: ymX + '-01', d2 });
     if (chErr) throw chErr;
     const byDay = {};
     data.forEach(l => (byDay[l.shift_date] = byDay[l.shift_date] || []).push(l));
@@ -123,7 +249,7 @@ async function download() {
     Object.keys(byDay).forEach(d => { const mm = Blank.build(byDay[d], refs, d); days[+d.slice(8)] = mm; Blank.warnings(mm).forEach(w => warn.add(w)); });
     await Blank.fillWorkbook(zip, days, refs, changes || []);
     const blob = await zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'Blanc-' + ym + '.xlsx';
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'Blanc-' + ymX + '.xlsx';
     document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1e4);
     $('#msg').textContent = 'Файл готов: ' + a.download + (warn.size ? '. Есть замечания, они показаны ниже.' : '');
     toast('Файл скачан');
@@ -133,15 +259,34 @@ async function download() {
   b.disabled = false;
 }
 
+// ---------- переключатели ----------
 const mark = () => { const d = $('#d').value, t = shiftToday(), y = addDays(t, -1);
-  [['t', d === t], ['y', d === y]].forEach(([id, on]) => { $('#' + id).classList.toggle('on', on); $('#' + id).setAttribute('aria-pressed', on); }); };
-const go = d => { $('#d').value = d; mark(); show(); };
-$('#d').onchange = () => { mark(); show(); };
+  [['t', d === t], ['y', d === y]].forEach(([id, on]) => { $('#' + id).classList.toggle('on', on); $('#' + id).setAttribute('aria-pressed', on); });
+  const cm = shiftToday().slice(0, 7);
+  [['mt', ym === cm], ['mp', ym === addMonth(cm, -1)]].forEach(([id, on]) => { $('#' + id).classList.toggle('on', on); $('#' + id).setAttribute('aria-pressed', on); }); };
+const go = d => { $('#d').value = d; mark(); showDay(); };
+const goMonth = v => { ym = v; $('#mm').value = v.slice(5, 7); $('#yy').value = v.slice(0, 4); mark(); showMonth(); };
+const setMode = v => {
+  mode = v; $('#dayc').hidden = v !== 'day'; $('#monc').hidden = v !== 'month';
+  $('#md').querySelectorAll('button').forEach(b => { b.classList.toggle('on', b.dataset.v === v); b.setAttribute('aria-pressed', b.dataset.v === v); });
+  $('#eb').textContent = v === 'month' ? 'Месяц' : 'Смена';
+  document.querySelectorAll('.xw').forEach(n => n.remove());
+  if (v === 'month') goMonth(ym || ($('#d').value || shiftToday()).slice(0, 7)); else go($('#d').value || shiftToday());
+};
+$('#md').onclick = e => { const b = e.target.closest('button'); if (b) setMode(b.dataset.v); };
+$('#d').onchange = () => { mark(); showDay(); };
 $('#t').onclick = () => go(shiftToday());
 $('#y').onclick = () => go(addDays(shiftToday(), -1));
 $('#pv').onclick = () => $('#d').value && go(addDays($('#d').value, -1));
 $('#nx').onclick = () => $('#d').value && go(addDays($('#d').value, 1));
+$('#mm').onchange = $('#yy').onchange = () => goMonth($('#yy').value + '-' + $('#mm').value);
+$('#mt').onclick = () => goMonth(shiftToday().slice(0, 7));
+$('#mp').onclick = () => goMonth(addMonth(shiftToday().slice(0, 7), -1));
+$('#mpv').onclick = () => ym && goMonth(addMonth(ym, -1));
+$('#mnx').onclick = () => ym && goMonth(addMonth(ym, 1));
 $('#x').onclick = download;
+// нажатие на день в календаре или таблице открывает бланк этой смены
+$('#out').onclick = e => { const b = e.target.closest('[data-day]'); if (!b || b.disabled) return; e.preventDefault(); mode = 'day'; $('#d').value = b.dataset.day; setMode('day'); window.scrollTo({ top: 0 }); };
 
 (async () => {
   if (!await need()) return;
@@ -154,6 +299,10 @@ $('#x').onclick = download;
   const g = k => { const x = (s.data || []).find(y => y.key === k); return x ? +x.value : null; };
   tz = g('tz_offset') ?? 5; st = g('shift_start') ?? 6;
   refs = { water: g('water_l') ?? 55, washTypes: w.data || [], chemicals: c.data || [], recipes: r.data || [] };
-  go(shiftToday());
+  const cy = +shiftToday().slice(0, 4);
+  $('#mm').innerHTML = MONN.map((n, i) => `<option value="${String(i + 1).padStart(2, '0')}">${n[0].toUpperCase() + n.slice(1)}</option>`).join('');
+  $('#yy').innerHTML = [cy - 3, cy - 2, cy - 1, cy, cy + 1].map(y => `<option value="${y}">${y}</option>`).join('');
+  const qm = q.get('m');                                           // blank.html?m=2026-10 открывает месяц сразу
+  if (/^\d{4}-(0[1-9]|1[0-2])$/.test(qm || '')) { ym = qm; setMode('month'); } else go(shiftToday());
 })();
 </script></body></html>

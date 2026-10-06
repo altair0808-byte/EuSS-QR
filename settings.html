@@ -18,6 +18,7 @@
 <div class="box" id="chem"></div>
 <details class="box" id="nc"><summary><b>+ Новый химикат</b></summary>
   <label>Название<input id="cn" autocomplete="off"></label>
+  <label>Ссылка на фото<input id="cim" type="url" inputmode="url" autocomplete="off" placeholder="https://…"></label>
   <label>Тип<select id="ck"><option value="main">Основная (дозатор, по рецептам)</option><option value="extra">Дополнительная (вручную на машину)</option></select></label>
   <div class="acc"><label>1 шт = литров<input id="cl2" type="number" min="0" step="0.1" inputmode="decimal"></label><label>1 шт = кг<input id="ckg" type="number" min="0" step="0.1" inputmode="decimal"></label></div>
   <div class="acc" id="cex" hidden><label>Расход на единицу<input id="cu" type="number" min="0" step="1" inputmode="numeric"></label><label>Измеряется в<select id="cun"><option value="ml">мл</option><option value="g">г</option></select></label></div>
@@ -49,6 +50,10 @@ const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '
 const num = v => v === '' ? null : +v;
 const done = e => { toast(e ? 'Не сохранено: ' + e.message : 'Сохранено'); return !e; };
 let chems = [], wts = [], rec = [];
+const hue = s => { let h = 0; for (const ch of String(s)) h = (h * 31 + ch.charCodeAt(0)) % 360; return h; };
+const safeUrl = u => /^https?:\/\/\S+$/i.test(String(u || '').trim()) ? String(u).trim() : '';
+const chemImg = x => `<span class="ci sm" style="--h:${hue(x.name)}"><span class="lt">${esc(String(x.name || '?').trim().charAt(0).toUpperCase())}</span>${safeUrl(x.image_url) ? `<img src="${esc(safeUrl(x.image_url))}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ''}</span>`;
+const imgFallback = root => root.querySelectorAll('.ci img').forEach(i => { i.onerror = () => i.remove(); });
 
 async function load() {
   const [{ data: st }, { data: ch }, { data: w }, { data: rc }, { data: fm }] = await Promise.all([
@@ -63,12 +68,15 @@ async function load() {
 
   const nv = v => v ?? '';
   $('#chem').innerHTML = '<p class="hint">1 штука (бутыль, пачка) = столько литров = столько кг. Остаток бригадир вводит в кг, система сама переведёт в литры.</p>' + chems.map(c =>
-    `<div class="cb" data-c="${c.id}"><b>${esc(c.name)}</b>
+    `<div class="cb" data-c="${c.id}"><b class="chrow">${chemImg(c)}${esc(c.name)} <small>${c.kind === 'extra' ? 'дополнительная' : 'основная'}</small></b>
+      <label>Название<input data-f="name" value="${esc(c.name)}" autocomplete="off"></label>
+      <label>Ссылка на фото<input type="url" inputmode="url" data-f="image_url" placeholder="https://…" value="${esc(c.image_url)}" autocomplete="off"></label>
       <div class="acc"><label>1 шт = литров<input type="number" min="0" step="0.1" inputmode="decimal" data-f="bottle_l" value="${nv(c.bottle_l)}"></label>
       <label>1 шт = кг<input type="number" min="0" step="0.1" inputmode="decimal" data-f="bottle_kg" value="${nv(c.bottle_kg)}"></label></div>
       ${c.kind === 'extra' ? `<div class="acc"><label>Расход на единицу<input type="number" min="0" step="1" inputmode="numeric" data-f="per_unit" value="${nv(c.per_unit)}"></label>
       <label>Расход измеряется в<select data-f="per_unit_unit"><option value="ml"${c.per_unit_unit === 'g' ? '' : ' selected'}>мл</option><option value="g"${c.per_unit_unit === 'g' ? ' selected' : ''}>г</option></select></label></div>` : ''}
     </div>`).join('') + '<button class="go" id="sc">Сохранить</button>';
+  imgFallback($('#chem'));
 
   const mains = chems.filter(c => c.kind === 'main');
   $('#wt').innerHTML = wts.map(x => `<details class="box" data-w="${x.id}"><summary><b>${esc(x.name)}</b> <small>${x.minutes ?? '–'} мин</small></summary>
@@ -93,7 +101,12 @@ $('#chem').onclick = async e => {
   let err = null;
   for (const d of document.querySelectorAll('#chem [data-c]')) {
     const row = {};
-    d.querySelectorAll('[data-f]').forEach(i => { row[i.dataset.f] = i.dataset.f === 'per_unit_unit' ? i.value : num(i.value); });
+    d.querySelectorAll('[data-f]').forEach(i => {
+      const k = i.dataset.f;
+      row[k] = k === 'per_unit_unit' ? i.value : k === 'name' ? i.value.trim() : k === 'image_url' ? (i.value.trim() || null) : num(i.value);
+    });
+    if (!row.name) { toast('У химиката должно быть название'); return; }
+    if (row.image_url && !safeUrl(row.image_url)) { toast('Ссылка на фото должна начинаться с http:// или https:// (' + row.name + ')'); return; }
     const { error } = await sb.from('chemicals').update(row).eq('id', d.dataset.c);
     err = err || error;
   }
@@ -114,12 +127,14 @@ $('#ck').onchange = () => $('#cex').hidden = $('#ck').value !== 'extra';
 $('#ca').onclick = async () => {
   const name = $('#cn').value.trim(); if (!name) { toast('Укажите название'); return; }
   if (chems.some(c => c.name.toLowerCase() === name.toLowerCase())) { toast('Такой химикат уже есть'); return; }
-  const kind = $('#ck').value, row = { name, kind, bottle_l: num($('#cl2').value), bottle_kg: num($('#ckg').value), sort: Math.max(0, ...chems.map(x => x.sort || 0)) + 1 };
+  const url = $('#cim').value.trim();
+  if (url && !safeUrl(url)) { toast('Ссылка на фото должна начинаться с http:// или https://'); return; }
+  const kind = $('#ck').value, row = { name, kind, image_url: url || null, bottle_l: num($('#cl2').value), bottle_kg: num($('#ckg').value), sort: Math.max(0, ...chems.map(x => x.sort || 0)) + 1 };
   if (kind === 'extra') { row.per_unit = num($('#cu').value); row.per_unit_unit = $('#cun').value; }
   const { data, error } = await sb.from('chemicals').insert(row).select('id').single();
   if (error) { done(error); return; }
   if (kind === 'main' && wts.length) await sb.from('recipes').insert(wts.map(w => ({ wash_type_id: w.id, chemical_id: data.id, ml_per_l: 0 })));
-  ['cn', 'cl2', 'ckg', 'cu'].forEach(i => $('#' + i).value = ''); toast('Химикат добавлен' + (kind === 'main' ? ', задайте рецепты' : '')); load();
+  ['cn', 'cim', 'cl2', 'ckg', 'cu'].forEach(i => $('#' + i).value = ''); toast('Химикат добавлен' + (kind === 'main' ? ', задайте рецепты' : '')); load();
 };
 
 $('#wa').onclick = async () => {

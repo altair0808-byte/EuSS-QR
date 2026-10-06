@@ -238,3 +238,58 @@ details.box>summary small{margin-left:auto}
 @media(max-width:480px){.sep,.sub{display:none}.grid{grid-template-columns:repeat(4,1fr)}.acc{grid-template-columns:1fr}}
 @media print{.hd,.noprint,.btn,.go{display:none!important}body{background:#fff;color:#000}.qrc .box{border:0;box-shadow:none}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}button:active:not(:disabled),.btn:active{transform:none}}
+
+/* ---------- замена химии: дозаторы и карточки с фото ---------- */
+.sh2{display:flex;align-items:center;justify-content:space-between;gap:.75rem}
+.sh2 h2{margin:0}
+.dz{display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin-top:.75rem}
+button.dzc{flex-direction:column;align-items:flex-start;justify-content:flex-start;gap:.15rem;min-height:6.5rem;padding:.85rem;text-align:left;border-width:2px}
+.dzc b{font-family:Sora,Manrope,sans-serif;font-size:1.7rem;line-height:1.1}
+.dzc span{font-weight:700}
+.dzc small{font-size:.75rem;font-weight:500;color:var(--mut)}
+button.dzc.sel,button.dzc.sel:hover:not(:disabled){background:color-mix(in oklab,var(--ac) 9%,#fff);border-color:var(--ac);color:var(--ink);box-shadow:0 0 0 3px color-mix(in oklab,var(--ac) 18%,transparent)}
+button.dzc.sel b{color:var(--ac-d)}
+.chg{display:grid;grid-template-columns:repeat(2,1fr);gap:.6rem;margin-top:.75rem}
+@media(min-width:560px){.chg{grid-template-columns:repeat(3,1fr)}}
+@media(min-width:900px){.chg{grid-template-columns:repeat(4,1fr)}}
+.cw{position:relative;min-width:0}
+button.cc{position:relative;width:100%;min-height:0;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:.2rem;padding:0 0 .7rem;overflow:hidden;text-align:left;border-width:2px;border-radius:.65rem;box-shadow:var(--sh)}
+button.cc:hover:not(:disabled){box-shadow:var(--sh2)}
+.cc .cn{padding:0 .75rem;margin-top:.5rem;font-size:.9rem;font-weight:800;line-height:1.25;word-break:break-word}
+.cc small{padding:0 .75rem;font-size:.72rem;font-weight:500;color:var(--mut)}
+button.cc.sel,button.cc.sel:hover:not(:disabled){border-color:var(--ac);background:color-mix(in oklab,var(--ac) 7%,#fff);color:var(--ink);box-shadow:0 0 0 3px color-mix(in oklab,var(--ac) 20%,transparent)}
+.ck{position:absolute;top:.5rem;right:.5rem;display:none;width:1.65rem;height:1.65rem;place-items:center;border-radius:50%;background:var(--ac);color:#fff;font-style:normal;font-size:.9rem;font-weight:800}
+.cc.sel .ck{display:grid}
+button.ed{position:absolute;top:.5rem;left:.5rem;z-index:2;width:2rem;min-height:2rem;height:2rem;padding:0;border-radius:50%;background:rgb(255 255 255/.94);box-shadow:var(--sh);font-size:.95rem}
+.ci{position:relative;display:block;aspect-ratio:4/3;overflow:hidden;background:linear-gradient(135deg,hsl(var(--h) 62% 91%),hsl(calc(var(--h) + 30) 55% 80%))}
+.ci .lt{position:absolute;inset:0;display:grid;place-items:center;font-family:Sora,Manrope,sans-serif;font-size:2.6rem;font-weight:700;color:hsl(var(--h) 45% 32%)}
+.ci img{position:absolute;inset:0;width:100%;height:100%;padding:.4rem;object-fit:contain;background:#fff}
+.ci.sm{display:inline-block;flex:none;width:2.5rem;aspect-ratio:1;border-radius:.5rem}
+.ci.sm .lt{font-size:1.1rem}
+.ci.sm img{padding:.15rem}
+.ci.pv{width:100%;max-width:12rem;margin:0 auto;border:1px solid var(--ln);border-radius:.65rem}
+.pvc{margin-top:1rem}
+.chrow{display:inline-flex;align-items:center;gap:.6rem;text-align:left}
+.tbl .cth{display:inline-flex;align-items:center;gap:.5rem}
+
+/* ---------- месячный отчёт: календарь и столбики ---------- */
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:.35rem;margin-top:.5rem}
+.cal .wd{text-align:center;font-size:.65rem;font-weight:800;text-transform:uppercase;color:var(--mut)}
+.cal .ep{min-height:1px}
+.cal button.dc{flex-direction:column;align-items:stretch;justify-content:flex-start;gap:.05rem;min-height:4.4rem;padding:.35rem .4rem;text-align:left;border-radius:.45rem;background:color-mix(in oklab,var(--ac) var(--p,0%),#fff);box-shadow:var(--sh)}
+.cal button.dc:hover:not(:disabled){background:color-mix(in oklab,var(--ac) calc(var(--p,0%) + 12%),#fff);color:var(--ink)}
+.cal .dc b{font-family:Sora,Manrope,sans-serif;font-size:.8rem;color:var(--mut)}
+.cal .dc span{font-size:.78rem;font-weight:800;line-height:1.15}
+.cal .dc small{font-size:.62rem;font-weight:600;color:var(--mut);white-space:nowrap}
+.cal .dc.no{background:var(--soft);box-shadow:none}
+.cal .dc.miss{background:color-mix(in oklab,oklch(.69 .17 48) 14%,#fff);border-color:color-mix(in oklab,oklch(.69 .17 48) 50%,var(--ln))}
+.cal .dc.fut{opacity:.45}
+.cal .dc.now{outline:2px solid var(--ac);outline-offset:1px}
+.lgd{display:flex;flex-wrap:wrap;gap:.4rem 1rem;margin-top:.75rem;font-size:.75rem;color:var(--mut)}
+.lgd i{display:inline-block;width:.7rem;height:.7rem;margin-right:.3rem;border-radius:.2rem;vertical-align:-1px}
+.meter.b{background:oklch(.69 .17 48)}
+.tbl tr.go-day{cursor:pointer}
+.tbl tr.miss td,.tbl tr.miss th{background:color-mix(in oklab,oklch(.69 .17 48) 9%,#fff)}
+.tbl th a{color:var(--ac-d);text-decoration:underline;text-underline-offset:2px}
+.grplab{margin:1.25rem 0 .25rem;font-size:.75rem;font-weight:800;text-transform:uppercase;color:var(--mut)}
+@media(max-width:480px){.dz{grid-template-columns:1fr 1fr}.cal{gap:.2rem}.cal button.dc{min-height:3.8rem;padding:.25rem}.cal .dc small{font-size:.58rem}}

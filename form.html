@@ -138,53 +138,69 @@
     render();
   }
 
-  // ---------- новая химия (только суперадмин: так устроены права в базе) ----------
-  function addChemPanel(chems, onDone) {
-    $('#ovl').innerHTML = `<div class="ov" id="bg"><section class="pn" role="dialog" aria-modal="true" aria-label="Новый химикат">
-      <div class="ph"><div><p class="eb">Справочник химии</p><h2>Новый химикат</h2></div><button class="ib" id="cl" aria-label="Закрыть">✕</button></div>
-      <label>Название<input id="cn" autocomplete="off"></label>
-      <label>Тип<select id="ck"><option value="main">Основная (дозатор, по рецептам)</option><option value="extra">Дополнительная (вручную на машину)</option></select></label>
-      <div class="acc"><label>1 шт = литров<input id="cl2" type="number" min="0" step="0.1" inputmode="decimal"></label><label>1 шт = кг<input id="ckg" type="number" min="0" step="0.1" inputmode="decimal"></label></div>
-      <div class="acc" id="ex" hidden><label>Расход на единицу<input id="cu" type="number" min="0" step="1" inputmode="numeric"></label><label>Измеряется в<select id="cun"><option value="ml">мл</option><option value="g">г</option></select></label></div>
-      <button class="go" id="ok">Добавить химикат</button></section></div>`;
+  // ---------- справочник химии: карточки с фото ----------
+  const fmt = n => (Math.round(n * 10) / 10).toLocaleString('ru-RU');
+  const hue = s => { let h = 0; for (const ch of String(s)) h = (h * 31 + ch.charCodeAt(0)) % 360; return h; };
+  const safeUrl = u => /^https?:\/\/\S+$/i.test(String(u || '').trim()) ? String(u).trim() : '';
+  // картинка химиката; если ссылки нет или фото не загрузилось, видна цветная буква
+  const chemImg = (x, cls = '') => `<span class="ci ${cls}" style="--h:${hue(x.name)}"><span class="lt">${esc(String(x.name || '?').trim().charAt(0).toUpperCase())}</span>${safeUrl(x.image_url) ? `<img src="${esc(safeUrl(x.image_url))}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ''}</span>`;
+  const imgFallback = root => root.querySelectorAll('.ci img').forEach(i => { i.onerror = () => i.remove(); });
+  const sizeTxt = x => { const p = []; if (+x.bottle_l > 0) p.push(fmt(+x.bottle_l) + ' л'); if (+x.bottle_kg > 0) p.push(fmt(+x.bottle_kg) + ' кг'); return p.length ? 'Бутыль ' + p.join(' · ') : 'Размер бутыли не задан'; };
+
+  // добавить или изменить химикат (кнопки видны только суперадмину; права дополнительно закрыты в базе)
+  function chemPanel(chems, cur, onDone) {
+    const nv = v => v == null ? '' : v;
+    $('#ovl').innerHTML = `<div class="ov" id="bg"><section class="pn" role="dialog" aria-modal="true" aria-label="${cur ? 'Изменить химикат' : 'Новый химикат'}">
+      <div class="ph"><div><p class="eb">Справочник химии · суперадмин</p><h2>${cur ? 'Изменить химикат' : 'Новый химикат'}</h2></div><button class="ib" id="cl" aria-label="Закрыть">✕</button></div>
+      <div id="pvw"></div>
+      <label>Название<input id="cn" autocomplete="off" value="${esc(cur ? cur.name : '')}"></label>
+      <label>Ссылка на фото<input id="ci" type="url" inputmode="url" autocomplete="off" placeholder="https://…" value="${esc(cur ? cur.image_url : '')}"></label>
+      <p class="hint">Вставьте прямую ссылку на картинку (начинается с https://). Без фото будет цветная буква.</p>
+      <div class="acc"><label>1 бутыль = литров<input id="cl2" type="number" min="0" step="0.1" inputmode="decimal" value="${nv(cur && cur.bottle_l)}"></label><label>1 бутыль = кг<input id="ckg" type="number" min="0" step="0.1" inputmode="decimal" value="${nv(cur && cur.bottle_kg)}"></label></div>
+      <button class="go" id="ok">${cur ? 'Сохранить' : 'Добавить химикат'}</button></section></div>`;
+    const prev = () => { $('#pvw').innerHTML = `<div class="pvc">${chemImg({ name: $('#cn').value || '?', image_url: $('#ci').value }, 'pv')}</div>`; imgFallback($('#pvw')); };
+    prev();
+    $('#cn').oninput = prev; $('#ci').oninput = prev;
     const close = () => { $('#ovl').innerHTML = ''; document.onkeydown = null; };
     document.onkeydown = e => { if (e.key === 'Escape') close(); };
     $('#cl').onclick = close; $('#bg').onmousedown = e => { if (e.target.id === 'bg') close(); };
-    $('#ck').onchange = () => $('#ex').hidden = $('#ck').value !== 'extra';
     const num = v => v === '' ? null : +v;
     $('#ok').onclick = async () => {
-      const name = $('#cn').value.trim();
+      const name = $('#cn').value.trim(), url = $('#ci').value.trim();
       if (!name) { toast('Укажите название'); return; }
-      if (chems.some(x => x.name.toLowerCase() === name.toLowerCase())) { toast('Такой химикат уже есть'); return; }
-      const kind = $('#ck').value, row = { name, kind, bottle_l: num($('#cl2').value), bottle_kg: num($('#ckg').value), sort: Math.max(0, ...chems.map(x => x.sort || 0)) + 1 };
-      if (kind === 'extra') { row.per_unit = num($('#cu').value); row.per_unit_unit = $('#cun').value; }
+      if (url && !safeUrl(url)) { toast('Ссылка на фото должна начинаться с http:// или https://'); return; }
+      if (chems.some(x => x.name.toLowerCase() === name.toLowerCase() && (!cur || x.id !== cur.id))) { toast('Такой химикат уже есть'); return; }
+      const row = { name, image_url: url || null, bottle_l: num($('#cl2').value), bottle_kg: num($('#ckg').value) };
       $('#ok').disabled = true;
+      if (cur) {
+        const { data, error } = await sb.from('chemicals').update(row).eq('id', cur.id).select('id');
+        if (error || !data || !data.length) { toast('Не сохранено: ' + (error ? error.message : 'нет прав или не выполнен stage5.sql')); $('#ok').disabled = false; return; }
+        close(); toast('Химикат обновлён'); onDone(cur.id); return;
+      }
+      row.kind = 'main'; row.sort = Math.max(0, ...chems.map(x => x.sort || 0)) + 1;
       const { data, error } = await sb.from('chemicals').insert(row).select('id').single();
       if (error) { toast('Не сохранено: ' + error.message); $('#ok').disabled = false; return; }
-      if (kind === 'main') {
-        const { data: ws } = await sb.from('wash_types').select('id');
-        if (ws && ws.length) await sb.from('recipes').insert(ws.map(w => ({ wash_type_id: w.id, chemical_id: data.id, ml_per_l: 0 })));
-      }
-      close(); toast('Химикат добавлен'); onDone(data.id);
+      const { data: ws } = await sb.from('wash_types').select('id');
+      if (ws && ws.length) await sb.from('recipes').insert(ws.map(w => ({ wash_type_id: w.id, chemical_id: data.id, ml_per_l: 0 })));
+      close(); toast('Химикат добавлен, задайте рецепты в настройках'); onDone(data.id);
     };
   }
 
-  async function laundryChem(lastId, preChem) {
+  async function laundryChem(lastId, preChem, preG) {
     const [{ data: ch }, { data: pr }] = await Promise.all([
-      sb.from('chemicals').select('id,name,kind,bottle_l,bottle_kg,sort').order('sort'),
+      sb.from('chemicals').select('*').order('sort'),
       sb.from('profiles').select('role').eq('id', ses.user.id).maybeSingle()
     ]);
-    const chems = ch || [], isSuper = pr?.role === 'superadmin';
-    const groups = [['1_10', 'Основной дозатор', 'машины 1–10'], ['11_12', 'Отдельный дозатор', 'машины 11–12']];
-    let g = null, c = preChem ? String(preChem) : null, mode = 'empty', unit = 'kg';
+    const chems = (ch || []).filter(x => x.kind === 'main');          // Ваниш, Ленор, Порошок здесь не нужны
+    const isSuper = pr?.role === 'superadmin';
+    const groups = [['1_10', 'Основной дозатор', 'машины 1–10', '1–10'], ['11_12', 'Отдельный дозатор', 'машины 11–12', '11–12']];
+    let g = preG || null, c = preChem ? String(preChem) : null, mode = 'empty', unit = 'kg';
     app.innerHTML = head + `
-      <div class="box"><h2>Что заменили</h2>
-        <h3>Дозатор</h3>
-        <div class="list" id="cg">${groups.map(([v, n, s]) => `<button data-v="${v}"><span>${n}</span><small>${s}</small></button>`).join('')}</div>
-        <h3>Химия</h3>
-        <div class="list" id="chem">${chems.map(x => `<button data-v="${x.id}" class="${String(x.id) === c ? 'on' : ''}"><span>${esc(x.name)}</span>${x.kind === 'extra' ? '<small>дополнительная</small>' : ''}</button>`).join('')}</div>
-        ${isSuper ? '<button class="mini opt" id="addc" style="margin-top:.5rem">+ Добавить химикат</button>' : ''}</div>
-      <div class="box"><h2>Остаток в бутыли</h2>
+      <div class="box"><h2>1 · Дозатор</h2>
+        <div class="dz" id="cg">${groups.map(([v, n, s, b]) => `<button type="button" class="dzc ${g === v ? 'sel' : ''}" data-v="${v}" aria-pressed="${g === v}"><b>${b}</b><span>${n}</span><small>${s}</small></button>`).join('')}</div></div>
+      <div class="box"><div class="sh2"><h2>2 · Какая химия закончилась</h2>${isSuper ? '<button type="button" class="mini opt" id="addc">+ Добавить</button>' : ''}</div>
+        <div class="chg" id="chem">${chems.map(x => `<div class="cw"><button type="button" class="cc ${String(x.id) === c ? 'sel' : ''}" data-v="${x.id}" aria-pressed="${String(x.id) === c}">${chemImg(x)}<span class="cn">${esc(x.name)}</span><small>${sizeTxt(x)}</small><i class="ck" aria-hidden="true">✓</i></button>${isSuper ? `<button type="button" class="ed" data-e="${x.id}" aria-label="Изменить ${esc(x.name)}" title="Изменить">✎</button>` : ''}</div>`).join('') || '<p class="hint">Химия пока не добавлена.</p>'}</div></div>
+      <div class="box"><h2>3 · Остаток в бутыли</h2>
         <p class="hint">Сколько осталось в снятой бутыли. Остаток записывается вместе с заменой.</p>
         <div class="seg" id="lm"><button data-v="empty" class="on">Бутыль пустая</button><button data-v="some">Остался остаток</button></div>
         <div id="lw" hidden><div class="seg" id="lu" aria-label="Единица"><button data-v="kg" class="on">кг</button><button data-v="l">литры</button></div>
@@ -192,6 +208,7 @@
         <p class="hint" id="lh"></p></div>
       <div class="bar"><button class="go" id="save">Проверить и заменить</button>
       <button class="ghost" id="undo" hidden>Отменить последнюю запись</button></div><div id="ovl"></div>`;
+    imgFallback(app);
     const show = undoBtn('chem_changes');
     if (lastId) show(lastId);
     const cur = () => chems.find(x => String(x.id) === c);
@@ -202,7 +219,7 @@
       if (mode === 'some') {
         t = 'Введите, сколько осталось в бутыли.';
         if (!x) t = 'Сначала выберите химию выше.';
-        else if (!(size > 0)) t = unit === 'kg' ? 'Вес полной бутыли не задан в настройках. Введите остаток в литрах или задайте вес.' : 'Объём бутыли не задан в настройках. Введите остаток в килограммах или задайте объём.';
+        else if (!(size > 0)) t = unit === 'kg' ? 'Вес полной бутыли не задан. Введите остаток в литрах или попросите суперадмина задать вес.' : 'Объём бутыли не задан. Введите остаток в килограммах или попросите суперадмина задать объём.';
         else if (v !== '') {
           pct = Math.min(100, +v / size * 100);
           if (+v > size) t = `Больше, чем в полной бутыли (${size} ${U()}). Проверьте.`;
@@ -214,11 +231,23 @@
       }
       $('#lh').textContent = t; $('#fb').style.width = pct + '%'; $('#lul').textContent = unit === 'kg' ? 'кг' : 'литры';
     };
-    pick('#cg', v => { g = v; }); pick('#chem', v => { c = v; hint(); });
+    $('#cg').onclick = e => {
+      const b = e.target.closest('[data-v]'); if (!b) return;
+      g = b.dataset.v;
+      $('#cg').querySelectorAll('.dzc').forEach(x => { x.classList.toggle('sel', x === b); x.setAttribute('aria-pressed', x === b); });
+    };
+    $('#chem').onclick = e => {
+      const ed = e.target.closest('[data-e]');
+      if (ed) { chemPanel(chems, chems.find(x => String(x.id) === ed.dataset.e), id => laundryChem(undefined, id, g)); return; }
+      const b = e.target.closest('.cc'); if (!b) return;
+      c = b.dataset.v;
+      $('#chem').querySelectorAll('.cc').forEach(x => { x.classList.toggle('sel', x === b); x.setAttribute('aria-pressed', x === b); });
+      hint();
+    };
     pick('#lm', v => { mode = v; $('#lw').hidden = v === 'empty'; hint(); });
     pick('#lu', v => { unit = v; hint(); });
     $('#lf').oninput = hint; hint();
-    if ($('#addc')) $('#addc').onclick = () => addChemPanel(chems, id => laundryChem(undefined, id));
+    if ($('#addc')) $('#addc').onclick = () => chemPanel(chems, null, id => laundryChem(undefined, id, g));
     $('#save').onclick = () => {
       if (!g) { toast('Выберите дозатор'); return; }
       if (!c) { toast('Выберите, какая химия закончилась'); return; }
@@ -226,13 +255,14 @@
       if (mode === 'some' && lf === '') { toast('Укажите остаток или выберите «Бутыль пустая»'); return; }
       if (mode === 'some' && !(sizeOf(x) > 0)) { toast(unit === 'kg' ? 'Для этой химии не задан вес бутыли: введите остаток в литрах' : 'Для этой химии не задан объём бутыли: введите остаток в килограммах'); return; }
       if (lf !== '' && +lf > sizeOf(x)) { toast('Остаток больше полной бутыли'); return; }
-      const gn = groups.find(r => r[0] === g).slice(1).join(' · ');
+      const gn = groups.find(r => r[0] === g).slice(1, 3).join(' · ');
       app.innerHTML = head + `<div class="box"><h2>Проверка замены</h2>
-        <div class="acc"><span>Дозатор</span><b>${gn}</b></div><div class="acc"><span>Химия</span><b>${esc(x.name)}</b></div>
+        <div class="acc"><span>Дозатор</span><b>${gn}</b></div><div class="acc"><span>Химия</span><b class="chrow">${chemImg(x, 'sm')}${esc(x.name)}</b></div>
         <div class="acc"><span>Остаток</span><b>${lf === '' ? 'бутыль пустая' : esc(lf) + ' ' + U()}</b></div></div>
         <div class="bar"><button class="go" id="confirm">Все верно — записать замену</button><button class="ghost" id="back">Изменить</button></div>`;
+      imgFallback(app);
       toTop();
-      $('#back').onclick = () => laundryChem(undefined, c);
+      $('#back').onclick = () => laundryChem(undefined, c, g);
       $('#confirm').onclick = async () => {
         $('#confirm').disabled = true;
         const { data, error } = await sb.from('chem_changes').insert({ form_id: f.id, chemical_id: +c, ...(lf === '' ? { leftover_kg: 0, leftover_l: 0 } : unit === 'kg' ? { leftover_kg: +lf } : { leftover_l: +lf }), machine_group: g }).select('id').single();

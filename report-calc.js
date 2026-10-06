@@ -49,7 +49,7 @@ function calcReport(loads, changes, refs) {
 
   function chemRows(groupKey) {
     return chemicals.map(c => {
-      const prim = +c.bottle_l > 0 ? 'l' : (+c.bottle_kg > 0 ? 'kg' : null);
+      const prim = c.kind === 'extra' ? null : (+c.bottle_l > 0 ? 'l' : (+c.bottle_kg > 0 ? 'kg' : null)); // замены бутылей отмечаются только для основной химии
       const size = prim === 'l' ? +c.bottle_l : prim === 'kg' ? +c.bottle_kg : null;
       const tu = c.kind === 'extra' && c.per_unit_unit === 'g' ? 'kg' : 'l';
       const theory = both(c, groups[groupKey].chem[c.id] || 0, tu);

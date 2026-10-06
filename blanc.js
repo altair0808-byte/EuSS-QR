@@ -353,7 +353,7 @@ const Blank = (() => {
             const theoryExtraRaw = exIndex >= 0 ? (m.groups[group].exTot[exIndex] || 0) : 0;
             const theoryUnit = c.kind === 'extra' && c.per_unit_unit === 'g' ? 'kg' : 'l';
             const theory = c.kind === 'main' ? theoryMain : (theoryExtraRaw / 1000);
-            const prim = +c.bottle_l > 0 ? 'l' : (+c.bottle_kg > 0 ? 'kg' : null);
+            const prim = c.kind === 'extra' ? null : (+c.bottle_l > 0 ? 'l' : (+c.bottle_kg > 0 ? 'kg' : null));
             const mine = (changes || []).filter(x => x.shift_date === date && x.chemical_id === c.id && (x.machine_group || '1_10') === group);
             let actual = 0, noLeft = 0;
             mine.forEach(x => {

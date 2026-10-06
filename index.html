@@ -24,6 +24,7 @@ main{max-width:1440px;margin:0 auto;padding:1.25rem 1rem}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:.4rem;height:2.5rem;padding:0 1rem;border-radius:var(--r);border:1px solid var(--bd);background:var(--card);font-size:.875rem;font-weight:600}
 .btn.p{background:var(--pri);border-color:var(--pri);color:#fff}
 .btn.s{height:2.25rem;width:100%}.btn:hover{filter:brightness(.97)}.btn:active{transform:scale(.98)}
+.gl{margin:1.25rem 0 .5rem;font-size:.75rem;font-weight:800;text-transform:uppercase;color:var(--mf)}
 .mg{display:grid;grid-template-columns:repeat(2,1fr);gap:.75rem}
 .m{min-width:0;border:1px solid var(--bd);border-bottom-width:3px;border-radius:var(--r);background:var(--card);padding:1rem;box-shadow:0 1px 2px rgb(0 0 0/.05)}
 .m .l{font-size:.7rem;font-weight:800;text-transform:uppercase;color:var(--mf);margin:0}
@@ -147,10 +148,13 @@ function machines(){
   return out;
 }
 function metrics(ms){
-  const r=calcReport(S.loads,[],S.refs);
-  const chem=r.groups.all.chem.filter(c=>c.kind==='main').reduce((s,c)=>s+(c.theory?.l||0),0);
-  const work=ms.filter(m=>m.status==='working').length,own=S.can?'за смену':'ваши за смену';
-  return[['Стирок',fmt(r.total),'',own,'m1'],['Общий вес',fmt(r.kg),'кг',own,'m2'],['Химия',fmt(chem,1),'л','по рецептам (теория)','m3'],['В работе',work+' / 12','','сейчас','m4']];
+  const r=calcReport(S.loads,[],S.refs),own=S.can?'за смену':'ваши за смену';
+  const mk=(key,lo,hi,title)=>{
+    const g=r.groups[key],chem=g.chem.filter(c=>c.kind==='main').reduce((s,c)=>s+(c.theory?.l||0),0);
+    const work=ms.filter(m=>m.id>=lo&&m.id<=hi&&m.status==='working').length;
+    return{title,cards:[['Стирок',fmt(g.total),'',own,'m1'],['Вес',fmt(g.kg),'кг',own,'m2'],['Химия',fmt(chem,1),'л','по рецептам (теория)','m3'],['В работе',work+' / '+(hi-lo+1),'','сейчас','m4']]};
+  };
+  return{blocks:[mk('1_10',1,10,'Дозатор 1 · машины 1–10'),mk('11_12',11,12,'Дозатор 2 · машины 11–12')],total:{n:r.total,kg:r.kg}};
 }
 
 function dashView(){
@@ -169,7 +173,7 @@ function dashView(){
    <div class="av">${esc(ini)}</div><button class="ib" id="out" aria-label="Выйти" title="Выйти">⎋</button></div></div></header>
   <main><div class="top"><div><p class="eb">Сегодня, ${loc.getUTCDate()} ${MON[loc.getUTCMonth()]}</p><h1>Обзор текущей смены</h1></div>
    ${first?`<a class="btn p" href="form.html?f=${encodeURIComponent(first.slug)}">+ Новая запись</a>`:''}</div>
-  <section class="mg" aria-label="Статистика смены">${metrics(ms).map(([l,v,u,n,c])=>`<article class="m ${c}"><p class="l">${l}</p><p class="v">${v} ${u?`<small>${u}</small>`:''}</p><p class="n">${n}</p></article>`).join('')}</section>
+  ${(()=>{const M=metrics(ms);return M.blocks.map(b=>`<section aria-label="${esc(b.title)}"><p class="gl">${esc(b.title)}</p><div class="mg">${b.cards.map(([l,v,u,n,c])=>`<article class="m ${c}"><p class="l">${l}</p><p class="v">${v} ${u?`<small>${u}</small>`:''}</p><p class="n">${n}</p></article>`).join('')}</div></section>`).join('')+`<p class="hint" style="margin:.75rem 0 0">Всего по двум дозаторам: ${fmt(M.total.n)} стирок · ${fmt(M.total.kg)} кг</p>`;})()}
   <section><div class="sh"><div><h2>Стиральные машины</h2><p>Выберите машину, чтобы открыть запись</p></div>
    <div class="tabs" role="tablist">${T.map(([id,l])=>`<button role="tab" aria-selected="${tab===id}" data-t="${id}">${l}</button>`).join('')}</div></div>
    <div class="mgr">${vis.map(m=>`<article class="mc ${m.status==='working'?'on':''}"><button class="mv" data-m="${m.id}" aria-label="Машина ${m.id}">
