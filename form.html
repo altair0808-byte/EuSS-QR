@@ -37,7 +37,22 @@
     const sv = k => { const r = (set || []).find(x => x.key === k); return r ? +r.value : null; };
     const tzH = sv('tz_offset') ?? 5, stH = sv('shift_start') ?? 6;
     const state = new Map();
-    let lastIds = null, tab = 'all';
+    let lastIds = null, tab = 'all', busy = new Map();
+    async function loadBusy() {                                  // какие машины сейчас стирают (как в главном меню)
+      const since = new Date(Date.now() - 864e5).toISOString();
+      const { data } = await sb.from('loads').select('machine,ts,wash_type_id,finished_at').gte('ts', since).order('ts');
+      const now = Date.now(), last = {}; busy = new Map();
+      (data || []).forEach(l => { last[l.machine] = l; });
+      Object.values(last).forEach(l => {
+        const w = washTypes.find(x => x.id === l.wash_type_id), end = new Date(l.ts).getTime() + (w?.minutes || 0) * 60000;
+        if (!l.finished_at && now < end) busy.set(l.machine, Math.max(1, Math.ceil((end - now) / 60000)));
+      });
+    }
+    if (!document.getElementById('busy-css')) { const st = document.createElement('style'); st.id = 'busy-css';
+      st.textContent = '.on .dr::after{content:"";position:absolute;inset:-.45rem;border:.22rem solid transparent;border-top-color:var(--ac);border-radius:99px;animation:bsp 3.2s linear infinite}.on .dr{animation:bsh .35s linear infinite}@keyframes bsp{to{transform:rotate(360deg)}}@keyframes bsh{25%{transform:translate(.6px,-.4px)}75%{transform:translate(-.5px,.4px)}}@media(prefers-reduced-motion:reduce){.on .dr,.on .dr::after{animation:none}}';
+      document.head.appendChild(st); }
+    await loadBusy();
+    setInterval(async () => { if (document.querySelector('.mgr') && !document.querySelector('#ovl .ov')) { await loadBusy(); render(); } }, 30000);
     const hh = n => String(n).padStart(2, '0');
     const fmt = n => (Math.round(n * 10) / 10).toLocaleString('ru-RU');
     const dos = m => m <= 10 ? 'Основной дозатор · 1–10' : 'Отдельный дозатор · 11–12';
@@ -54,7 +69,7 @@
         <section class="mg" aria-label="Итоги">${M.map(([l, v, u, n, c]) => `<article class="m ${c}"><p class="l">${l}</p><p class="v">${v} ${u ? `<small>${u}</small>` : ''}</p><p class="n">${n}</p></article>`).join('')}</section>
         <div class="sh"><div><h2>Стиральные машины</h2><p>Выберите машину, задайте вид стирки и вес, затем проверьте всё и отправьте</p></div>
           <div class="seg" role="tablist">${T.map(([id, l]) => `<button role="tab" aria-selected="${tab === id}" class="${tab === id ? 'on' : ''}" data-t="${id}">${l}</button>`).join('')}</div></div>
-        <div class="mgr">${vis.map(m => { const v = state.get(m); return `<article class="mc ${v ? 'set' : ''}"><button class="mv" data-m="${m}" aria-label="Машина ${m}"><span class="ct"><i></i><i></i><i></i></span><span class="dr"><strong>${hh(m)}</strong></span><span class="st">${v ? esc(wname(v.wash_type_id)) + ' · ' + fmt(v.weight_kg) + ' кг' : 'Не настроена'}</span></button><button class="btn s ${v ? '' : 'p'}" data-m="${m}">${v ? 'Изменить' : 'Настроить'} →</button></article>`; }).join('')}</div>
+        <div class="mgr">${vis.map(m => { const v = state.get(m); const b = busy.get(m); return `<article class="mc ${v ? 'set' : ''} ${b ? 'on' : ''}"><button class="mv" data-m="${m}" aria-label="Машина ${m}"><span class="ct"><i></i><i></i><i></i></span><span class="dr"><strong>${hh(m)}</strong></span><span class="st">${v ? esc(wname(v.wash_type_id)) + ' · ' + fmt(v.weight_kg) + ' кг' : b ? 'Стирка · ' + b + ' мин' : 'Не настроена'}</span></button><button class="btn s ${v ? '' : 'p'}" data-m="${m}">${v ? 'Изменить' : 'Настроить'} →</button></article>`; }).join('')}</div>
         <div class="bar"><button class="go" id="review">Проверить всё${state.size ? ' · ' + state.size + ' ' + mw(state.size) : ''}</button>
         <button class="ghost" id="undo" hidden>Отменить последнюю запись</button></div><div id="ovl"></div>`;
       document.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { tab = b.dataset.t; render(); });
@@ -133,7 +148,7 @@
         const { data, error } = await sb.from('loads').insert(payload).select('id,machine');
         if (error) { toast('Не сохранено: ' + error.message); $('#confirm').disabled = false; return; }
         toast(`Отправлено: ${data.length} ${mw(data.length)}`);
-        lastIds = data.map(x => x.id); state.clear(); render(); toTop();
+        lastIds = data.map(x => x.id); state.clear(); await loadBusy(); render(); toTop();
       };
     }
 
