@@ -6,6 +6,9 @@
 alter table loads        add column if not exists created_by uuid;
 alter table chem_changes add column if not exists created_by uuid;
 alter table chem_changes add column if not exists connect_id uuid;   -- к какому «подключению остатка» относится
+-- дозатор замены (раньше добавлялся в stage3.sql; если его не запускали, колонки не было)
+alter table chem_changes add column if not exists machine_group text default '1_10';
+update chem_changes set machine_group = '1_10' where machine_group is null;
 
 create or replace function set_created_by() returns trigger language plpgsql as $$
 begin
