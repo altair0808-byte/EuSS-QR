@@ -23,7 +23,7 @@ main{max-width:1440px;margin:0 auto;padding:1.25rem 1rem}
 .top h1{font-size:1.5rem}.top .eb{margin-bottom:.25rem;font-size:.75rem;font-weight:700}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:.4rem;height:2.5rem;padding:0 1rem;border-radius:var(--r);border:1px solid var(--bd);background:var(--card);font-size:.875rem;font-weight:600}
 .btn.p{background:var(--pri);border-color:var(--pri);color:#fff}
-.btn.s{height:2.25rem;width:100%}.btn:hover{filter:brightness(.97)}
+.btn.s{height:2.25rem;width:100%}.btn:hover{filter:brightness(.97)}.btn:active{transform:scale(.98)}
 .mg{display:grid;grid-template-columns:repeat(2,1fr);gap:.75rem}
 .m{min-width:0;border:1px solid var(--bd);border-bottom-width:3px;border-radius:var(--r);background:var(--card);padding:1rem;box-shadow:0 1px 2px rgb(0 0 0/.05)}
 .m .l{font-size:.7rem;font-weight:800;text-transform:uppercase;color:var(--mf);margin:0}
@@ -196,17 +196,19 @@ function panel(m,first){
    <div class="wl" id="wl">${wt.map(x=>`<button data-v="${x.id}"><span>${esc(x.name)}</span>${x.minutes?`<small>${x.minutes} мин</small>`:''}</button>`).join('')}</div>
    <h3>Вес, кг</h3><div class="kgr"><button id="mi" aria-label="Меньше">−</button><input id="kg" type="number" inputmode="decimal" min="0" step="0.5" value="25"><button id="pl" aria-label="Больше">+</button></div>
    ${ex.length?`<h3>Дополнительно</h3><div class="xg">${ex.map(x=>`<label>${esc(x.name)}, ${x.per_unit_unit==='g'?'г':'мл'}<input type="number" min="0" step="1" inputmode="numeric" data-x="${x.id}" placeholder="0"></label>`).join('')}</div>`:''}
-   <button class="btn p wide" id="save" disabled>${busy?'Записать и начать следующую':'Записать загрузку'}</button>`
+   <button class="btn p wide" id="save">${busy?'Записать и начать следующую':'Записать загрузку'}</button>`
    :'<p class="hint" style="margin-top:1rem">Нет доступа к бланку загрузки.</p>'}</section></div>`;
-  const close=()=>{sel=null;$('#ovl').innerHTML='';};
+  const close=()=>{sel=null;$('#ovl').innerHTML='';document.onkeydown=null;};
+  document.onkeydown=e=>{if(e.key==='Escape')close();};
   $('#cl').onclick=close;$('#bg').onmousedown=e=>{if(e.target.id==='bg')close();};
   const fin=async()=>{const{error}=await sb.rpc('finish_load',{p_id:l.id});if(error){toast('Не удалось: '+error.message);return false;}return true;};
   if($('#fin'))$('#fin').onclick=async()=>{$('#fin').disabled=true;if(await fin()){await loadLoads();toast('Машина '+m.id+' свободна');dashView();}else $('#fin').disabled=false;};
   if(!first)return;
-  $('#wl').onclick=e=>{const b=e.target.closest('button');if(!b)return;w=+b.dataset.v;$('#wl').querySelectorAll('button').forEach(x=>x.classList.toggle('sel',x===b));$('#save').disabled=false;};
+  $('#wl').onclick=e=>{const b=e.target.closest('button');if(!b)return;w=+b.dataset.v;$('#wl').querySelectorAll('button').forEach(x=>x.classList.toggle('sel',x===b));};
   $('#mi').onclick=()=>$('#kg').value=Math.max(0,(+$('#kg').value||0)-1);
   $('#pl').onclick=()=>$('#kg').value=(+$('#kg').value||0)+1;
   $('#save').onclick=async()=>{
+    if(!w){toast('Выберите вид стирки');return;}
     const b=$('#save');b.disabled=true;
     if(busy&&!await fin()){b.disabled=false;return;}
     const extras={};document.querySelectorAll('[data-x]').forEach(i=>{if(+i.value>0)extras[i.dataset.x]=+i.value;});

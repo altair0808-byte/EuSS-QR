@@ -32,6 +32,6 @@ function unpick(sel) { document.querySelectorAll(sel + ' button').forEach(x => x
 // кнопка «Отменить последнюю запись» (10 минут)
 function undoBtn(table) {
   const b = $('#undo'); let ids = [];
-  b.onclick = async () => { await sb.from(table).delete().in('id', ids); b.hidden = true; toast(ids.length > 1 ? 'Записи отменены' : 'Запись отменена'); };
+  b.onclick = async () => { b.disabled = true; const { error } = await sb.from(table).delete().in('id', ids); b.disabled = false; if (error) { toast('Не удалось отменить: ' + error.message); return; } b.hidden = true; toast(ids.length > 1 ? 'Записи отменены' : 'Запись отменена'); };
   return i => { ids = [].concat(i); b.textContent = ids.length > 1 ? 'Отменить последние ' + ids.length + ' записи' : 'Отменить последнюю запись'; b.hidden = false; clearTimeout(undoBtn.t); undoBtn.t = setTimeout(() => b.hidden = true, 6e5); };
 }

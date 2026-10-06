@@ -1,10 +1,12 @@
 <!doctype html>
 <html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>QR бланка</title><link rel="stylesheet" href="style.css"></head>
-<body><main class="qr">
-<h1 id="t"></h1><div id="code"></div><p id="u"></p>
-<button class="go" onclick="print()">Печать</button>
-<a class="ghost" href="index.html">К списку бланков</a>
+<title>QR бланка — EuSS</title><link rel="icon" href="favicon.png" type="image/png"><link rel="stylesheet" href="style.css"></head>
+<body>
+<header class="hd"><div><a class="lg" href="index.html" aria-label="На панель смены"><img src="euss-logo.png" alt="EuSS"><span class="sep"></span><span class="sub">Бланки</span></a><nav class="nav"><a class="btn s" href="index.html">← Панель</a></nav></div></header>
+<main class="qrc">
+<div class="box"><p class="eb">QR-код бланка</p><h1 id="t">Загрузка…</h1><div id="code"></div><p id="u"></p>
+<button class="go" id="pr" type="button">Печать</button></div>
+<p class="hint noprint" style="margin-top:1rem">Распечатайте код и повесьте у машин: сотрудник наводит камеру и сразу открывает бланк.</p>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -14,7 +16,8 @@
   if (!await need()) return;
   const { data: f } = await sb.from('forms').select('name').eq('slug', q.get('f')).maybeSingle();
   $('#t').textContent = f ? f.name : 'Бланк недоступен';
-  if (!f) return;
+  $('#pr').onclick = () => window.print();
+  if (!f) { $('#pr').hidden = true; return; }
   const u = new URL('form.html?f=' + q.get('f'), location.href).href;
   new QRCode($('#code'), { text: u, width: 340, height: 340 });
   $('#u').textContent = u;

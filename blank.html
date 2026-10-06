@@ -1,11 +1,14 @@
 <!doctype html>
 <html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Бланк за смену</title><link rel="stylesheet" href="style.css"></head>
-<body><main class="wide full">
-<header><h1>Бланк за смену</h1><a class="ghost" href="index.html">Бланки</a></header>
+<title>Бланк за смену — EuSS</title><link rel="icon" href="favicon.png" type="image/png"><link rel="stylesheet" href="style.css"></head>
+<body>
+<header class="hd"><div><a class="lg" href="index.html" aria-label="На панель смены"><img src="euss-logo.png" alt="EuSS"><span class="sep"></span><span class="sub">Отчёты</span></a><nav class="nav"><a class="btn s" href="index.html">← Панель</a></nav></div></header>
+<main class="wide full">
+<div class="top"><h1>Бланк за смену</h1></div>
 <div class="box">
   <label>Дата смены<input type="date" id="d"></label>
-  <div class="row"><button class="mini" id="t">Сегодня</button><button class="mini" id="y">Вчера</button><button class="mini" id="x">Скачать Excel за месяц</button></div>
+  <div class="seg" role="group" aria-label="Смена"><button id="t">Сегодня</button><button id="y">Вчера</button></div>
+  <button class="go" id="x" style="margin-top:1rem">⬇ Скачать Excel за месяц</button>
   <p class="hint" id="msg"></p>
 </div>
 <div id="warn"></div>
@@ -65,9 +68,11 @@ async function download() {
   b.disabled = false;
 }
 
-$('#d').onchange = show;
-$('#t').onclick = () => { $('#d').value = shiftToday(); show(); };
-$('#y').onclick = () => { $('#d').value = addDays(shiftToday(), -1); show(); };
+const mark = () => { const d = $('#d').value, t = shiftToday(), y = addDays(t, -1);
+  [['t', d === t], ['y', d === y]].forEach(([id, on]) => { $('#' + id).classList.toggle('on', on); $('#' + id).setAttribute('aria-pressed', on); }); };
+$('#d').onchange = () => { mark(); show(); };
+$('#t').onclick = () => { $('#d').value = shiftToday(); mark(); show(); };
+$('#y').onclick = () => { $('#d').value = addDays(shiftToday(), -1); mark(); show(); };
 $('#x').onclick = download;
 
 (async () => {
@@ -81,6 +86,6 @@ $('#x').onclick = download;
   const g = k => { const x = (s.data || []).find(y => y.key === k); return x ? +x.value : null; };
   tz = g('tz_offset') ?? 5; st = g('shift_start') ?? 6;
   refs = { water: g('water_l') ?? 55, washTypes: w.data || [], chemicals: c.data || [], recipes: r.data || [] };
-  $('#d').value = shiftToday(); show();
+  $('#d').value = shiftToday(); mark(); show();
 })();
 </script></body></html>

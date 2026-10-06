@@ -1,15 +1,17 @@
 <!doctype html>
 <html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Пользователи</title><link rel="stylesheet" href="style.css"></head>
-<body><main class="wide">
-<header><h1>Пользователи</h1><span><a class="ghost" href="settings.html">Настройки</a><a class="ghost" href="index.html">Бланки</a></span></header>
+<title>Пользователи — EuSS</title><link rel="icon" href="favicon.png" type="image/png"><link rel="stylesheet" href="style.css"></head>
+<body>
+<header class="hd"><div><a class="lg" href="index.html" aria-label="На панель смены"><img src="euss-logo.png" alt="EuSS"><span class="sep"></span><span class="sub">Администрирование</span></a><nav class="nav"><a class="btn s" href="settings.html">Настройки</a><a class="btn s" href="index.html">← Панель</a></nav></div></header>
+<main class="wide">
+<div class="top"><h1>Пользователи</h1></div>
 <div class="box">
-  <b>Новый сотрудник</b>
+  <h2>Новый сотрудник</h2>
   <label>Имя<input id="nm" placeholder="Фамилия Имя" autocomplete="off"></label>
   <label>Почта (логин)<input id="em" type="email" autocomplete="off"></label>
   <label>Пароль<input id="pw" autocomplete="off"></label>
-  <button class="ghost" id="gen" type="button">Придумать пароль</button>
-  <h2>Доступ к бланкам</h2><div id="fa"></div>
+  <button class="mini" id="gen" type="button" style="margin-top:.5rem">Придумать пароль</button>
+  <h3>Доступ к бланкам</h3><div id="fa"></div>
   <button class="go" id="mk">Создать сотрудника</button>
 </div>
 <div id="made" class="box" hidden></div>
@@ -42,7 +44,7 @@ async function load() {
     return `<div class="box" data-u="${p.id}"><b>${p.full_name || p.email}</b> <small>${p.full_name ? p.email : ''}</small>` + (isS ? ' <small>(суперадмин)</small><div class="row"><button class="mini" data-act="nm">Имя</button><button class="mini" data-act="pw">Новый пароль</button></div></div>' :
       forms.map(x => { const a = (acc || []).find(r => r.user_id === p.id && r.form_id === x.id);
         return `<div class="acc"><span>${x.name}</span><select data-f="${x.id}">${opts(a ? a.role : '')}</select></div>`; }).join('') +
-      `<div class="row"><button class="mini" data-act="nm">Имя</button><button class="mini" data-act="pw">Новый пароль</button><button class="mini" data-act="del">Удалить</button></div></div>`);
+      `<div class="row"><button class="mini" data-act="nm">Имя</button><button class="mini" data-act="pw">Новый пароль</button><button class="mini danger" data-act="del">Удалить</button></div></div>`);
   }).join('');
 }
 

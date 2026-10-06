@@ -1,10 +1,12 @@
 <!doctype html>
 <html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Настройки</title><link rel="stylesheet" href="style.css"></head>
-<body><main class="wide">
-<header><h1>Настройки</h1><span><a class="ghost" href="admin.html">Пользователи</a><a class="ghost" href="index.html">Бланки</a></span></header>
+<title>Настройки — EuSS</title><link rel="icon" href="favicon.png" type="image/png"><link rel="stylesheet" href="style.css"></head>
+<body>
+<header class="hd"><div><a class="lg" href="index.html" aria-label="На панель смены"><img src="euss-logo.png" alt="EuSS"><span class="sep"></span><span class="sub">Администрирование</span></a><nav class="nav"><a class="btn s" href="admin.html">Пользователи</a><a class="btn s" href="index.html">← Панель</a></nav></div></header>
+<main class="wide">
+<div class="top"><h1>Настройки</h1></div>
 
-<h2>Общие</h2>
+<h2 style="margin-top:.25rem">Общие</h2>
 <div class="box" id="gen">
   <label>Вода на загрузку, л<input type="number" step="1" data-k="water_l"></label>
   <label>Часовой пояс, часы от UTC<input type="number" step="1" data-k="tz_offset"></label>
@@ -18,7 +20,7 @@
 <h2>Виды стирки и рецепты</h2>
 <div id="wt"></div>
 <div class="box">
-  <b>Новый вид стирки</b>
+  <h2>Новый вид стирки</h2>
   <label>Название<input id="wn"></label>
   <label>Минуты<input id="wm" type="number" min="0" inputmode="numeric"></label>
   <button class="go" id="wa">Добавить</button>
@@ -27,7 +29,7 @@
 <h2>Бланки</h2>
 <div id="fm"></div>
 <div class="box">
-  <b>Новый бланк</b>
+  <h2>Новый бланк</h2>
   <label>Название<input id="fn"></label>
   <label>Адрес (латиница, например laundry-load-2)<input id="fs" autocapitalize="off"></label>
   <label>Тип<select id="ft"><option value="laundry_load">Загрузка белья</option><option value="laundry_chem">Замена химии</option></select></label>
@@ -66,7 +68,7 @@ async function load() {
   $('#wt').innerHTML = wts.map(x => `<details class="box" data-w="${x.id}"><summary><b>${esc(x.name)}</b> <small>${x.minutes ?? '–'} мин</small></summary>
     <label>Название<input data-wf="name" value="${esc(x.name)}"></label>
     <label>Минуты<input data-wf="minutes" type="number" min="0" value="${x.minutes ?? ''}"></label>
-    <h2>Химия, мл на литр воды</h2>
+    <h3>Химия, мл на литр воды</h3>
     ${mains.map(c => { const r = rec.find(y => y.wash_type_id === x.id && y.chemical_id === c.id);
       return `<label>${esc(c.name)}<input type="number" min="0" step="0.5" data-r="${c.id}" value="${r ? r.ml_per_l : 0}"></label>`; }).join('')}
     <button class="go" data-act="sw">Сохранить</button></details>`).join('');

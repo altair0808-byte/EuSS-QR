@@ -1,11 +1,13 @@
 <!doctype html>
 <html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Отчёт по сменам</title><link rel="stylesheet" href="style.css"></head>
-<body><main class="wide">
-<header><h1>Отчёт по сменам</h1><a class="ghost" href="index.html">Бланки</a></header>
+<title>Отчёт по сменам — EuSS</title><link rel="icon" href="favicon.png" type="image/png"><link rel="stylesheet" href="style.css"></head>
+<body>
+<header class="hd"><div><a class="lg" href="index.html" aria-label="На панель смены"><img src="euss-logo.png" alt="EuSS"><span class="sep"></span><span class="sub">Отчёты</span></a><nav class="nav"><a class="btn s" href="index.html">← Панель</a></nav></div></header>
+<main class="wide">
+<div class="top"><h1>Отчёт по сменам</h1></div>
 <div class="box">
   <div class="acc"><label>С даты смены<input type="date" id="d1"></label><label>По дату смены<input type="date" id="d2"></label></div>
-  <div class="row"><button class="mini" id="t">Сегодня</button><button class="mini" id="y">Вчера</button><button class="mini" id="w">7 дней</button></div>
+  <div class="seg" role="group" aria-label="Период"><button id="t">Сегодня</button><button id="y">Вчера</button><button id="w">7 дней</button></div>
   <p class="hint" id="rng"></p>
 </div>
 <div id="out"><p class="hint">Загрузка…</p></div>
@@ -60,8 +62,10 @@ async function show(){
     <div class="box"><table class="tbl"><tr><th>Смена</th><th>Время</th><th>Дозатор</th><th>Химия</th><th>Остаток</th></tr>
     ${chRows.map(x=>`<tr><td>${dmy(x.shift_date)}</td><td>${hhmm(x.ts)}</td><td>${x.machine_group==='11_12'?'11–12':'1–10'}</td><td>${esc(cn[x.chemical_id])}</td><td>${x.leftover_kg!=null?f(x.leftover_kg)+' кг':x.leftover_l!=null?f(x.leftover_l)+' л':'пусто'}</td></tr>`).join('')||'<tr><td colspan="5">Нет замен</td></tr>'}</table></div>`;
 }
-function setRange(a,b){$('#d1').value=a;$('#d2').value=b;show();}
-$('#d1').onchange=$('#d2').onchange=show;
+function mark(){const a=$('#d1').value,b=$('#d2').value,t=shiftToday(),y=addDays(t,-1),w=addDays(t,-6);
+  [['t',a===t&&b===t],['y',a===y&&b===y],['w',a===w&&b===t]].forEach(([id,on])=>{$('#'+id).classList.toggle('on',on);$('#'+id).setAttribute('aria-pressed',on);});}
+function setRange(a,b){$('#d1').value=a;$('#d2').value=b;mark();show();}
+$('#d1').onchange=$('#d2').onchange=()=>{mark();show();};
 $('#t').onclick=()=>setRange(shiftToday(),shiftToday());
 $('#y').onclick=()=>{const d=addDays(shiftToday(),-1);setRange(d,d)};
 $('#w').onclick=()=>setRange(addDays(shiftToday(),-6),shiftToday());
