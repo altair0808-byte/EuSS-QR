@@ -10,7 +10,7 @@ const StorageAnim = (() => {
   function addCss() { if (css) return; css = true; document.head.insertAdjacentHTML('beforeend', `<style>.sa{--w:#8aa}.sa .bar{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin:.5rem 0}.sa .clk{font:700 1.4rem/1 inherit;min-width:5ch}.sa .pg{flex:1;min-width:100px;height:6px;background:#8883;border-radius:3px;overflow:hidden}.sa .pg i{display:block;height:100%;background:#3b82f6;width:0}
 .sa .row{display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem}@media(max-width:700px){.sa .row{grid-template-columns:1fr}}.sa .cd{border:1px solid #8885;border-radius:10px;padding:.6rem}.sa h4{margin:0 0 .4rem;font-size:.9rem}
 .sa .tw{display:flex;gap:.7rem;align-items:flex-end}.sa .tk{position:relative;width:88px;height:190px;flex:none;border:2px solid #889;border-top-width:1px;border-radius:4px 4px 14px 14px;overflow:hidden;background:#8881}.sa .lq{position:absolute;left:0;right:0;bottom:0;transition:height .35s linear}.sa .dz{position:absolute;left:0;right:0;bottom:0;border-top:2px dashed #889;background:repeating-linear-gradient(135deg,transparent 0 5px,#8883 5px 7px)}
-.sa .lv{position:absolute;top:5px;width:100%;text-align:center;font-weight:700}.sa .ct{display:flex;flex-direction:column;gap:.35rem;font-size:.8rem}.sa input[type=number]{width:64px}.sa .w{color:#c0392b;font-weight:600}.sa .tb{overflow-x:auto;margin-top:.6rem}.sa table{border-collapse:collapse;width:100%;font-size:.78rem;white-space:nowrap}.sa th,.sa td{padding:.25rem .5rem;text-align:right;border-bottom:1px solid #8883}.sa th:first-child,.sa td:first-child{text-align:left}
+.sa .lv{position:absolute;top:5px;width:100%;text-align:center;font-weight:700;line-height:1.15}.sa .ct{display:flex;flex-direction:column;gap:.35rem;font-size:.8rem}.sa input[type=number]{width:64px}.sa .w{color:#c0392b;font-weight:600}.sa .tb{overflow-x:auto;margin-top:.6rem}.sa table{border-collapse:collapse;width:100%;font-size:.78rem;white-space:nowrap}.sa th,.sa td{padding:.25rem .5rem;text-align:right;border-bottom:1px solid #8883}.sa th:first-child,.sa td:first-child{text-align:left}
 @keyframes saf{from{background:#f59e0b88}to{background:transparent}}.sa .fl{animation:saf 1.2s ease-out}@media(prefers-reduced-motion:reduce){.sa .lq{transition:none}.sa .fl{animation:none}}</style>`); }
 
   async function load(o) {
@@ -43,35 +43,35 @@ const StorageAnim = (() => {
   }
   async function mount(el, o) {
     addCss(); el.className = 'sa'; el.innerHTML = '<p class="hint">Загружаю хранилище…</p>';
-    let D, S, i = 0, sel = 0, tm = 0, run = false, last = 0, raf = 0, sp = 30;
-    const build = async (keep) => { D = await load(o); S = model(o, D); i = 0; if (keep) { while (i < S.ev.length && S.ev[i].t <= D.d0 + tm * 60e3) S.apply(S.ev[i++], true); } else tm = 0; };
+    let D, S, sel = 0, timer = 0;
+    // текущий остаток: применяем все события до «сейчас» (для прошедшей смены — до её конца)
+    const build = async () => { D = await load(o); S = model(o, D); const cut = Math.min(Date.now(), D.d0 + MS); S.ev.forEach(e => { if (e.t <= cut) S.apply(e, true); }); };
     await build();
     if (!D.chems.length) { el.innerHTML = '<p class="hint">Нет химии с объёмом бутыли в настройках.</p>'; return; }
-    const hm = m => { m = (Math.floor(m) + o.st * 60) % 1440; return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
-    const act = async (kind, g, amt) => { const c = D.chems[sel]; const { error } = await sb.rpc('chem_move', { p_chemical: c.id, p_group: G[g], p_kind: kind, p_amount_l: amt }); if (error) { o.toast && o.toast(error.message || 'Не удалось'); return; } await build(true); o.toast && o.toast(kind === 'take' ? 'Остаток забран' : 'Залито в дозатор'); };
-    const skel = () => { el.innerHTML = `<div class="bar"><button class="btn" data-a="go">Старт</button><button class="btn" data-a="rs">Сначала</button><select data-a="sp"><option value="90">1×</option><option value="30" selected>3×</option><option value="10">9×</option></select><span class="clk">${hm(0)}</span><div class="pg"><i></i></div></div>
-      <div class="bar" data-r="tabs"></div><div class="row" data-r="pan"></div><div class="tb" data-r="tb"></div><p class="hint" data-r="bal"></p>`; };
-    skel();
-    const q = s => el.querySelector(`[data-r=${s}]`);
+    const dens = c => (+c.bottle_l > 0 && +c.bottle_kg > 0) ? +c.bottle_kg / +c.bottle_l : null;
+    const V = (c, v) => { const d = dens(c); return `${f(v)} л${d ? ` · ${f(v * d)} кг` : ''}`; };          // литры и кг сразу
+    const toL = (c, v, u) => u === 'kg' ? v / (dens(c) || 1) : v;
+    const act = async (kind, g, amt, u) => { const c = D.chems[sel], l = toL(c, amt, u); if (!(l > 0)) { o.toast && o.toast('Укажите количество'); return; }
+      const { error } = await sb.rpc('chem_move', { p_chemical: c.id, p_group: G[g], p_kind: kind, p_amount_l: Math.round(l * 1000) / 1000 });
+      if (error) { o.toast && o.toast(error.message || 'Не удалось'); return; } await build(); draw(); o.toast && o.toast(kind === 'take' ? 'Остаток забран' : 'Залито в дозатор'); };
+    const unit = id => `<select id="${id}"><option value="l">л</option>${dens(D.chems[sel]) ? '<option value="kg">кг</option>' : ''}</select>`;
     function draw() {
-      el.querySelector('.clk').textContent = hm(tm); el.querySelector('.pg i').style.width = tm / 14.4 + '%';
-      q('tabs').innerHTML = D.chems.map((c, n) => `<button class="btn" ${n === sel ? 'aria-pressed="true" style="font-weight:700;text-decoration:underline"' : ''} data-t="${n}" style="border-left:5px solid hsl(${hue(c.name)} 70% 50%)">${E(c.name)}</button>`).join('');
-      const c = D.chems[sel], cap = +c.bottle_l, col = `hsl(${hue(c.name)} 70% 50%)`;
-      const tank = (v, dz) => `<div class="tk"><div class="lq" style="height:${Math.min(100, v / cap * 100)}%;background:${col}"></div>${dz ? `<div class="dz" style="height:${DEAD / cap * 100}%"></div>` : ''}<div class="lv">${f(v)} л</div></div>`;
-      const ctl = (j) => `<div class="ct"><span>Расход по рецептам <b>${f(S.cons[sel][j])} л</b></span><span>Забрано <b>−${f(S.took[sel][j])}</b> · залито <b>+${f(S.put[sel][j])}</b> · бутылей <b>${S.bot[sel][j]}</b></span>${S.lvl[sel][j] <= DEAD + .02 ? '<span class="w">Трубка не достаёт: забрать остаток</span>' : ''}${o.can ? `<span><input type="number" id="a${j}" value="3" min="0.5" step="0.5"> <button class="btn" data-m="take" data-g="${j}">Забрать остаток</button></span>` : ''}</div>`;
-      q('pan').innerHTML = [0, 1].map(j => `<div class="cd"><h4>Дозатор ${GN[j]}</h4><div class="tw">${tank(S.lvl[sel][j], 1)}${ctl(j)}</div></div>`).join('') +
-        `<div class="cd"><h4>Запас бригадира</h4><div class="tw">${tank(S.stock[sel], 0)}<div class="ct"><span>В запасе <b>${f(S.stock[sel])} л</b></span>${o.can ? `<span><select id="tg"><option value="0">в дозатор 1–10</option><option value="1">в дозатор 11–12</option></select></span><span><input type="number" id="as" value="6" min="0.5" step="0.5"> <button class="btn" data-m="pour">Залить</button></span>` : ''}</div></div></div>`;
-      let h = '<table><tr><th rowspan=2>Химикат</th>' + GN.map(n => `<th colspan=4>Дозатор ${n}, л</th>`).join('') + '<th rowspan=2>Запас</th></tr><tr>' + GN.map(() => '<th>Уровень</th><th>Расход</th><th>Забрано</th><th>Залито</th>').join('') + '</tr>';
-      D.chems.forEach((ch, n) => { h += `<tr><td>${E(ch.name)}</td>` + [0, 1].map(j => `<td><b>${f(S.lvl[n][j])}</b></td><td>${f(S.cons[n][j])}</td><td class="${S.flash['t' + n + j] ? 'fl' : ''}">−${f(S.took[n][j])}</td><td class="${S.flash['p' + n + j] ? 'fl' : ''}">+${f(S.put[n][j])}</td>`).join('') + `<td><b>${f(S.stock[n])}</b></td></tr>`; });
-      q('tb').innerHTML = h + '</table>'; S.flash = {};
-      q('bal').textContent = 'Уровни считаются по рецептам (как в панели смены); фактический расход точно известен только в момент замены бутыли.';
+      const c = D.chems[sel], cap = +c.bottle_l, col = `hsl(${hue(c.name)} 70% 50%)`, d = dens(c);
+      const fo = el.querySelector('input:focus,select:focus'); if (fo) return;
+      const tank = (v, dz) => `<div class="tk"><div class="lq" style="height:${Math.min(100, v / cap * 100)}%;background:${col}"></div>${dz ? `<div class="dz" style="height:${DEAD / cap * 100}%"></div>` : ''}<div class="lv">${f(v)} л${d ? `<br><small>${f(v * d)} кг</small>` : ''}</div></div>`;
+      const ctl = j => `<div class="ct"><span>Остаток сейчас <b>${V(c, S.lvl[sel][j])}</b></span><span>Расход за смену <b>${V(c, S.cons[sel][j])}</b></span><span>Забрано <b>−${V(c, S.took[sel][j])}</b></span><span>Залито <b>+${V(c, S.put[sel][j])}</b></span><span>Бутылей за смену <b>${S.bot[sel][j]}</b></span>${S.lvl[sel][j] <= DEAD + .02 ? '<span class="w">Трубка не достаёт: забрать остаток</span>' : ''}${o.can ? `<span><input type="number" id="a${j}" value="3" min="0.5" step="0.5"> ${unit('u' + j)} <button class="btn" data-m="take" data-g="${j}">Забрать остаток</button></span>` : ''}</div>`;
+      el.innerHTML = `<div class="bar" data-r="tabs">${D.chems.map((x, n) => `<button class="btn" data-t="${n}" ${n === sel ? 'aria-pressed="true" style="font-weight:700;text-decoration:underline;border-left:5px solid hsl(' + hue(x.name) + ' 70% 50%)"' : 'style="border-left:5px solid hsl(' + hue(x.name) + ' 70% 50%)"'}>${E(x.name)}</button>`).join('')}</div>
+        <div class="row">${[0, 1].map(j => `<div class="cd"><h4>Дозатор ${GN[j]}</h4><div class="tw">${tank(S.lvl[sel][j], 1)}${ctl(j)}</div></div>`).join('')}
+        <div class="cd"><h4>Запас бригадира</h4><div class="tw">${tank(S.stock[sel], 0)}<div class="ct"><span>В запасе <b>${V(c, S.stock[sel])}</b></span>${o.can ? `<span><select id="tg"><option value="0">в дозатор 1–10</option><option value="1">в дозатор 11–12</option></select></span><span><input type="number" id="as" value="6" min="0.5" step="0.5"> ${unit('us')} <button class="btn" data-m="pour">Залить</button></span>` : ''}</div></div></div></div>
+        <div class="tb"><table><tr><th>Химикат</th>${GN.map(n => `<th>Дозатор ${n}: остаток</th>`).join('')}<th>Запас</th></tr>${D.chems.map(x => `<tr><td>${E(x.name)}</td>${[0, 1].map(j => `<td><b>${V(x, S.lvl[D.chems.indexOf(x)][j])}</b></td>`).join('')}<td><b>${V(x, S.stock[D.chems.indexOf(x)])}</b></td></tr>`).join('')}</table></div>
+        <p class="hint">Остаток считается по рецептам от последней замены бутыли с учётом «забрано» и «залито». Обновляется раз в минуту. Кг = литры × плотность из настроек химии.</p>`;
     }
     el.onclick = e => { const b = e.target.closest('button'); if (!b) return;
-      if (b.dataset.t != null) { sel = +b.dataset.t; draw(); } else if (b.dataset.a === 'go') { run = !run; b.textContent = run ? 'Пауза' : 'Продолжить'; } else if (b.dataset.a === 'rs') { run = false; build(false).then(() => { skel(); draw(); }); }
-      else if (b.dataset.m === 'take') { const g = +b.dataset.g; act('take', g, +el.querySelector('#a' + g).value); } else if (b.dataset.m === 'pour') act('pour', +el.querySelector('#tg').value, +el.querySelector('#as').value); };
-    el.onchange = e => { if (e.target.dataset.a === 'sp') sp = +e.target.value; };
-    const loop = ts => { if (!el.isConnected) return; if (run) { tm = Math.min(1440, tm + (ts - last) / 1000 * 1440 / sp); while (i < S.ev.length && S.ev[i].t <= D.d0 + tm * 60e3) S.apply(S.ev[i++], true); if (tm >= 1440) run = false; } last = ts; if (!el.querySelector('input:focus,select:focus')) draw(); raf = requestAnimationFrame(loop); };
-    draw(); raf = requestAnimationFrame(loop);
+      if (b.dataset.t != null) { sel = +b.dataset.t; draw(); }
+      else if (b.dataset.m === 'take') { const g = +b.dataset.g; act('take', g, +el.querySelector('#a' + g).value, el.querySelector('#u' + g).value); }
+      else if (b.dataset.m === 'pour') act('pour', +el.querySelector('#tg').value, +el.querySelector('#as').value, el.querySelector('#us').value); };
+    draw();
+    clearInterval(el._sa); el._sa = setInterval(async () => { if (!el.isConnected) return clearInterval(el._sa); try { await build(); draw(); } catch (e) {} }, 60000);
   }
   return { mount };
 })();
