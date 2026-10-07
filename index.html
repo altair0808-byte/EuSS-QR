@@ -141,6 +141,12 @@ body{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-ri
 .t1.on{background:oklch(.975 .025 55);border-color:oklch(.69 .17 48)}.t1.on i{background:oklch(.69 .17 48);animation:tp 1.6s infinite}
 .t1 em{position:absolute;left:0;bottom:0;height:.2rem;background:oklch(.69 .17 48)}
 @keyframes tp{50%{opacity:.35}}
+.t1 .dm{position:relative;display:grid;place-items:center;width:2.9rem;aspect-ratio:1;margin:.15rem 0 .25rem;border:.28rem solid var(--sec);border-radius:99px;background:var(--mut);box-shadow:inset 0 0 0 1px var(--bd)}
+.t1 .dm b{font-size:1.05rem}
+.t1.on .dm{animation:bsh .35s linear infinite;border-color:color-mix(in oklab,var(--pri) 28%,#fff);background:color-mix(in oklab,var(--pri) 7%,#fff);color:var(--pri)}
+.t1.on .dm::after{content:"";position:absolute;inset:-.28rem;border:.14rem solid transparent;border-top-color:var(--pri);border-radius:99px;animation:sp 3.2s linear infinite}
+@media(prefers-reduced-motion:reduce){.t1.on .dm,.t1.on .dm::after,.t1.on i{animation:none}}
+
 @media(min-width:768px){.ag{grid-template-columns:repeat(4,1fr)}}
 </style></head>
 <body><div id="app"><p class="hint" style="padding:1rem">Загрузка…</p></div>
@@ -279,7 +285,7 @@ function dashView(){
   ${(()=>{const M=metrics(ms);return leftoverBlock()+M.blocks.map(b=>`<section aria-label="${esc(b.title)}"><p class="gl">${esc(b.title)}</p><div class="mg">${b.cards.map(([l,v,u,n,c])=>`<article class="m ${c}"><p class="l">${l}</p><p class="v">${v} ${u?`<small>${u}</small>`:''}</p><p class="n">${n}</p></article>`).join('')}</div></section>`).join('')+`<p class="hint" style="margin:.75rem 0 0">Всего по двум дозаторам: ${fmt(M.total.n)} стирок · ${fmt(M.total.kg)} кг</p>`;})()}
   <section><div class="sh"><div><h2>Стиральные машины</h2><p>Нажмите на машину, чтобы открыть запись</p></div>
    <div class="tabs" role="tablist">${T.map(([id,l])=>`<button role="tab" aria-selected="${tab===id}" data-t="${id}">${l}</button>`).join('')}</div></div>
-   <div class="mt">${vis.map(m=>{const on=m.status==='working',pr=on&&m.w?.minutes?Math.min(100,Math.max(0,(1-m.left/m.w.minutes)*100)):0;return `<button class="t1 ${on?'on':''}" data-m="${m.id}" aria-label="Машина ${m.id}: ${on?'стирка, осталось '+m.left+' мин':'свободна'}"><i></i><b>${hh(m.id)}</b><small>${on?m.left+' мин':'свободна'}</small>${on?`<em style="width:${pr.toFixed(0)}%"></em>`:''}</button>`;}).join('')}</div></section>
+   <div class="mt">${vis.map(m=>{const on=m.status==='working',pr=on&&m.w?.minutes?Math.min(100,Math.max(0,(1-m.left/m.w.minutes)*100)):0;return `<button class="t1 ${on?'on':''}" data-m="${m.id}" aria-label="Машина ${m.id}: ${on?'стирка, осталось '+m.left+' мин':'свободна'}"><i></i><span class="dm"><b>${hh(m.id)}</b></span><small>${on?m.left+' мин':'свободна'}</small>${on?`<em style="width:${pr.toFixed(0)}%"></em>`:''}</button>`;}).join('')}</div></section>
   ${acts.length?`<section aria-label="Разделы сайта">${[['Записи смены',0],['Отчёты и журнал',1],['Администрирование',2]].map(([t,g],k,all)=>{const l=acts.filter(a=>a[5]===g);return l.length?`<p class="gl">${t}</p><div class="qg" style="margin-top:.25rem;padding-bottom:.5rem">${l.map(a=>`<a class="qa ${a[4]||''}" href="${a[3]}"><span class="qi">${a[0]}</span><span><b>${esc(a[1])}</b><small>${esc(a[2])}</small></span><span>→</span></a>`).join('')}</div>`:''}).join('')}</section>`
    :'<p class="hint">Вам пока не выдан доступ ни к одному бланку. Обратитесь к суперадмину.</p>'}
   </main><div id="ovl"></div>`;
