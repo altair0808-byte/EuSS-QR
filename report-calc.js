@@ -3,7 +3,7 @@
 // то ёмкость, которая сейчас закончилась, была не полной бутылью, а именно этим остатком (его объём и есть «ёмкость»).
 // Замены и подключения идут по времени; подключение относится к ближайшей следующей замене той же химии и того же дозатора.
 // Для периода нужны замены и подключения с запасом назад (60 дней), чтобы подключение из прошлого периода не потерялось.
-function chemUsed(refs, changes, connects) {
+function chemUsed(refs, changes, connects, moves) {
   const used = {}, noLeft = {};
   const dens = c => (+c.bottle_l > 0 && +c.bottle_kg > 0) ? +c.bottle_kg / +c.bottle_l : null;
   const conv = (c, v, from, to) => { if (from === to) return v; const d = dens(c); if (!d) return null; return from === 'l' ? v * d : v / d; };
@@ -22,15 +22,17 @@ function chemUsed(refs, changes, connects) {
       const ev = [];
       (changes || []).filter(x => +x.chemical_id === +c.id && (x.machine_group || '1_10') === g).forEach(x => ev.push({ k: 0, t: T(x), x }));
       (connects || []).filter(x => +x.chemical_id === +c.id && (x.machine_group || '1_10') === g).forEach(x => ev.push({ k: 1, t: T(x), x }));
-      ev.sort((a, b) => a.t - b.t || a.k - b.k);            // при равном времени сначала замена, потом подключение
-      let pending = 0;
+      (moves || []).filter(x => +x.chemical_id === +c.id && (x.machine_group || '1_10') === g).forEach(x => ev.push({ k: -1, t: T(x), x }));
+      ev.sort((a, b) => a.t - b.t || a.k - b.k);            // при равном времени сначала перемещение, потом замена, потом подключение
+      let pending = 0, adj = 0;                              // adj: забрали (−) и залили (+) в дозатор с момента прошлой замены
       ev.forEach(e => {
+        if (e.k === -1) { const a = amt(e.x); if (a > 0) adj += e.x.kind === 'take' ? -a : a; return; }
         if (e.k === 1) { const a = amt(e.x); if (a > 0) pending += a; return; }
         let left = leftOf(e.x);
         if (left == null || !isFinite(left)) { noLeft[e.x.id] = true; left = 0; }
-        const cap = pending > 0 ? pending : size;
+        const cap = Math.max(0, (pending > 0 ? pending : size) + adj);   // забранное не расход, залитое — не «лишний» расход
         used[e.x.id] = cap - Math.max(0, Math.min(cap, left));
-        pending = 0;
+        pending = 0; adj = 0;
       });
     });
   });
@@ -43,9 +45,9 @@ function addDaysISO(d, n) { const t = new Date(d + 'T00:00:00Z'); t.setUTCDate(t
 // connects: подключения остатка (report_connects). Они уменьшают факт: подключённый остаток уже был посчитан
 // как «не израсходованный» при замене, а следующая замена посчитает всю бутыль целиком.
 // ctx (необязательно): { changes, connects } с запасом назад по времени, чтобы подключения из прошлого периода учитывались.
-function calcReport(loads, changes, refs, connects, ctx) {
-  connects = connects || [];
-  const U = chemUsed(refs, ctx ? ctx.changes : changes, ctx ? ctx.connects : connects).used;
+function calcReport(loads, changes, refs, connects, ctx, moves) {
+  connects = connects || []; moves = moves || [];
+  const U = chemUsed(refs, ctx ? ctx.changes : changes, ctx ? ctx.connects : connects, ctx && ctx.moves ? ctx.moves : moves).used;
   const { water, washTypes, chemicals, recipes } = refs;
   const GROUPS = ['1_10','11_12'];
   const groupOfMachine = m => (+m <= 10 ? '1_10' : '11_12');
@@ -104,7 +106,7 @@ function calcReport(loads, changes, refs, connects, ctx) {
       const tu = c.kind === 'extra' && c.per_unit_unit === 'g' ? 'kg' : 'l';
       const theory = both(c, groups[groupKey].chem[c.id] || 0, tu);
       const mine = changes.filter(x => x.chemical_id === c.id && (groupKey === 'all' || (x.machine_group || '1_10') === groupKey));
-      let actual=null, noLeft=0, diff=null, pct=null, stock=null, connected=null, adj=0;
+      let took=null, put=null, actual=null, noLeft=0, diff=null, pct=null, stock=null, connected=null, adj=0;
       const leftOf = x => prim==='l'
         ? (x.leftover_l != null ? +x.leftover_l : x.leftover_kg != null ? conv(c,+x.leftover_kg,'kg','l') : null)
         : (x.leftover_kg != null ? +x.leftover_kg : x.leftover_l != null ? conv(c,+x.leftover_l,'l','kg') : null);
@@ -124,12 +126,18 @@ function calcReport(loads, changes, refs, connects, ctx) {
           if(a==null||!(a>0))return;
           conn += a;
         });
-        actual=both(c,sum,prim);
+        let tk=0,pr=0;
+        moves.filter(x => +x.chemical_id === +c.id && (groupKey === 'all' || (x.machine_group || '1_10') === groupKey)).forEach(x=>{
+          const a = prim==='l' ? (x.amount_l != null ? +x.amount_l : x.amount_kg != null ? conv(c,+x.amount_kg,'kg','l') : null) : (x.amount_kg != null ? +x.amount_kg : x.amount_l != null ? conv(c,+x.amount_l,'l','kg') : null);
+          if(a>0){ if(x.kind==='take') tk+=a; else pr+=a; }
+        });
+        st = Math.max(0, st + tk - pr);                         // забрали из дозатора — прибавилось в запас, залили — убавилось
+        actual=both(c,sum,prim); took=both(c,tk,prim); put=both(c,pr,prim);
         stock=both(c,st,prim); connected=both(c,conn,prim);
         const theoryPrim=prim==='l'?theory.l:theory.kg;
         if(theoryPrim!=null){diff=sum-theoryPrim;pct=theoryPrim>0?diff/theoryPrim*100:null;}
       }
-      return {id:c.id,name:c.name,kind:c.kind,prim,size,theory,actual,changes:mine.length,noLeft,diff,pct,stock,connected,adj};
+      return {id:c.id,name:c.name,kind:c.kind,prim,size,theory,actual,took,put,changes:mine.length,noLeft,diff,pct,stock,connected,adj};
     });
   }
 

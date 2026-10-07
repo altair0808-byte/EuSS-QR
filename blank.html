@@ -63,7 +63,7 @@ details.det{margin-top:.75rem}
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="config.js"></script><script src="app.js"></script><script src="report-calc.js"></script><script src="blanc.js"></script>
+<script src="config.js"></script><script src="app.js"></script><script src="report-calc.js"></script><script src="blanc.js"></script><script src="storage-anim.js"></script>
 <script>
 let refs = null, tz = 5, st = 6, seq = 0;
 const shiftToday = () => new Date(Date.now() + (tz - st) * 3600e3).toISOString().slice(0, 10);
@@ -190,7 +190,7 @@ function view(m, data) {
     ${tabBar('day', [['mach', 'Машины'], ['type', 'Виды стирки'], ['chem', 'Химия'], ['blk', 'Бланк как в Excel']])}
     <section class="pn2" data-p="day:mach"><p class="hint">Задействовано машин: ${used} из 12. Дозаторы 1–10 и 11–12 считаются отдельно.</p>${machTable(ms, ck.overlapMachines)}</section>
     <section class="pn2" data-p="day:type">${typesTable(data)}</section>
-    <section class="pn2" data-p="day:chem">${chemBlock([m])}${chemByType([m])}</section>
+    <section class="pn2" data-p="day:chem">${chemBlock([m])}${chemByType([m])}<h3 style="margin:1rem 0 .25rem">Хранилище химии за смену</h3><div id="stg"></div></section>
     <section class="pn2" data-p="day:blk"><p class="hint">Вес каждой стирки по машинам: так же, как в листе дня Excel.</p><div class="blkwrap box" style="margin-top:0">${Blank.html(m)}</div></section>`;
 }
 
@@ -278,6 +278,7 @@ async function showDay() {
     const data = await loads(date, date);
     if (my !== seq) return;
     $('#out').innerHTML = view(Blank.build(data, refs, date), data); applyTabs();
+    if ($('#stg')) StorageAnim.mount($('#stg'), { refs, date, st, tz, toast, can: true }).catch(() => { $('#stg').innerHTML = '<p class="hint">Хранилище появится после выполнения stage10.sql.</p>'; });
   } catch (e) {
     $('#out').innerHTML = '<p class="err">Не удалось загрузить данные. Проверьте, что выполнены report.sql и stage2.sql.</p>';
   }
