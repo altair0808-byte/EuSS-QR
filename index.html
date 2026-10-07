@@ -194,11 +194,11 @@ function metrics(ms){
 const canConnect=()=>S.isSuper||S.forms.some(f=>f.type==='laundry_chem'&&canFill(f));
 function leftoverBlock(){
   if(S.pool==null)return S.poolErr?'<p class="hint" style="margin:1rem 0 0">Остатки химии появятся после выполнения stage6.sql.</p>':'';
-  return `<section aria-label="Остатки химии"><p class="gl" style="color:var(--chd)">Остатки химии · в запасе</p><div id="lov">${Leftover.html(S.pool,S.refs.chemicals,S.names,{can:canConnect(),today:shiftDate()})}</div></section>`;
+  return `<section aria-label="Остатки химии"><p class="gl" style="color:var(--chd)">Остатки химии · в запасе</p><div id="lov">${Leftover.html(S.pool,S.refs.chemicals,S.names,{can:canConnect(),canWriteoff:S.isSuper,today:shiftDate()})}</div></section>`;
 }
 function bindLeftover(){
   const el=document.getElementById('lov');if(!el||S.pool==null)return;
-  Leftover.bind(el,S.pool,S.refs.chemicals,S.names,{can:canConnect(),today:shiftDate()},async()=>{await loadLoads();dashView();});
+  Leftover.bind(el,S.pool,S.refs.chemicals,S.names,{can:canConnect(),canWriteoff:S.isSuper,today:shiftDate()},async()=>{await loadLoads();dashView();});
 }
 function feedBlock(){
   const hhmm=ts=>new Date(new Date(ts).getTime()+S.tz*3600e3).toISOString().slice(11,16);

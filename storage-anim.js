@@ -33,7 +33,7 @@ const StorageAnim = (() => {
       const x = e.x, gi = G.indexOf(x.machine_group || '1_10');
       if (e.k === 'L') { const g = +x.machine <= 10 ? 0 : 1; D.chems.forEach((c, i) => { const d = water * (rec[x.wash_type_id + ':' + c.id] || 0) / 1000; if (!d || S.lvl[i][g] == null) return; const u = Math.min(d, Math.max(0, S.lvl[i][g])); S.lvl[i][g] -= u; if (day) S.cons[i][g] += u; }); return; }
       const i = ix(x.chemical_id); if (i < 0) return;
-      if (e.k === 'C') { S.lvl[i][gi] = S.pend[i][gi] > 0 ? S.pend[i][gi] : +D.chems[i].bottle_l; S.pend[i][gi] = 0; S.stock[i] += Math.max(0, +x.leftover_l || 0); if (day) { S.bot[i][gi]++; S.flash['b' + i + gi] = 1; } }
+      if (e.k === 'C') { S.lvl[i][gi] = S.pend[i][gi] > 0 ? S.pend[i][gi] : +D.chems[i].bottle_l; S.pend[i][gi] = 0; S.stock[i] += x.written_off_at ? 0 : Math.max(0, +x.leftover_l || 0); if (day) { S.bot[i][gi]++; S.flash['b' + i + gi] = 1; } }
       else if (e.k === 'K') { S.pend[i][gi] += a(x); S.stock[i] = Math.max(0, S.stock[i] - a(x)); }
       else { const t = x.kind === 'take'; if (S.lvl[i][gi] == null) S.lvl[i][gi] = +D.chems[i].bottle_l; S.lvl[i][gi] = Math.max(0, S.lvl[i][gi] + (t ? -a(x) : a(x))); S.stock[i] = Math.max(0, S.stock[i] + (t ? a(x) : -a(x))); if (day) { (t ? S.took : S.put)[i][gi] += a(x); S.flash[(t ? 't' : 'p') + i + gi] = 1; } }
     };

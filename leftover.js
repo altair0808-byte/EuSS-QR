@@ -58,6 +58,11 @@ const Leftover = (() => {
 .lo-l li{display:flex;justify-content:space-between;gap:.5rem}.lo-l em{font-style:normal;color:var(--mu);text-align:right;font-size:.75rem}
 .lo-b{display:flex;align-items:center;justify-content:center;width:100%;min-height:2.9rem;margin-top:.7rem;border:0;border-radius:.5rem;background:var(--o);color:#fff;font:inherit;font-weight:700;font-size:.9rem;cursor:pointer;touch-action:manipulation}
 .lo-b:active{transform:scale(.98)}.lo-b:disabled{opacity:.5}
+.lo-b2{display:flex;align-items:center;justify-content:center;width:100%;min-height:2.5rem;margin-top:.4rem;border:1px solid var(--ln);border-radius:.5rem;background:#fff;color:#b42318;font:inherit;font-weight:600;font-size:.82rem;cursor:pointer;touch-action:manipulation}
+.lo-b2:active{transform:scale(.98)}
+.lo-ck{display:grid;gap:.4rem;margin-top:.9rem}.lo-ck label{display:flex;align-items:center;gap:.6rem;min-height:2.75rem;padding:.4rem .7rem;border:1px solid var(--ln,#d6e3e6);border-radius:.5rem;font-size:.88rem;cursor:pointer}
+.lo-ck input{width:1.15rem;height:1.15rem;flex:none}.lo-ck em{font-style:normal;margin-left:auto;font-size:.75rem;color:var(--mut,var(--mf,#566));text-align:right}
+.lo-go.dg{background:#b42318}
 .lo-e{padding:.8rem .9rem;border:1px dashed var(--ln);border-radius:.5rem;font-size:.85rem;color:var(--mu)}
 .lo-ov{position:fixed;inset:0;z-index:80;display:flex;align-items:flex-end;justify-content:center;background:rgb(10 40 55/.3)}
 .lo-pn{--o:oklch(.66 .16 48);--od:oklch(.52 .15 48);width:100%;max-width:28rem;max-height:92dvh;overflow:auto;overscroll-behavior:contain;padding:1.25rem 1.25rem calc(1.25rem + env(safe-area-inset-bottom));border-radius:1rem 1rem 0 0;background:#fff;color:var(--ink,var(--fg,#123));box-shadow:0 20px 50px rgb(0 0 0/.25)}
@@ -82,12 +87,42 @@ const Leftover = (() => {
       <div class="lo-top">${thumb(s.c)}<div class="lo-nm"><b>${E(s.c.name)}</b><small>${s.items.length} ${s.items.length % 10 === 1 && s.items.length !== 11 ? 'остаток' : 'остатка'} в запасе</small></div>
         <div class="lo-tot"><b>${N(s.total)} ${U(s.p)}</b>${s.other != null ? `<small>≈ ${N(s.other)} ${s.p === 'l' ? 'кг' : 'л'}</small>` : ''}</div></div>
       <ul class="lo-l">${s.items.map(x => `<li><span>${N(x.amt)} ${U(s.p)}</span><em>${dayLabel(x.shift_date, o.today)}${names[x.created_by] ? ' · ' + E(names[x.created_by]) : ''} · дозатор ${grpName(x.machine_group)}</em></li>`).join('')}</ul>
-      ${o.can ? `<button class="lo-b" data-lo="${s.c.id}">Подключили остаток</button>` : ''}</article>`).join('')}</div>`;
+      ${o.can ? `<button class="lo-b" data-lo="${s.c.id}">Подключили остаток</button>` : ''}
+      ${o.canWriteoff ? `<button class="lo-b2" data-lw="${s.c.id}">Списать остаток</button>` : ''}</article>`).join('')}</div>`;
   }
 
   function bind(root, rows, chems, names, o, onDone) {
     const sum = summary(rows, chems);
     root.querySelectorAll('[data-lo]').forEach(b => b.onclick = () => panel(sum.find(s => String(s.c.id) === b.dataset.lo), o, onDone));
+    root.querySelectorAll('[data-lw]').forEach(b => b.onclick = () => writeoffPanel(sum.find(s => String(s.c.id) === b.dataset.lw), names, o, onDone));
+  }
+
+  // Списание остатка (суперадмин). Списанное пропадает из запаса и нигде не показывается в истории, журнале и отчёте.
+  function writeoffPanel(s, names, o, onDone) {
+    if (!s) return;
+    css();
+    const d = document.createElement('div'); d.className = 'lo-ov';
+    d.innerHTML = `<section class="lo-pn" role="dialog" aria-modal="true" aria-label="Списать остаток">
+      <p class="k" style="color:#b42318">Списать остаток</p><h2>${E(s.c.name)} · ${N(s.total)} ${U(s.p)}</h2>
+      <p>Отметьте, что списать. Списанное пропадёт из запаса и не будет показано в истории и отчётах. Расход за период не изменится.</p>
+      <div class="lo-ck" id="lwck">${s.items.map(x => `<label><input type="checkbox" value="${E(x.id)}" data-a="${x.amt}" checked><span>${N(x.amt)} ${U(s.p)}</span><em>${dayLabel(x.shift_date, o.today)}${names[x.created_by] ? ' · ' + E(names[x.created_by]) : ''} · дозатор ${grpName(x.machine_group)}</em></label>`).join('')}</div>
+      <button class="lo-go dg" id="lwgo" type="button">Списать</button><button class="lo-gh" id="lwcl" type="button" style="color:#566">Отмена</button></section>`;
+    document.body.appendChild(d);
+    const close = () => { d.remove(); document.removeEventListener('keydown', esc); };
+    const esc = e => { if (e.key === 'Escape' && !document.querySelector('form[role=dialog]')) close(); };
+    document.addEventListener('keydown', esc);
+    d.onmousedown = e => { if (e.target === d) close(); };
+    d.querySelector('#lwcl').onclick = close;
+    const sel = () => [...d.querySelectorAll('#lwck input:checked')];
+    const upd = () => { const a = sel().reduce((t, i) => t + (+i.dataset.a || 0), 0); const b = d.querySelector('#lwgo'); b.disabled = !sel().length; b.textContent = sel().length ? 'Списать ' + N(a) + ' ' + U(s.p) : 'Ничего не выбрано'; };
+    d.querySelector('#lwck').onchange = upd; upd();
+    d.querySelector('#lwgo').onclick = async () => {
+      const ids = sel().map(i => i.value); if (!ids.length) return;
+      const a = sel().reduce((t, i) => t + (+i.dataset.a || 0), 0);
+      const ok = await withPw('Списать ' + N(a) + ' ' + U(s.p) + '?', s.c.name + '\nСписанное не будет отображаться в истории.', pw => rpcAsk('writeoff_leftovers', { p_chemical: +s.c.id, p_ids: ids, p_pw: pw }));
+      if (!ok) return;
+      close(); toast('Списано: ' + s.c.name); if (onDone) onDone();
+    };
   }
 
   function panel(s, o, onDone) {
@@ -118,5 +153,5 @@ const Leftover = (() => {
     };
   }
 
-  return { fetch, summary, html, bind, panel, css, N, U, grpName, dayLabel };
+  return { fetch, summary, html, bind, panel, writeoffPanel, css, N, U, grpName, dayLabel };
 })();

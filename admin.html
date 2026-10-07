@@ -15,7 +15,10 @@
   <button class="go" id="mk">Создать сотрудника</button>
 </div>
 <div id="made" class="box" hidden></div>
-<h2>Все пользователи</h2><div id="list"></div>
+<h2>Все аккаунты <small id="cnt" style="font-weight:500"></small></h2>
+<p class="hint" id="warn" hidden></p>
+<label>Поиск<input id="q" type="search" placeholder="Имя или логин" autocomplete="off"></label>
+<div id="list"></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script><script src="app.js"></script>
@@ -31,23 +34,51 @@ async function call(b) {
   return data;
 }
 
+const RANK = { admin: 3, foreman: 2, worker: 1 };
+const summary = roles => { const r = roles.filter(Boolean).sort((a, b) => RANK[b] - RANK[a]); return r.length ? R[r[0]] : 'Нет доступа'; };
+const when = ts => ts ? new Date(ts).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'ещё не входил';
+// быстрые роли: какой доступ выдать на каждый бланк. Точная настройка по бланкам остаётся в списках ниже
+const PRESETS = { none: 'Без доступа', worker: 'Сотрудник', foreman: 'Бригадир', admin: 'Админ' };
+const presetRole = (p, f) => p === 'admin' ? 'admin' : p === 'foreman' ? (f.type === 'laundry_chem' ? 'foreman' : 'worker') : p === 'worker' ? (f.type === 'laundry_chem' ? '' : 'worker') : '';
+let accounts = [];
+
+async function accountsList() {
+  const r = await sb.rpc('list_accounts');
+  if (!r.error) { $('#warn').hidden = true; return (r.data || []).map(a => ({ id: a.acc_id, email: a.acc_email, name: a.acc_name, last: a.acc_last, sup: a.acc_super })); }
+  // stage11.sql ещё не выполнен: показываем только тех, кто есть в таблице people
+  $('#warn').hidden = false; $('#warn').textContent = 'Чтобы видеть все аккаунты и время входа, выполните stage11.sql в Supabase. Сейчас показаны только созданные через эту страницу.';
+  const [{ data: ppl }, { data: sup }] = await Promise.all([sb.from('people').select('*').order('created_at'), sb.from('profiles').select('id').eq('role', 'superadmin')]);
+  return (ppl || []).map(p => ({ id: p.id, email: p.email, name: p.full_name, last: null, sup: (sup || []).some(x => x.id === p.id) }));
+}
+
 async function load() {
-  const [{ data: f }, { data: ppl }, { data: acc }, { data: sup }] = await Promise.all([
-    sb.from('forms').select('id,name').eq('archived', false).order('sort_order'),
-    sb.from('people').select('*').order('created_at'),
+  const [{ data: f }, acc, list] = await Promise.all([
+    sb.from('forms').select('id,name,type').eq('archived', false).order('sort_order'),
     sb.from('form_access').select('*'),
-    sb.from('profiles').select('id').eq('role', 'superadmin')
+    accountsList()
   ]);
-  forms = f || [];
-  $('#fa').innerHTML = forms.map(x => `<div class="acc"><span>${x.name}</span><select data-f="${x.id}">${opts('')}</select></div>`).join('');
-  $('#list').innerHTML = (ppl || []).map(p => {
-    const isS = (sup || []).some(s => s.id === p.id);
-    return `<div class="box" data-u="${p.id}"><b>${p.full_name || showLogin(p.email)}</b> <small>${p.full_name ? 'логин: ' + showLogin(p.email) : ''}</small>` + (isS ? ' <small>(суперадмин)</small><div class="row"><button class="mini" data-act="nm">Имя</button><button class="mini" data-act="pw">Новый пароль</button></div></div>' :
-      forms.map(x => { const a = (acc || []).find(r => r.user_id === p.id && r.form_id === x.id);
-        return `<div class="acc"><span>${x.name}</span><select data-f="${x.id}">${opts(a ? a.role : '')}</select></div>`; }).join('') +
+  forms = f || []; accounts = list;
+  $('#fa').innerHTML = forms.map(x => `<div class="acc"><span>${esc(x.name)}</span><select data-f="${x.id}">${opts('')}</select></div>`).join('');
+  let noAccess = 0;
+  $('#list').innerHTML = accounts.map(p => {
+    const mine = forms.map(x => { const a = (acc.data || []).find(r => r.user_id === p.id && r.form_id === x.id); return { x, role: a ? a.role : '' }; });
+    const tag = p.sup ? 'Суперадмин' : summary(mine.map(m => m.role));
+    if (!p.sup && tag === 'Нет доступа') noAccess++;
+    const login = showLogin(p.email);
+    return `<div class="box" data-u="${p.id}" data-s="${esc((p.name || '') + ' ' + login).toLowerCase()}">
+      <b>${esc(p.name || login)}</b> <small>${p.name ? 'логин: ' + esc(login) + ' · ' : ''}вход: ${when(p.last)}</small>
+      <div><span class="tg ld rt" style="margin-top:.4rem">${tag}</span></div>` +
+      (p.sup ? '<div class="row"><button class="mini" data-act="nm">Имя</button><button class="mini" data-act="pw">Новый пароль</button></div></div>' :
+      `<h3 style="margin-top:.9rem">Быстрая роль на все бланки</h3><div class="row">${Object.entries(PRESETS).map(([k, t]) => `<button class="mini" data-act="pre" data-p="${k}">${t}</button>`).join('')}</div>
+      <h3>Доступ по бланкам</h3>` +
+      mine.map(m => `<div class="acc"><span>${esc(m.x.name)}</span><select data-f="${m.x.id}">${opts(m.role)}</select></div>`).join('') +
       `<div class="row"><button class="mini" data-act="nm">Имя</button><button class="mini" data-act="pw">Новый пароль</button><button class="mini danger" data-act="del">Удалить</button></div></div>`);
   }).join('');
+  $('#cnt').textContent = `· ${accounts.length}` + (noAccess ? `, без доступа: ${noAccess}` : '');
+  $('#q').oninput();
 }
+
+$('#q').oninput = () => { const v = $('#q').value.trim().toLowerCase(); document.querySelectorAll('#list [data-u]').forEach(b => b.style.display = v && !b.dataset.s.includes(v) ? 'none' : ''); };
 
 $('#gen').onclick = () => {
   const c = 'abcdefghjkmnpqrstuvwxyz23456789', a = crypto.getRandomValues(new Uint8Array(8));
@@ -66,19 +97,33 @@ $('#mk').onclick = async () => {
   load();
 };
 
+const refreshTag = box => { const t = box.querySelector('.rt'); if (t) t.textContent = summary([...box.querySelectorAll('select')].map(x => x.value)); };
+
 $('#list').onchange = async e => {
   const s = e.target.closest('select'); if (!s) return;
-  const u = s.closest('[data-u]').dataset.u;
+  const box = s.closest('[data-u]'), u = box.dataset.u;
   const { error } = s.value
     ? await sb.from('form_access').upsert({ user_id: u, form_id: s.dataset.f, role: s.value })
     : await sb.from('form_access').delete().eq('user_id', u).eq('form_id', s.dataset.f);
+  if (!error) refreshTag(box);
   toast(error ? 'Не сохранено' : 'Сохранено');
 };
 
 $('#list').onclick = async e => {
   const b = e.target.closest('button'); if (!b) return;
-  const u = b.closest('[data-u]').dataset.u;
-  if (b.dataset.act === 'nm') {
+  const box = b.closest('[data-u]'), u = box.dataset.u;
+  if (b.dataset.act === 'pre') {
+    const p = b.dataset.p, who = box.querySelector('b').textContent;
+    if (p === 'admin' && !confirm('Выдать «Админ» на все бланки: ' + who + '?\nАдмин может исправлять и удалять записи сотрудников (с паролем).')) return;
+    let err = null;
+    for (const f of forms) {
+      const role = presetRole(p, f);
+      const r = role ? await sb.from('form_access').upsert({ user_id: u, form_id: f.id, role }) : await sb.from('form_access').delete().eq('user_id', u).eq('form_id', f.id);
+      err = err || r.error;
+      const sel = box.querySelector(`select[data-f="${f.id}"]`); if (sel) sel.value = role;
+    }
+    refreshTag(box); toast(err ? 'Сохранено не полностью' : 'Роль: ' + PRESETS[p]);
+  } else if (b.dataset.act === 'nm') {
     const name = prompt('Фамилия Имя'); if (name === null) return;
     const { error } = await sb.from('people').update({ full_name: name.trim() || null }).eq('id', u);
     toast(error ? 'Не сохранено' : 'Сохранено'); load();

@@ -116,7 +116,7 @@ function calcReport(loads, changes, refs, connects, ctx, moves) {
           let left = leftOf(x);
           if(left==null){noLeft++;left=0;}
           sum += U[x.id] != null ? U[x.id] : size - Math.max(0,Math.min(size,left));
-          if(!x.connect_id && left>0) st += Math.min(size,left);          // остаток лежит в запасе, ещё не подключён
+          if(!x.connect_id && !x.written_off_at && left>0) st += Math.min(size,left);   // остаток лежит в запасе: не подключён и не списан
         });
         let conn=0;
         connects.filter(x => +x.chemical_id === +c.id && (groupKey === 'all' || (x.machine_group || '1_10') === groupKey)).forEach(x=>{
