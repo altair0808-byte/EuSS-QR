@@ -53,11 +53,11 @@ async function show(){
   const d1=$('#d1').value,d2=$('#d2').value,my=++seq;
   if(!d1||!d2||d1>d2){$('#out').innerHTML='<p class="hint">Укажите период: дата «с» не позже даты «по».</p>';return;}
   $('#rng').textContent=`Смена начинается в ${String(st).padStart(2,'0')}:00 и длится сутки. Расход считается отдельно по двум дозаторам.`;
-  const [{data,error},{data:chg,error:e2},{data:cn,error:e3},sn]=await Promise.all([sb.rpc('report_loads',{d1,d2}),sb.rpc('report_changes',{d1:addDaysISO(d1,-60),d2}),sb.rpc('report_connects',{d1:addDaysISO(d1,-60),d2}),sb.rpc('staff_names')]);
+  const [{data,error},{data:chg,error:e2},{data:cn,error:e3},sn,{data:lv}]=await Promise.all([sb.rpc('report_loads',{d1,d2}),sb.rpc('report_changes',{d1:addDaysISO(d1,-60),d2}),sb.rpc('report_connects',{d1:addDaysISO(d1,-60),d2}),sb.rpc('staff_names'),sb.rpc('report_levels',{d1:addDaysISO(d1,-60),d2})]);   // report_levels появится после stage12.sql; без него просто пусто
   if(my!==seq)return;
-  if(error||e2||e3){$('#out').innerHTML='<p class="err">Не удалось загрузить данные. Выполните supabase.sql, затем stage3.sql … stage11.sql.</p>';return;}
+  if(error||e2||e3){$('#out').innerHTML='<p class="err">Не удалось загрузить данные. Выполните supabase.sql, затем stage3.sql … stage12.sql.</p>';return;}
   nm=Object.fromEntries(((sn&&sn.data)||[]).map(x=>[x.id,x.name]));
-  const loads=data||[],chgAll=chg||[],cnAll=cn||[],changes=chgAll.filter(x=>x.shift_date>=d1),conns=cnAll.filter(x=>x.shift_date>=d1),r=calcReport(loads,changes,refs,conns,{changes:chgAll,connects:cnAll});
+  const loads=data||[],chgAll=chg||[],cnAll=cn||[],changes=chgAll.filter(x=>x.shift_date>=d1),conns=cnAll.filter(x=>x.shift_date>=d1),r=calcReport(loads,changes,refs,conns,{changes:chgAll,connects:cnAll,levels:lv||[]});
   cache={loads,changes,conns};
   $('#out').innerHTML=`
     <div class="kpi"><div><b>${r.total}</b><span>стирок всего</span></div><div><b>${f(r.kg,0)}</b><span>кг всего</span></div><div><b>${r.byPart.day}</b><span>день</span></div><div><b>${r.byPart.night}</b><span>ночь</span></div></div>

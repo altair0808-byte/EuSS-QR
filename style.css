@@ -333,3 +333,7 @@ body.k-chem{--ac:var(--ch);--ac-d:var(--ch-d);--tint:var(--ch-t);--soft:oklch(.9
 @media(min-width:640px){.cm .cmg{grid-template-columns:repeat(4,1fr)}}
 @media(max-width:639px){.top .btn{flex:1}.kpi{grid-template-columns:repeat(2,1fr)}main.wide{padding-left:.75rem;padding-right:.75rem}.box{padding:.85rem}.seg button{min-height:2.5rem}.op .act button{min-height:2.75rem}}
 .nav .btn.s{min-height:2.5rem}
+
+/* поле остатка: рядом сразу пересчёт в другую единицу (кг ↔ л) */
+.lfw{display:flex;align-items:center;gap:.6rem}.lfw input{flex:1;min-width:0}
+.cvo,.cv{flex:none;font-weight:700;color:var(--ac,#0a7);white-space:nowrap;font-size:.85rem}

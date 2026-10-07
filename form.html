@@ -156,7 +156,7 @@
   }
 
   // ---------- справочник химии: карточки с фото ----------
-  const fmt = n => (Math.round(n * 10) / 10).toLocaleString('ru-RU');
+  const fmt = n => (Math.round((+n || 0) * 100) / 100).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });   // всегда в сотых: 0,00
   const hue = s => { let h = 0; for (const ch of String(s)) h = (h * 31 + ch.charCodeAt(0)) % 360; return h; };
   const safeUrl = u => /^https?:\/\/\S+$/i.test(String(u || '').trim()) ? String(u).trim() : '';
   // картинка химиката; если ссылки нет или фото не загрузилось, видна цветная буква
@@ -173,7 +173,7 @@
       <label>Название<input id="cn" autocomplete="off" value="${esc(cur ? cur.name : '')}"></label>
       <label>Ссылка на фото<input id="ci" type="url" inputmode="url" autocomplete="off" placeholder="https://…" value="${esc(cur ? cur.image_url : '')}"></label>
       <p class="hint">Вставьте прямую ссылку на картинку (начинается с https://). Без фото будет цветная буква.</p>
-      <div class="acc"><label>1 бутыль = литров<input id="cl2" type="number" min="0" step="0.1" inputmode="decimal" value="${nv(cur && cur.bottle_l)}"></label><label>1 бутыль = кг<input id="ckg" type="number" min="0" step="0.1" inputmode="decimal" value="${nv(cur && cur.bottle_kg)}"></label></div>
+      <div class="acc"><label>1 бутыль = литров<input id="cl2" type="number" min="0" step="0.01" inputmode="decimal" value="${nv(cur && cur.bottle_l)}"></label><label>1 бутыль = кг<input id="ckg" type="number" min="0" step="0.01" inputmode="decimal" value="${nv(cur && cur.bottle_kg)}"></label></div>
       <button class="go" id="ok">${cur ? 'Сохранить' : 'Добавить химикат'}</button></section></div>`;
     const prev = () => { $('#pvw').innerHTML = `<div class="pvc">${chemImg({ name: $('#cn').value || '?', image_url: $('#ci').value }, 'pv')}</div>`; imgFallback($('#pvw')); };
     prev();
@@ -226,7 +226,7 @@
         <p class="hint">Сколько осталось в снятой бутыли. Остаток запишется вместе с заменой и попадёт в запас: он виден на панели смены, там же его отмечают подключённым.</p>
         <div class="seg" id="lm"><button data-v="empty" class="on">Бутыль пустая</button><button data-v="some">Остался остаток</button></div>
         <div id="lw" hidden><div class="seg" id="lu" aria-label="Единица"><button data-v="kg" class="on">кг</button><button data-v="l">литры</button></div>
-          <label>Остаток, <span id="lul">кг</span><input id="lf" type="number" min="0" step="0.1" inputmode="decimal"></label><div class="fill"><i id="fb"></i></div></div>
+          <label>Остаток, <span id="lul">кг</span><span class="lfw"><input id="lf" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0,00"><output id="lconv" class="cvo" aria-live="polite"></output></span></label><div class="fill"><i id="fb"></i></div></div>
         <p class="hint" id="lh"></p></div>
       ${lo.rows ? `<div class="box"><h2>Остатки в запасе</h2><p class="hint">Остаток из бутылей, которые сняли не пустыми. Когда подключите его к дозатору, нажмите «Подключили остаток».</p><div id="lov">${Leftover.html(lo.rows, chems, lo.names, { can: canConn, today: new Date(Date.now() + (tzH - stH) * 3600e3).toISOString().slice(0, 10) })}</div></div>` : ''}
       <div class="bar"><button class="go" id="save">Проверить и заменить</button>
@@ -238,6 +238,7 @@
     const cur = () => chems.find(x => String(x.id) === c);
     const sizeOf = x => x ? (unit === 'kg' ? +x.bottle_kg : +x.bottle_l) : 0;
     const U = () => unit === 'kg' ? 'кг' : 'л';
+    const cvt = n => { const x = cur(); if (!x || !(+x.bottle_l > 0 && +x.bottle_kg > 0)) return ''; return unit === 'kg' ? fmt(n * x.bottle_l / x.bottle_kg) + ' л' : fmt(n * x.bottle_kg / x.bottle_l) + ' кг'; };
     const hint = () => {
       const x = cur(), v = $('#lf').value, size = sizeOf(x); let t = 'Бутыль будет записана как пустая.', pct = 0;
       if (mode === 'some') {
@@ -248,13 +249,15 @@
           pct = Math.min(100, +v / size * 100);
           if (+v > size) t = `Больше, чем в полной бутыли (${size} ${U()}). Проверьте.`;
           else {
-            const other = unit === 'kg' ? (+x.bottle_l > 0 ? `≈ ${(+v * x.bottle_l / x.bottle_kg).toLocaleString('ru-RU', { maximumFractionDigits: 2 })} л · ` : '') : (+x.bottle_kg > 0 ? `≈ ${(+v * x.bottle_kg / x.bottle_l).toLocaleString('ru-RU', { maximumFractionDigits: 2 })} кг · ` : '');
+            const other = unit === 'kg' ? (+x.bottle_l > 0 ? `≈ ${fmt(+v * x.bottle_l / x.bottle_kg)} л · ` : '') : (+x.bottle_kg > 0 ? `≈ ${fmt(+v * x.bottle_kg / x.bottle_l)} кг · ` : '');
             t = other + `${Math.round(pct)}% полной бутыли`;
           }
         }
       }
       const stk = lo.rows && x ? Leftover.summary(lo.rows, chems).find(z => String(z.c.id) === String(x.id)) : null;
       if (stk) t += ` В запасе уже: ${Leftover.N(stk.total)} ${Leftover.U(stk.p)}.`;
+      const dn = x && +x.bottle_l > 0 && +x.bottle_kg > 0 ? +x.bottle_kg / +x.bottle_l : null, nv = parseFloat(String(v).replace(',', '.'));
+      $('#lconv').textContent = dn && v !== '' && isFinite(nv) ? '≈ ' + fmt(unit === 'kg' ? nv / dn : nv * dn) + (unit === 'kg' ? ' л' : ' кг') : '';   // сразу рядом: 1 кг → 0,97 л
       $('#lh').textContent = t; $('#fb').style.width = pct + '%'; $('#lul').textContent = unit === 'kg' ? 'кг' : 'литры';
     };
     $('#cg').onclick = e => {
@@ -272,7 +275,7 @@
     };
     pick('#lm', v => { mode = v; $('#lw').hidden = v === 'empty'; hint(); });
     pick('#lu', v => { unit = v; hint(); });
-    $('#lf').oninput = hint; hint();
+    $('#lf').oninput = hint; $('#lf').onblur = () => { const n = parseFloat(String($('#lf').value).replace(',', '.')); if (isFinite(n)) $('#lf').value = n.toFixed(2); hint(); }; hint();
     if ($('#addc')) $('#addc').onclick = () => chemPanel(chems, null, id => laundryChem(undefined, id, g));
     $('#save').onclick = () => {
       if (!g) { toast('Выберите дозатор'); return; }
@@ -284,7 +287,7 @@
       const gn = groups.find(r => r[0] === g).slice(1, 3).join(' · ');
       app.innerHTML = head + `<div class="box"><h2>Проверка замены</h2>
         <div class="acc"><span>Дозатор</span><b>${gn}</b></div><div class="acc"><span>Химия</span><b class="chrow">${chemImg(x, 'sm')}${esc(x.name)}</b></div>
-        <div class="acc"><span>Остаток</span><b>${lf === '' ? 'бутыль пустая' : esc(lf) + ' ' + U()}</b></div></div>
+        <div class="acc"><span>Остаток</span><b>${lf === '' ? 'бутыль пустая' : fmt(+lf) + ' ' + U() + (cvt(+lf) ? ' · ≈ ' + cvt(+lf) : '')}</b></div></div>
         <div class="bar"><button class="go" id="confirm">Все верно — записать замену</button><button class="ghost" id="back">Изменить</button></div>`;
       imgFallback(app);
       toTop();

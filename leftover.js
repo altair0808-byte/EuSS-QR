@@ -3,7 +3,7 @@
 // Нужны глобальные sb (supabase), toast; стили подключаются сами.
 const Leftover = (() => {
   const E = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  const N = (n, d = 1) => (Math.round(n * 10 ** d) / 10 ** d).toLocaleString('ru-RU');
+  const N = (n, d = 2) => (Math.round(n * 10 ** d) / 10 ** d).toLocaleString('ru-RU', { minimumFractionDigits: d, maximumFractionDigits: d });   // сотые: 0,00
   const prim = c => (+c.bottle_l > 0 ? 'l' : (+c.bottle_kg > 0 ? 'kg' : null));
   const dens = c => (+c.bottle_l > 0 && +c.bottle_kg > 0) ? +c.bottle_kg / +c.bottle_l : null;
   const conv = (c, v, from, to) => { if (from === to) return v; const d = dens(c); if (!d) return 0; return from === 'l' ? v * d : v / d; };

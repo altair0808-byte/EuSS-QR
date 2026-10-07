@@ -71,8 +71,8 @@ async function load() {
     `<div class="cb" data-c="${c.id}"><b class="chrow">${chemImg(c)}${esc(c.name)} <small>${c.kind === 'extra' ? 'дополнительная' : 'основная'}</small></b>
       <label>Название<input data-f="name" value="${esc(c.name)}" autocomplete="off"></label>
       <label>Ссылка на фото<input type="url" inputmode="url" data-f="image_url" placeholder="https://…" value="${esc(c.image_url)}" autocomplete="off"></label>
-      <div class="acc"><label>1 шт = литров<input type="number" min="0" step="0.1" inputmode="decimal" data-f="bottle_l" value="${nv(c.bottle_l)}"></label>
-      <label>1 шт = кг<input type="number" min="0" step="0.1" inputmode="decimal" data-f="bottle_kg" value="${nv(c.bottle_kg)}"></label></div>
+      <div class="acc"><label>1 шт = литров<input type="number" min="0" step="0.01" inputmode="decimal" data-f="bottle_l" value="${nv(c.bottle_l)}"></label>
+      <label>1 шт = кг<input type="number" min="0" step="0.01" inputmode="decimal" data-f="bottle_kg" value="${nv(c.bottle_kg)}"></label></div>
       ${c.kind === 'extra' ? `<div class="acc"><label>Расход на единицу<input type="number" min="0" step="1" inputmode="numeric" data-f="per_unit" value="${nv(c.per_unit)}"></label>
       <label>Расход измеряется в<select data-f="per_unit_unit"><option value="ml"${c.per_unit_unit === 'g' ? '' : ' selected'}>мл</option><option value="g"${c.per_unit_unit === 'g' ? ' selected' : ''}>г</option></select></label></div>` : ''}
     </div>`).join('') + '<button class="go" id="sc">Сохранить</button>';
