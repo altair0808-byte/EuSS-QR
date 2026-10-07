@@ -30,6 +30,8 @@ main{max-width:1440px;margin:0 auto;padding:1.25rem 1rem}
 .m .l{font-size:.7rem;font-weight:800;text-transform:uppercase;color:var(--mf);margin:0}
 .m .v{font-family:Sora,sans-serif;font-size:1.5rem;font-weight:700;margin:.25rem 0 0}.m .v small{font-size:.875rem;font-weight:600;color:var(--mf)}
 .m .n{font-size:.75rem;color:var(--mf);margin:.25rem 0 0}
+.mg3{display:grid;grid-template-columns:repeat(2,1fr);gap:.75rem}
+.m5{border-bottom-color:oklch(.6 .15 300)}.m6{border-bottom-color:oklch(.62 .17 25)}
 .m1{border-bottom-color:var(--pri)}.m2{border-bottom-color:var(--fg)}.m3{border-bottom-color:oklch(.72 .11 174)}.m4{border-bottom-color:oklch(.69 .17 48)}
 .sh{margin-top:1.5rem;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.75rem;margin-bottom:1rem}
 .sh h2{font-size:1.125rem}.sh p{margin:.15rem 0 0;font-size:.875rem;color:var(--mf)}
@@ -105,7 +107,7 @@ body{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-ri
 }
 
 @media(min-width:640px){main,.hd>div{padding-left:1.5rem;padding-right:1.5rem}.mgr{grid-template-columns:repeat(3,1fr)}.pn{border-radius:var(--r);margin:1rem}.top h1{font-size:1.875rem}}
-@media(min-width:768px){.mg{grid-template-columns:repeat(4,1fr)}.qg{grid-template-columns:1fr 1fr}}
+@media(min-width:768px){.mg3{grid-template-columns:repeat(3,1fr)}.mg{grid-template-columns:repeat(4,1fr)}.qg{grid-template-columns:1fr 1fr}}
 @media(min-width:900px){.mgr{grid-template-columns:repeat(4,1fr)}}
 @media(min-width:1180px){.mgr{grid-template-columns:repeat(6,1fr)}}
 @media(max-width:639px){.hide-s{display:none}}
@@ -196,6 +198,26 @@ function bindLeftover(){
   const el=document.getElementById('lov');if(!el||S.pool==null)return;
   Leftover.bind(el,S.pool,S.refs.chemicals,S.names,{can:canConnect(),canWriteoff:S.isSuper,today:shiftDate()},async()=>{await loadLoads();dashView();});
 }
+// ---------- общая статистика за смену (только админы) ----------
+function adminSummary(people){
+  const r=calcReport(S.loads,[],S.refs),a=r.groups.all;
+  const main=a.chem.filter(c=>c.kind==='main');
+  const chL=main.reduce((s,c)=>s+(c.theory?.l||0),0),chKg=main.reduce((s,c)=>s+(c.theory?.kg||0),0);
+  const work=machines().filter(m=>m.status==='working').length;
+  const has=Number.isFinite(people)&&people>0,per=v=>has?Num.fmt(v/people,2):'–';
+  const nPeople=people===undefined?'…':people==null?'не введено':fmt(people);
+  const cards=[
+    ['Стирок всего',fmt(r.total),'','за смену','m1'],
+    ['Вес всего',fmt(r.kg),'кг','за смену','m2'],
+    ['Химия всего',fmt(chL,1),'л','≈ '+fmt(chKg,1)+' кг · по рецептам','m3'],
+    ['В работе',work+' / 12','','машин сейчас','m4'],
+    ['Проживающих',nPeople,has?'чел.':'','введено в карточке ниже','m5'],
+    ['Вес на 1 жителя',per(r.kg),has?'кг':'',has?'стирок на жителя: '+per(r.total)+' · химии: '+Num.fmt(chL*1000/people,1)+' мл':'нужно число проживающих','m6']
+  ];
+  return `<section aria-label="Общая статистика"><p class="gl">Общая статистика за смену · видят только админы</p><div class="mg3">${cards.map(([l,v,u,n,c])=>`<article class="m ${c}"><p class="l">${l}</p><p class="v">${v} ${u?`<small>${u}</small>`:''}</p><p class="n">${n}</p></article>`).join('')}</div></section>`;
+}
+function drawSummary(){const el=document.getElementById('asum');if(el)el.innerHTML=adminSummary(Residents.get(shiftDate()));}
+
 function dashView(){
   const ms=machines(),em=showLogin(S.session.user.email),ini=em.slice(0,2).toUpperCase();
   const loc=new Date(Date.now()+S.tz*3600e3),first=S.forms.find(f=>f.type==='laundry_load'&&canFill(f)),firstChem=S.forms.find(f=>f.type==='laundry_chem'&&canFill(f));
@@ -212,7 +234,7 @@ function dashView(){
    <div class="av">${esc(ini)}</div><button class="ib" id="out" aria-label="Выйти" title="Выйти">⎋</button></div></div></header>
   <main><div class="top"><div><p class="eb">Сегодня, ${loc.getUTCDate()} ${MON[loc.getUTCMonth()]}</p><h1>Обзор текущей смены</h1></div>
    <div class="acts">${first?`<a class="btn p" href="form.html?f=${encodeURIComponent(first.slug)}">🧺 Загрузка белья</a>`:''}${firstChem?`<a class="btn c" href="form.html?f=${encodeURIComponent(firstChem.slug)}">⚗ Замена химии</a>`:''}</div></div>
-  ${isAdm?'<div id="rsd"></div>':''}
+  ${isAdm?'<div id="asum"></div><div id="rsd"></div>':''}
   ${(()=>{const M=metrics(ms);return leftoverBlock()+M.blocks.map(b=>`<section aria-label="${esc(b.title)}"><p class="gl">${esc(b.title)}</p><div class="mg">${b.cards.map(([l,v,u,n,c])=>`<article class="m ${c}"><p class="l">${l}</p><p class="v">${v} ${u?`<small>${u}</small>`:''}</p><p class="n">${n}</p></article>`).join('')}</div></section>`).join('')+`<p class="hint" style="margin:.75rem 0 0">Всего по двум дозаторам: ${fmt(M.total.n)} стирок · ${fmt(M.total.kg)} кг</p>`;})()}
   <section><div class="sh"><div><h2>Стиральные машины</h2><p>Выберите машину, чтобы открыть запись</p></div>
    <div class="tabs" role="tablist">${T.map(([id,l])=>`<button role="tab" aria-selected="${tab===id}" data-t="${id}">${l}</button>`).join('')}</div></div>
@@ -225,7 +247,7 @@ function dashView(){
   </main><div id="ovl"></div>`;
   $('#out').onclick=async()=>{await sb.auth.signOut();Residents.reset();isAdm=false;loginView();};
   bindLeftover();
-  if(isAdm)Residents.mount($('#rsd'),shiftDate(),{today:shiftDate(),toast});
+  if(isAdm){drawSummary();Residents.mount($('#rsd'),shiftDate(),{today:shiftDate(),toast,onValue:drawSummary});}
   document.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{tab=b.dataset.t;dashView();});
   document.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{sel=+b.dataset.m;panel(ms.find(m=>m.id===sel),first);});
   if(sel){const m=ms.find(m=>m.id===sel);if(m)panel(m,first);}

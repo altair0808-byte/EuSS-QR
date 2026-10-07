@@ -69,15 +69,17 @@ const Residents = (() => {
         btn.disabled = false;
         if (error) { m.className = 'rs-m er'; m.textContent = /set_residents|is_admin/.test(error.message || '') ? 'Выполните stage13.sql в Supabase.' : (error.message || 'Не сохранено'); return; }
         cache[date] = n; dirty = false;
+        if (opts.onValue) opts.onValue(n);
         m.className = 'rs-m ok'; m.textContent = n == null ? 'Число удалено.' : `Сохранено: ${n} чел.`;
         toastF(n == null ? 'Число проживающих удалено' : 'Проживающих: ' + n);
       };
     };
-    if (date in cache) draw(cache[date]); else draw(null, 'Загружаю…');   // сначала то, что уже знаем, потом свежее значение
+    if (date in cache) { draw(cache[date]); if (opts.onValue) opts.onValue(cache[date]); } else draw(null, 'Загружаю…');   // сначала то, что уже знаем, потом свежее значение
     if (el.querySelector('#rs-n') && dirty) return;                       // не затираем то, что человек уже печатает
     const r = await range(date, date);
     if (r === null) { el.innerHTML = '<section class="rs-c"><p class="rs-k">Видят только админы</p><h3>Проживающие</h3><p class="rs-m">Раздел появится после выполнения stage13.sql в Supabase.</p></section>'; return; }
     cache[date] = date in r ? r[date] : null;
+    if (opts.onValue) opts.onValue(cache[date]);
     const inp = el.querySelector('#rs-n');
     if (inp && document.activeElement === inp) return;                    // человек уже печатает, не перерисовываем
     draw(cache[date]);
@@ -87,5 +89,6 @@ const Residents = (() => {
   const reset = () => { Object.keys(cache).forEach(k => delete cache[k]); dirty = false; };   // при выходе из аккаунта
   const busy = () => dirty || (document.activeElement && document.activeElement.id === 'rs-n');
 
-  return { isAdmin, range, mount, busy, reset };
+  const get = d => (d in cache ? cache[d] : undefined);   // число за день из кэша; undefined, если ещё не загружено
+  return { isAdmin, range, mount, busy, reset, get };
 })();
