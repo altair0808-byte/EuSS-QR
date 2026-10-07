@@ -198,7 +198,7 @@ async function loadAll(session){
     sb.from('recipes').select('*')]);
   const g=k=>{const x=(set||[]).find(y=>y.key===k);return x?+x.value:null};
   S={session,isSuper:pr?.role==='superadmin',forms:forms||[],acc:acc||[],can:!!can,tz:g('tz_offset')??5,st:g('shift_start')??6,
-     refs:{water:g('water_l')??55,washTypes:wt||[],chemicals:ch||[],recipes:rc||[]},loads:[],changes:[],pool:null,names:{}};
+     refs:{water:g('water_l')??55,washTypes:wt||[],chemicals:ch||[],recipes:rc||[]},loads:[],mach:[],changes:[],pool:null,names:{}};
   isAdm=await Residents.isAdmin();
   await loadLoads();
 }
@@ -207,6 +207,7 @@ async function loadLoads(){
   const d=shiftDate();
   const r=S.can?await sb.rpc('report_loads',{d1:d,d2:d}):await sb.from('loads').select('id,ts,shift_date,part,machine,wash_type_id,weight_kg,extras,finished_at,created_by').eq('shift_date',d).order('ts');
   S.loads=r.data||[];
+  { const ms=await sb.rpc('machine_status',{d}); S.mach=ms.error?S.loads:(ms.data||[]); }   // статус машин виден всем; до stage14.sql берём свои загрузки
   if(S.can){const c=await sb.rpc('report_changes',{d1:d,d2:d});S.changes=c.data||[];}
   const lo=await Leftover.fetch();S.pool=lo.rows;S.names=lo.names;S.poolErr=lo.error;
 }
@@ -216,7 +217,8 @@ const canFill=f=>S.isSuper||(f.type==='laundry_load'?['worker','admin'].includes
 function machines(){
   const now=Date.now(),out=[];
   for(let id=1;id<=12;id++){
-    const last=S.loads.filter(l=>l.machine===id).sort((a,b)=>new Date(b.ts)-new Date(a.ts))[0];
+    const l0=S.mach.filter(l=>l.machine===id).sort((a,b)=>new Date(b.ts)-new Date(a.ts))[0];
+    const last=l0?Object.assign({},S.loads.find(x=>x.id===l0.id)||{},l0):undefined;
     let status='ready',left=null,w=null;
     if(last){w=S.refs.washTypes.find(x=>x.id===last.wash_type_id);
       const end=new Date(last.ts).getTime()+(w?.minutes||0)*60000;
@@ -317,6 +319,7 @@ function chemBlock(l){
 }
 function panel(m,first){
   clearInterval(window.__ptm);
+  const canFin=S.can||(m.last&&m.last.created_by===S.session.user.id);
   const l=m.last,busy=m.status==='working',wt=S.refs.washTypes,ex=S.refs.chemicals.filter(c=>c.kind==='extra');
   const hhmm=ts=>new Date(new Date(ts).getTime()+S.tz*3600e3).toISOString().slice(11,16);
   let w=null;
@@ -326,7 +329,7 @@ function panel(m,first){
    <div class="pbar"><i id="pbi"></i></div>
    <div class="pst"><span>Начало<b>${hhmm(l.ts)}</b></span><span>Прошло<b id="ppc">0%</b></span><span>Осталось<b id="plf">${m.left} мин</b></span><span>Конец<b>${hhmm(new Date(new Date(l.ts).getTime()+(m.w?.minutes||0)*60000))}</b></span></div>
    ${who(l.created_by)?`<p class="pw">Загрузил: ${esc(who(l.created_by))}</p>`:''}${chemBlock(l)}
-   <button class="btn p" id="fin">✓ Постиралось</button></div>`:''}
+   ${canFin?'<button class="btn p" id="fin">✓ Постиралось</button>':'<p class="pw">Отметить «Постиралось» может тот, кто загрузил, или бригадир.</p>'}</div>`:''}
    ${first?`<h3>${busy?'Следующая стирка':'Вид стирки'}</h3>
    <div class="wl" id="wl">${wt.map(x=>`<button data-v="${x.id}"><span>${esc(x.name)}</span>${x.minutes?`<small>${x.minutes} мин</small>`:''}</button>`).join('')}</div>
    <h3>Вес, кг</h3><div class="kgr"><button id="mi" aria-label="Меньше">−</button><input id="kg" type="number" inputmode="decimal" min="0" step="any" value="25"><button id="pl" aria-label="Больше">+</button></div>
