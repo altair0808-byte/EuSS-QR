@@ -113,13 +113,13 @@ body{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-ri
 </style></head>
 <body><div id="app"><p class="hint" style="padding:1rem">Загрузка…</p></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="config.js"></script><script src="app.js"></script><script src="report-calc.js"></script><script src="leftover.js"></script>
+<script src="config.js"></script><script src="num.js"></script><script src="app.js"></script><script src="report-calc.js"></script><script src="leftover.js"></script><script src="residents.js"></script>
 <script>
 const esc=t=>String(t??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const fmt=(n,d=0)=>(Math.round(n*10**d)/10**d).toLocaleString('ru-RU');
+const fmt=n=>Num.fmt(n);   // без округления: 0,175 → «0,175», 0,350 → «0,35»
 const app=$('#app');
 const MON=['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
-let S=null,tab='all',timer=null,sel=null;
+let S=null,tab='all',timer=null,sel=null,isAdm=false;
 const who=id=>(id&&S.names[id])||'';
 const nextUrl=()=>{const n=q.get('next')||'';return /^[a-z0-9_-]+\.html(\?[^#]*)?$/i.test(n)?n:null;};
 
@@ -149,6 +149,7 @@ async function loadAll(session){
   const g=k=>{const x=(set||[]).find(y=>y.key===k);return x?+x.value:null};
   S={session,isSuper:pr?.role==='superadmin',forms:forms||[],acc:acc||[],can:!!can,tz:g('tz_offset')??5,st:g('shift_start')??6,
      refs:{water:g('water_l')??55,washTypes:wt||[],chemicals:ch||[],recipes:rc||[]},loads:[],changes:[],pool:null,names:{}};
+  isAdm=await Residents.isAdmin();
   await loadLoads();
 }
 const shiftDate=()=>new Date(Date.now()+(S.tz-S.st)*3600e3).toISOString().slice(0,10);
@@ -211,6 +212,7 @@ function dashView(){
    <div class="av">${esc(ini)}</div><button class="ib" id="out" aria-label="Выйти" title="Выйти">⎋</button></div></div></header>
   <main><div class="top"><div><p class="eb">Сегодня, ${loc.getUTCDate()} ${MON[loc.getUTCMonth()]}</p><h1>Обзор текущей смены</h1></div>
    <div class="acts">${first?`<a class="btn p" href="form.html?f=${encodeURIComponent(first.slug)}">🧺 Загрузка белья</a>`:''}${firstChem?`<a class="btn c" href="form.html?f=${encodeURIComponent(firstChem.slug)}">⚗ Замена химии</a>`:''}</div></div>
+  ${isAdm?'<div id="rsd"></div>':''}
   ${(()=>{const M=metrics(ms);return leftoverBlock()+M.blocks.map(b=>`<section aria-label="${esc(b.title)}"><p class="gl">${esc(b.title)}</p><div class="mg">${b.cards.map(([l,v,u,n,c])=>`<article class="m ${c}"><p class="l">${l}</p><p class="v">${v} ${u?`<small>${u}</small>`:''}</p><p class="n">${n}</p></article>`).join('')}</div></section>`).join('')+`<p class="hint" style="margin:.75rem 0 0">Всего по двум дозаторам: ${fmt(M.total.n)} стирок · ${fmt(M.total.kg)} кг</p>`;})()}
   <section><div class="sh"><div><h2>Стиральные машины</h2><p>Выберите машину, чтобы открыть запись</p></div>
    <div class="tabs" role="tablist">${T.map(([id,l])=>`<button role="tab" aria-selected="${tab===id}" data-t="${id}">${l}</button>`).join('')}</div></div>
@@ -221,8 +223,9 @@ function dashView(){
   ${acts.length?`<section aria-label="Разделы сайта">${[['Записи смены',0],['Отчёты и журнал',1],['Администрирование',2]].map(([t,g],k,all)=>{const l=acts.filter(a=>a[5]===g);return l.length?`<p class="gl">${t}</p><div class="qg" style="margin-top:.25rem;padding-bottom:.5rem">${l.map(a=>`<a class="qa ${a[4]||''}" href="${a[3]}"><span class="qi">${a[0]}</span><span><b>${esc(a[1])}</b><small>${esc(a[2])}</small></span><span>→</span></a>`).join('')}</div>`:''}).join('')}</section>`
    :'<p class="hint">Вам пока не выдан доступ ни к одному бланку. Обратитесь к суперадмину.</p>'}
   </main><div id="ovl"></div>`;
-  $('#out').onclick=async()=>{await sb.auth.signOut();loginView();};
+  $('#out').onclick=async()=>{await sb.auth.signOut();Residents.reset();isAdm=false;loginView();};
   bindLeftover();
+  if(isAdm)Residents.mount($('#rsd'),shiftDate(),{today:shiftDate(),toast});
   document.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{tab=b.dataset.t;dashView();});
   document.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{sel=+b.dataset.m;panel(ms.find(m=>m.id===sel),first);});
   if(sel){const m=ms.find(m=>m.id===sel);if(m)panel(m,first);}
@@ -237,7 +240,7 @@ function panel(m,first){
    ${busy?`<div class="cur ld"><div><b>🧺 ${esc(m.w?.name||'Загрузка')}</b><span>${fmt(l.weight_kg,1)} кг · с ${hhmm(l.ts)} · осталось ${m.left} мин${who(l.created_by)?'<br>Загрузил: '+esc(who(l.created_by)):''}</span></div><button class="btn p" id="fin">✓ Постиралось</button></div>`:''}
    ${first?`<h3>${busy?'Следующая стирка':'Вид стирки'}</h3>
    <div class="wl" id="wl">${wt.map(x=>`<button data-v="${x.id}"><span>${esc(x.name)}</span>${x.minutes?`<small>${x.minutes} мин</small>`:''}</button>`).join('')}</div>
-   <h3>Вес, кг</h3><div class="kgr"><button id="mi" aria-label="Меньше">−</button><input id="kg" type="number" inputmode="decimal" min="0" step="0.5" value="25"><button id="pl" aria-label="Больше">+</button></div>
+   <h3>Вес, кг</h3><div class="kgr"><button id="mi" aria-label="Меньше">−</button><input id="kg" type="number" inputmode="decimal" min="0" step="any" value="25"><button id="pl" aria-label="Больше">+</button></div>
    ${ex.length?`<h3>Дополнительно, количество (шт)</h3><div class="xg">${ex.map(x=>`<label>${esc(x.name)}<input type="number" min="0" step="1" inputmode="numeric" data-x="${x.id}" data-u="${+x.per_unit||0}" data-un="${x.per_unit_unit==='g'?'г':'мл'}" placeholder="0"><small class="xs">1 шт = ${+x.per_unit||0} ${x.per_unit_unit==='g'?'г':'мл'}</small></label>`).join('')}</div>`:''}
    <button class="btn p wide" id="save">${busy?'Записать и начать следующую':'Записать загрузку'}</button>`
    :'<p class="hint" style="margin-top:1rem">Нет доступа к бланку загрузки.</p>'}</section></div>`;
@@ -271,7 +274,7 @@ async function start(){
   try{await loadAll(session);}catch(e){app.innerHTML='<p class="err" style="padding:1rem">Не удалось загрузить данные: '+esc(e.message)+'</p>';return;}
   dashView();
   clearInterval(timer);
-  let k=0;timer=setInterval(async()=>{if(++k%2===0)await loadLoads();if(!sel)dashView();},30000);
+  let k=0;timer=setInterval(async()=>{if(++k%2===0)await loadLoads();if(!sel&&!Residents.busy())dashView();},30000);
 }
 start();
 </script></body></html>

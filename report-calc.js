@@ -27,7 +27,7 @@ function chemUsed(refs, changes, connects, moves, levels) {
       ev.sort((a, b) => a.t - b.t || a.k - b.k);            // при равном времени сначала перемещение, потом замена, потом подключение, потом «реальный уровень»
       let pending = 0, adj = 0, lvl = null;                  // adj: забрали (−) и залили (+) в дозатор с момента прошлой замены; lvl: реальный уровень, указанный вручную
       ev.forEach(e => {
-        if (e.k === -1) { const a = amt(e.x); if (a > 0) adj += e.x.kind === 'take' ? -a : a; return; }
+        if (e.k === -1) { const a = amt(e.x); if (a > 0) adj += e.x.kind === 'take' ? -a : a; return; }   // 'pour' и 'add' (добавил суперадмин) поднимают уровень, 'take' снижает
         if (e.k === 1) { const a = amt(e.x); if (a > 0) pending += a; return; }
         if (e.k === 2) { const a = amt(e.x); if (a != null && isFinite(a) && a >= 0) { lvl = a; pending = 0; adj = 0; } return; }   // «в дозаторе было X»: заменяет и бутыль, и подключённый остаток
         let left = leftOf(e.x);
@@ -108,7 +108,7 @@ function calcReport(loads, changes, refs, connects, ctx, moves, levels) {
       const tu = c.kind === 'extra' && c.per_unit_unit === 'g' ? 'kg' : 'l';
       const theory = both(c, groups[groupKey].chem[c.id] || 0, tu);
       const mine = changes.filter(x => x.chemical_id === c.id && (groupKey === 'all' || (x.machine_group || '1_10') === groupKey));
-      let took=null, put=null, actual=null, noLeft=0, diff=null, pct=null, stock=null, connected=null, adj=0;
+      let took=null, put=null, added=null, actual=null, noLeft=0, diff=null, pct=null, stock=null, connected=null, adj=0;
       const leftOf = x => prim==='l'
         ? (x.leftover_l != null ? +x.leftover_l : x.leftover_kg != null ? conv(c,+x.leftover_kg,'kg','l') : null)
         : (x.leftover_kg != null ? +x.leftover_kg : x.leftover_l != null ? conv(c,+x.leftover_l,'l','kg') : null);
@@ -128,18 +128,18 @@ function calcReport(loads, changes, refs, connects, ctx, moves, levels) {
           if(a==null||!(a>0))return;
           conn += a;
         });
-        let tk=0,pr=0;
+        let tk=0,pr=0,ad=0;
         moves.filter(x => +x.chemical_id === +c.id && (groupKey === 'all' || (x.machine_group || '1_10') === groupKey)).forEach(x=>{
           const a = prim==='l' ? (x.amount_l != null ? +x.amount_l : x.amount_kg != null ? conv(c,+x.amount_kg,'kg','l') : null) : (x.amount_kg != null ? +x.amount_kg : x.amount_l != null ? conv(c,+x.amount_l,'l','kg') : null);
-          if(a>0){ if(x.kind==='take') tk+=a; else pr+=a; }
+          if(a>0){ if(x.kind==='take') tk+=a; else if(x.kind==='add') ad+=a; else pr+=a; }   // add: суперадмин добавил любое количество, запас не трогает
         });
         st = Math.max(0, st + tk - pr);                         // забрали из дозатора — прибавилось в запас, залили — убавилось
-        actual=both(c,sum,prim); took=both(c,tk,prim); put=both(c,pr,prim);
+        actual=both(c,sum,prim); took=both(c,tk,prim); put=both(c,pr,prim); added=both(c,ad,prim);
         stock=both(c,st,prim); connected=both(c,conn,prim);
         const theoryPrim=prim==='l'?theory.l:theory.kg;
         if(theoryPrim!=null){diff=sum-theoryPrim;pct=theoryPrim>0?diff/theoryPrim*100:null;}
       }
-      return {id:c.id,name:c.name,kind:c.kind,prim,size,theory,actual,took,put,changes:mine.length,noLeft,diff,pct,stock,connected,adj};
+      return {id:c.id,name:c.name,kind:c.kind,prim,size,theory,actual,took,put,added,changes:mine.length,noLeft,diff,pct,stock,connected,adj};
     });
   }
 

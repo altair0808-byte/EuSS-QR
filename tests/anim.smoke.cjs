@@ -8,7 +8,7 @@ const sb={rpc:(fn)=>{const r={then:(res)=>res({data:data[fn]||[],error:null}),ra
 const cache={};const mkEl=()=>new Proxy({style:{},classList:{toggle(){}},dataset:{}},{get:(t,k)=>k in t?t[k]:undefined,set:(t,k,v)=>{t[k]=v;return true}});
 const el=mkEl();el.querySelector=s=>s.includes(':focus')?null:(cache[s]||(cache[s]=mkEl()));el.isConnected=true;
 let raf=null;const ctx={sb,document:{head:{insertAdjacentHTML(){}}},requestAnimationFrame:f=>{raf=f},Date,Math,String,Promise,Object,Array,JSON};
-vm.createContext(ctx);vm.runInContext(fs.readFileSync('storage-anim.js','utf8')+';this.SA=StorageAnim;',ctx);
+vm.createContext(ctx);vm.runInContext(fs.readFileSync('num.js','utf8'),ctx);vm.runInContext(fs.readFileSync('storage-anim.js','utf8')+';this.SA=StorageAnim;',ctx);
 const refs={water:55,chemicals:chems,recipes:[{wash_type_id:1,chemical_id:1,ml_per_l:3}]};
 (async()=>{await ctx.SA.mount(el,{refs,date:'2026-10-07',st:6,tz:5,can:true});
  el.onclick({target:{closest:()=>({dataset:{a:'go'},textContent:''})}});

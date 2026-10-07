@@ -14,10 +14,10 @@
 <div id="ovl"></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="config.js"></script><script src="app.js"></script><script src="report-calc.js"></script>
+<script src="config.js"></script><script src="num.js"></script><script src="app.js"></script><script src="report-calc.js"></script>
 <script>
 const esc=t=>String(t??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const f=(n,d=1)=>(Math.round(n*10**d)/10**d).toLocaleString('ru-RU');
+const f=n=>Num.fmt(n);   // без округления: 0,175 → «0,175», 0,350 → «0,35»
 let refs=null,tz=5,st=6,seq=0,canEdit=false,byId={},byCh={},nm={},cache={loads:[],changes:[],conns:[]},kindF='all';
 const who=id=>(id&&nm[id])||'';
 const shiftToday=()=>new Date(Date.now()+(tz-st)*3600e3).toISOString().slice(0,10);
@@ -26,7 +26,7 @@ const hhmm=ts=>new Date(new Date(ts).getTime()+tz*3600e3).toISOString().slice(11
 const dmy=d=>d.split('-').reverse().join('.');
 
 function two(o){return o?[o.pc!=null?f(o.pc,2)+' шт':'',o.l!=null?f(o.l)+' л':'',o.kg!=null?f(o.kg)+' кг':''].filter(Boolean).join('<br>')||'–':'–'}
-function dif(c){if(c.diff==null||!c.changes)return'–';const u=c.prim==='l'?'л':'кг',cls=c.pct!=null&&c.pct>10?' class="bad"':c.pct!=null&&c.pct<-10?' class="good"':'';return `<span${cls}>${c.diff>0?'+':''}${f(c.diff)} ${u}${c.size>0&&c.kind!=='extra'?'<br>'+(c.diff>0?'+':'')+f(c.diff/c.size,2)+' шт':''}${c.pct==null?'':'<br>'+(c.pct>0?'+':'')+f(c.pct,0)+'%'}</span>`}
+function dif(c){if(c.diff==null||!c.changes)return'–';const u=c.prim==='l'?'л':'кг',cls=c.pct!=null&&c.pct>10?' class="bad"':c.pct!=null&&c.pct<-10?' class="good"':'';return `<span${cls}>${c.diff>0?'+':''}${f(c.diff)} ${u}${c.size>0&&c.kind!=='extra'?'<br>'+(c.diff>0?'+':'')+f(c.diff/c.size,2)+' шт':''}${c.pct==null?'':'<br>'+(c.pct>0?'+':'')+Num.fmt(c.pct,2)+'%'}</span>`}
 function note(c){if(c.kind==='extra')return'по загрузкам, замены бутылей не отмечаются';return c.prim==null?'Задайте литры и кг в настройках':c.diff==null?'Задайте и литры, и кг в настройках':`замен: ${c.changes}${c.noLeft?`, без остатка: ${c.noLeft}`:''}`}
 function chemTable(g){
   const body=g.chem.map(c=>{
@@ -115,7 +115,7 @@ function chemEdit(x){
    <label>Дозатор<select id="eg"><option value="1_10"${x.machine_group!=='11_12'?' selected':''}>1–10 · основной</option><option value="11_12"${x.machine_group==='11_12'?' selected':''}>11–12 · отдельный</option></select></label>
    <h3>Остаток в бутыли</h3>
    <div class="seg" id="eu"><button data-v="kg" class="${unit==='kg'?'on':''}">кг</button><button data-v="l" class="${unit==='l'?'on':''}">литры</button></div>
-   <label>Остаток (пусто или 0 — бутыль пустая)<input id="ev" type="number" min="0" step="0.1" inputmode="decimal" value="${v0}"></label>
+   <label>Остаток (пусто или 0 — бутыль пустая)<input id="ev" type="number" min="0" step="any" inputmode="decimal" value="${v0}"></label>
    ${x.connect_id?'<p class="hint">Этот остаток уже подключён к дозатору. Если изменить количество, подключение и отчёт пересчитаются автоматически.</p>':''}
    <button class="go" id="ok">Сохранить исправление</button>
    <button class="ghost danger" id="rm">Удалить запись</button></section></div>`;
@@ -154,7 +154,7 @@ function editPanel(l){
    <div class="ph"><div><p class="eb">Админ и суперадмин</p><h2>Исправить загрузку</h2><p class="hint">Запись от ${dmy(l.shift_date)}, ${hhmm(l.ts)}</p></div><button class="ib" id="cl" aria-label="Закрыть">✕</button></div>
    <label>Машина<select id="em">${Array.from({length:12},(_,i)=>i+1).map(m=>`${optN(m,l.machine)}>${m} · ${m<=10?'дозатор 1':'дозатор 2'}</option>`).join('')}</select></label>
    <label>Вид стирки<select id="ew">${refs.washTypes.map(w=>`${optN(w.id,l.wash_type_id)}>${esc(w.name)}</option>`).join('')}</select></label>
-   <label>Вес, кг<input id="ek" type="number" min="0" step="0.5" inputmode="decimal" value="${+l.weight_kg}"></label>
+   <label>Вес, кг<input id="ek" type="number" min="0" step="any" inputmode="decimal" value="${+l.weight_kg}"></label>
    <div class="acc"><label>Дата смены<input id="ed" type="date" value="${d0}"></label><label>Время запуска<input id="et" type="time" value="${t0}"></label></div>
    <p class="hint">Смена начинается в ${String(st).padStart(2,'0')}:00. Время до ${String(st).padStart(2,'0')}:00 относится к ночи этой же смены.</p>
    ${ex.length?`<h3>Дополнительно, шт</h3><div class="acc">${ex.map(c=>`<label>${esc(c.name)}<input type="number" min="0" step="1" inputmode="numeric" data-x="${c.id}" value="${(l.extras||{})[c.id]||''}" placeholder="0"></label>`).join('')}</div>`:''}

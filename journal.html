@@ -15,10 +15,10 @@
 <div id="out"><p class="hint">Загрузка…</p></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="config.js"></script><script src="app.js"></script>
+<script src="config.js"></script><script src="num.js"></script><script src="app.js"></script>
 <script>
 const esc=t=>String(t??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const f=(n,d=1)=>(Math.round(n*10**d)/10**d).toLocaleString('ru-RU');
+const f=n=>Num.fmt(n);   // без округления: 0,175 → «0,175», 0,350 → «0,35»
 let tz=5,st=6,refs=null,nm={},rows=[],per='0',ent='all',act='all',seq=0;
 const who=id=>(id&&nm[id])||'система';
 const dmy=d=>d.split('-').reverse().join('.');

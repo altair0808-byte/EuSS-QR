@@ -11,7 +11,8 @@ const Blank = (() => {
   const r6 = x => Math.round(x * 1e6) / 1e6;
   const serial = d => Math.round((Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10)) - Date.UTC(1899, 11, 30)) / 864e5);
   const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  const fmt = (n, d = 1) => (Math.round(n * 10 ** d) / 10 ** d).toLocaleString('ru-RU');
+  // без округления (то же правило, что в num.js; здесь свой экземпляр, чтобы файл работал и в node): 0,175 → «0,175», 0,350 → «0,35»
+  const fmt = n => { const s = Number(Number(n).toPrecision(12)).toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 6 }); return /^[-\u2212]0$/.test(s) ? '0' : s; };
 
   function setup(refs) {
     const allMain = refs.chemicals.filter(c => c.kind === 'main').sort(bySort), allExtra = refs.chemicals.filter(c => c.kind === 'extra').sort(bySort);

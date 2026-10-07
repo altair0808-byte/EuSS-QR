@@ -3,7 +3,7 @@
 const StorageAnim = (() => {
   const DEAD = 3, G = ['1_10', '11_12'], GN = ['1–10', '11–12'], MS = 864e5;
   const E = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  const f = x => (Math.round((+x || 0) * 100) / 100).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), T = x => new Date(x.ts).getTime() || 0, hue = s => { let h = 0; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
+  const f = x => Num.fmt(+x || 0), T = x => new Date(x.ts).getTime() || 0, hue = s => { let h = 0; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
   async function page(fn, args) { const o = []; for (let i = 0; i < 30; i++) { const r = await sb.rpc(fn, args).range(i * 1000, i * 1000 + 999); if (r.error) return o; o.push(...(r.data || [])); if ((r.data || []).length < 1000) break; } return o; }
   const addD = (d, n) => { const t = new Date(d + 'T00:00:00Z'); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); };
   let css = false;
@@ -27,7 +27,7 @@ const StorageAnim = (() => {
     const water = +o.refs.water || 55, ev = [];
     D.loads.forEach(l => ev.push({ t: T(l), r: 1, k: 'L', x: l })); D.ch.forEach(x => ev.push({ t: T(x), r: 2, k: 'C', x })); D.cn.forEach(x => ev.push({ t: T(x), r: 3, k: 'K', x })); D.mv.forEach(x => ev.push({ t: T(x), r: 0, k: 'M', x })); D.lv.forEach(x => ev.push({ t: T(x), r: 4, k: 'S', x }));
     ev.sort((a, b) => a.t - b.t || a.r - b.r);
-    const Z = () => D.chems.map(() => [0, 0]), S = { lvl: D.chems.map(() => [null, null]), pend: Z(), stock: D.chems.map(() => 0), cons: Z(), took: Z(), put: Z(), bot: Z(), flash: {} };
+    const Z = () => D.chems.map(() => [0, 0]), S = { lvl: D.chems.map(() => [null, null]), pend: Z(), stock: D.chems.map(() => 0), cons: Z(), took: Z(), put: Z(), added: Z(), bot: Z(), flash: {} };
     const ix = id => D.chems.findIndex(c => +c.id === +id), a = x => +x.amount_l || 0;
     S.apply = (e, day) => {
       const x = e.x, gi = G.indexOf(x.machine_group || '1_10');
@@ -36,7 +36,9 @@ const StorageAnim = (() => {
       if (e.k === 'C') { S.lvl[i][gi] = S.pend[i][gi] > 0 ? S.pend[i][gi] : +D.chems[i].bottle_l; S.pend[i][gi] = 0; S.stock[i] += x.written_off_at ? 0 : Math.max(0, +x.leftover_l || 0); if (day) { S.bot[i][gi]++; S.flash['b' + i + gi] = 1; } }
       else if (e.k === 'S') { S.lvl[i][gi] = a(x); S.pend[i][gi] = 0; }   // «в дозаторе было X» на момент x.ts: дальше стирки вычитаются сами
       else if (e.k === 'K') { S.pend[i][gi] += a(x); S.stock[i] = Math.max(0, S.stock[i] - a(x)); }
-      else { const t = x.kind === 'take'; if (S.lvl[i][gi] == null) S.lvl[i][gi] = +D.chems[i].bottle_l; S.lvl[i][gi] = Math.max(0, S.lvl[i][gi] + (t ? -a(x) : a(x))); S.stock[i] = Math.max(0, S.stock[i] + (t ? a(x) : -a(x))); if (day) { (t ? S.took : S.put)[i][gi] += a(x); S.flash[(t ? 't' : 'p') + i + gi] = 1; } }
+      else { const t = x.kind === 'take', ad = x.kind === 'add'; if (S.lvl[i][gi] == null) S.lvl[i][gi] = +D.chems[i].bottle_l; S.lvl[i][gi] = Math.max(0, S.lvl[i][gi] + (t ? -a(x) : a(x)));
+        if (!ad) S.stock[i] = Math.max(0, S.stock[i] + (t ? a(x) : -a(x)));            // «добавил суперадмин» запас бригадира не трогает
+        if (day) { (ad ? S.added : t ? S.took : S.put)[i][gi] += a(x); S.flash[(ad ? 'a' : t ? 't' : 'p') + i + gi] = 1; } }
     };
     let k = 0; while (k < ev.length && ev[k].t < D.d0) S.apply(ev[k++], false);
     D.chems.forEach((c, i) => G.forEach((g, j) => { if (S.lvl[i][j] == null) S.lvl[i][j] = +c.bottle_l; }));   // дозатор без истории считаем полным
@@ -53,7 +55,7 @@ const StorageAnim = (() => {
     const V = (c, v) => { const d = dens(c); return `${f(v)} л${d ? ` · ${f(v * d)} кг` : ''}`; };          // литры и кг сразу
     const toL = (c, v, u) => u === 'kg' ? v / (dens(c) || 1) : v;
     const act = async (kind, g, amt, u) => { const c = D.chems[sel], l = toL(c, amt, u); if (!(l > 0)) { o.toast && o.toast('Укажите количество'); return; }
-      const { error } = await sb.rpc('chem_move', { p_chemical: c.id, p_group: G[g], p_kind: kind, p_amount_l: Math.round(l * 1000) / 1000 });
+      const { error } = await sb.rpc('chem_move', { p_chemical: c.id, p_group: G[g], p_kind: kind, p_amount_l: Num.clean(l) });   // без округления до 3 знаков: 0,175 кг не превращается в 0,1749
       if (error) { o.toast && o.toast(error.message || 'Не удалось'); return; } await build(); draw(); o.toast && o.toast(kind === 'take' ? 'Остаток забран' : 'Залито в дозатор'); };
     const unit = id => `<select id="${id}"><option value="l">л</option>${dens(D.chems[sel]) ? '<option value="kg">кг</option>' : ''}</select>`;
     const conv = () => { const c = D.chems[sel], d = dens(c); el.querySelectorAll && el.querySelectorAll('output.cv').forEach(o => {
@@ -72,7 +74,7 @@ const StorageAnim = (() => {
         <h3 style="margin:0 0 .3rem">${E(c.name)} · дозатор ${GN[j]}</h3>
         <p class="hint" style="margin:0 0 .7rem">Сколько в дозаторе было на выбранный момент (до стирок). Все стирки после него система вычтет сама, и покажет реальный остаток.</p>
         <label style="display:block;font-weight:600;margin-bottom:.2rem">Сколько было</label>
-        <div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap"><input id="lv-a" type="number" min="0" step="0.01" inputmode="decimal" style="width:6.5rem" placeholder="0,00">
+        <div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap"><input id="lv-a" type="number" min="0" step="any" inputmode="decimal" style="width:6.5rem" placeholder="0">
           <select id="lv-u"><option value="l">л</option>${d ? '<option value="kg">кг</option>' : ''}</select><output id="lv-cv" class="cv"></output></div>
         <label style="display:block;font-weight:600;margin:.8rem 0 .2rem">На какой момент</label>
         <input id="lv-t" type="datetime-local" value="${loc(def)}" max="${loc(now)}" style="max-width:100%">
@@ -98,14 +100,48 @@ const StorageAnim = (() => {
         close(); await build(); draw(); o.toast && o.toast('Уровень учтён, стирки вычтены');
       };
     }
+    // окно «Добавить химию» (только суперадмин): любое количество, не обязательно целая бутыль
+    function addPanel(j) {
+      const c = D.chems[sel], d = dens(c), g = G[j], cap = +c.bottle_l, cur = S.lvl[sel][j], ov = document.createElement('div');
+      ov.style.cssText = 'position:fixed;inset:0;z-index:90;display:flex;align-items:center;justify-content:center;background:rgb(0 0 0/.35);padding:1rem';
+      ov.innerHTML = `<section role="dialog" aria-modal="true" style="background:#fff;color:#123;border-radius:.75rem;max-width:26rem;width:100%;padding:1.1rem;max-height:92dvh;overflow:auto;box-shadow:0 20px 50px rgb(0 0 0/.3)">
+        <p class="hint" style="margin:0;font-weight:800;text-transform:uppercase;font-size:.7rem">Только суперадмин</p>
+        <h3 style="margin:.15rem 0 .3rem">Добавить химию · ${E(c.name)} · дозатор ${GN[j]}</h3>
+        <p class="hint" style="margin:0 0 .7rem">Укажите любое количество, не обязательно целая бутыль. Уровень дозатора вырастет на это количество, запас бригадира не изменится.</p>
+        <label style="display:block;font-weight:600;margin-bottom:.2rem">Сколько добавить</label>
+        <div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap"><input id="ad-a" type="number" min="0" step="any" inputmode="decimal" style="width:7rem" placeholder="0">
+          <select id="ad-u"><option value="l">л</option>${d ? '<option value="kg">кг</option>' : ''}</select><output id="ad-cv" class="cv"></output></div>
+        <p id="ad-h" class="hint" style="margin:.6rem 0 0"></p>
+        <div style="display:flex;gap:.5rem;margin-top:.9rem"><button type="button" class="btn" id="ad-ok" style="font-weight:700" disabled>Добавить</button><button type="button" class="btn" id="ad-no">Отмена</button></div></section>`;
+      document.body.appendChild(ov);
+      const $ = q => ov.querySelector(q), close = () => { ov.remove(); document.removeEventListener('keydown', esc); }, esc = e => { if (e.key === 'Escape') close(); };
+      document.addEventListener('keydown', esc); ov.onmousedown = e => { if (e.target === ov) close(); }; $('#ad-no').onclick = close;
+      const amountL = () => { const v = Num.parse($('#ad-a').value); if (!isFinite(v) || !(v > 0)) return NaN; return $('#ad-u').value === 'kg' ? (d ? v / d : NaN) : v; };
+      const upd = () => {
+        const v = Num.parse($('#ad-a').value), kg = $('#ad-u').value === 'kg', l = amountL();
+        $('#ad-cv').textContent = d && isFinite(v) ? '≈ ' + Num.fmt(kg ? v / d : v * d) + (kg ? ' л' : ' кг') : '';
+        $('#ad-ok').disabled = !(l > 0);
+        $('#ad-h').textContent = l > 0 ? `Сейчас в дозаторе ${V(c, cur)}. Станет ${V(c, cur + l)}${cur + l > cap + 1e-9 ? ` (больше полной бутыли ${f(cap)} л, проверьте)` : ''}.` : `Сейчас в дозаторе ${V(c, cur)}.`;
+        $('#ad-ok').textContent = l > 0 ? 'Добавить ' + Num.fmt(v) + (kg ? ' кг' : ' л') : 'Добавить';
+      };
+      ov.oninput = ov.onchange = upd; upd(); $('#ad-a').focus();
+      $('#ad-ok').onclick = async () => {
+        const v = Num.parse($('#ad-a').value), kg = $('#ad-u').value === 'kg';
+        if (!(amountL() > 0)) { o.toast && o.toast('Укажите количество больше нуля'); return; }
+        const b = $('#ad-ok'); b.disabled = true;
+        const { error } = await sb.rpc('chem_add', { p_chemical: +c.id, p_group: g, p_amount_l: kg ? null : Num.clean(v), p_amount_kg: kg ? Num.clean(v) : null });
+        if (error) { o.toast && o.toast(/chem_add/.test(error.message || '') ? 'Выполните stage13.sql в Supabase' : (error.message || 'Не удалось')); b.disabled = false; return; }
+        close(); await build(); draw(); o.toast && o.toast('Добавлено в дозатор ' + GN[j] + ': ' + Num.fmt(v) + (kg ? ' кг' : ' л'));
+      };
+    }
     function draw() {
       const c = D.chems[sel], cap = +c.bottle_l, col = `hsl(${hue(c.name)} 70% 50%)`, d = dens(c);
       const fo = el.querySelector('input:focus,select:focus'); if (fo) return;
       const tank = (v, dz) => `<div class="sa-tk"><div class="sa-lq" style="height:${Math.min(100, v / cap * 100)}%;background:${col}"></div>${dz ? `<div class="sa-dz" style="height:${DEAD / cap * 100}%"></div>` : ''}<div class="sa-lv">${f(v)} л${d ? `<br><small>${f(v * d)} кг</small>` : ''}</div></div>`;
-      const ctl = j => `<div class="sa-ct"><span>Остаток сейчас <b>${V(c, S.lvl[sel][j])}</b></span><span>Расход за смену <b>${V(c, S.cons[sel][j])}</b></span><span>Забрано <b>−${V(c, S.took[sel][j])}</b></span><span>Залито <b>+${V(c, S.put[sel][j])}</b></span><span>Бутылей за смену <b>${S.bot[sel][j]}</b></span>${S.lvl[sel][j] <= DEAD + .02 ? '<span class="sa-w">Трубка не достаёт: забрать остаток</span>' : ''}${o.can ? `<span><input type="number" id="a${j}" value="3.00" min="0" step="0.01" inputmode="decimal"> ${unit('u' + j)} <output class="cv" data-a="a${j}" data-u="u${j}"></output> <button class="btn" data-m="take" data-g="${j}">Забрать остаток</button></span><span><button class="btn" data-m="lvl" data-g="${j}">Указать реальный уровень</button></span>` : ''}</div>`;
+      const ctl = j => `<div class="sa-ct"><span>Остаток сейчас <b>${V(c, S.lvl[sel][j])}</b></span><span>Расход за смену <b>${V(c, S.cons[sel][j])}</b></span><span>Забрано <b>−${V(c, S.took[sel][j])}</b></span><span>Залито <b>+${V(c, S.put[sel][j])}</b></span>${S.added[sel][j] > 0 ? `<span>Добавлено суперадмином <b>+${V(c, S.added[sel][j])}</b></span>` : ''}<span>Бутылей за смену <b>${S.bot[sel][j]}</b></span>${S.lvl[sel][j] <= DEAD + .02 ? '<span class="sa-w">Трубка не достаёт: забрать остаток</span>' : ''}${o.can ? `<span><input type="number" id="a${j}" value="3" min="0" step="any" inputmode="decimal"> ${unit('u' + j)} <output class="cv" data-a="a${j}" data-u="u${j}"></output> <button class="btn" data-m="take" data-g="${j}">Забрать остаток</button></span><span><button class="btn" data-m="lvl" data-g="${j}">Указать реальный уровень</button></span>` : ''}${o.isSuper ? `<span><button class="btn" data-m="add" data-g="${j}">Добавить химию</button></span>` : ''}</div>`;
       el.innerHTML = `<div class="sa-bar" data-r="tabs">${D.chems.map((x, n) => `<button class="btn" data-t="${n}" ${n === sel ? 'aria-pressed="true" style="font-weight:700;text-decoration:underline;border-left:5px solid hsl(' + hue(x.name) + ' 70% 50%)"' : 'style="border-left:5px solid hsl(' + hue(x.name) + ' 70% 50%)"'}>${E(x.name)}</button>`).join('')}</div>
         <div class="sa-row">${[0, 1].map(j => `<div class="sa-cd"><h4>Дозатор ${GN[j]}</h4><div class="sa-tw">${tank(S.lvl[sel][j], 1)}${ctl(j)}</div></div>`).join('')}
-        <div class="sa-cd"><h4>Запас бригадира</h4><div class="sa-tw">${tank(S.stock[sel], 0)}<div class="sa-ct"><span>В запасе <b>${V(c, S.stock[sel])}</b></span>${o.can ? `<span><select id="tg"><option value="0">в дозатор 1–10</option><option value="1">в дозатор 11–12</option></select></span><span><input type="number" id="as" value="6.00" min="0" step="0.01" inputmode="decimal"> ${unit('us')} <output class="cv" data-a="as" data-u="us"></output> <button class="btn" data-m="pour">Залить</button></span>` : ''}</div></div></div></div>
+        <div class="sa-cd"><h4>Запас бригадира</h4><div class="sa-tw">${tank(S.stock[sel], 0)}<div class="sa-ct"><span>В запасе <b>${V(c, S.stock[sel])}</b></span>${o.can ? `<span><select id="tg"><option value="0">в дозатор 1–10</option><option value="1">в дозатор 11–12</option></select></span><span><input type="number" id="as" value="6" min="0" step="any" inputmode="decimal"> ${unit('us')} <output class="cv" data-a="as" data-u="us"></output> <button class="btn" data-m="pour">Залить</button></span>` : ''}</div></div></div></div>
         <div class="sa-tb"><table><tr><th>Химикат</th>${GN.map(n => `<th>Дозатор ${n}: остаток</th>`).join('')}<th>Запас</th></tr>${D.chems.map(x => `<tr><td>${E(x.name)}</td>${[0, 1].map(j => `<td><b>${V(x, S.lvl[D.chems.indexOf(x)][j])}</b></td>`).join('')}<td><b>${V(x, S.stock[D.chems.indexOf(x)])}</b></td></tr>`).join('')}</table></div>
         <p class="hint">Остаток считается по рецептам от последней замены бутыли с учётом «забрано» и «залито». Обновляется раз в минуту. Кг = литры × плотность из настроек химии. Если в дозаторе было другое количество, нажмите «Указать реальный уровень»: стирки после выбранного момента вычтутся сами.</p>`;
       conv();
@@ -114,6 +150,7 @@ const StorageAnim = (() => {
       if (b.dataset.t != null) { sel = +b.dataset.t; draw(); }
       else if (b.dataset.m === 'take') { const g = +b.dataset.g; act('take', g, +el.querySelector('#a' + g).value, el.querySelector('#u' + g).value); }
       else if (b.dataset.m === 'lvl') levelPanel(+b.dataset.g);
+      else if (b.dataset.m === 'add') { if (o.isSuper) addPanel(+b.dataset.g); }
       else if (b.dataset.m === 'pour') act('pour', +el.querySelector('#tg').value, +el.querySelector('#as').value, el.querySelector('#us').value); };
     draw(); conv();
     clearInterval(el._sa); el._sa = setInterval(async () => { if (!el.isConnected) return clearInterval(el._sa); try { await build(); draw(); } catch (e) {} }, 60000);
