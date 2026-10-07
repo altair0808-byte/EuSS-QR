@@ -112,7 +112,7 @@ const wdOf = d => WD[(new Date(d + 'T00:00:00Z').getUTCDay() + 6) % 7];
 const addMonth = (ym, n) => { const d = new Date(Date.UTC(+ym.slice(0, 4), +ym.slice(5, 7) - 1 + n, 1)); return d.toISOString().slice(0, 7); };
 const ymLabel = ym => MONN[+ym.slice(5, 7) - 1] + ' ' + ym.slice(0, 4);
 let mode = 'day', ym = null;
-const tabState = { day: 'mach', mon: 'cal' };            // выбранная вкладка помнится при смене даты
+const tabState = { day: 'mach', mon: 'cal', chem: 'stor' };            // выбранная вкладка помнится при смене даты
 
 // ---------- общие элементы ----------
 const strip = k => `<div class="sum">${k.map(([l, v, u, n]) => `<div><span>${l}</span><b>${v}${u ? ` <i>${u}</i>` : ''}</b><small>${n}</small></div>`).join('')}</div>`;
@@ -190,7 +190,9 @@ function view(m, data) {
     ${tabBar('day', [['mach', 'Машины'], ['type', 'Виды стирки'], ['chem', 'Химия'], ['blk', 'Бланк как в Excel']])}
     <section class="pn2" data-p="day:mach"><p class="hint">Задействовано машин: ${used} из 12. Дозаторы 1–10 и 11–12 считаются отдельно.</p>${machTable(ms, ck.overlapMachines)}</section>
     <section class="pn2" data-p="day:type">${typesTable(data)}</section>
-    <section class="pn2" data-p="day:chem">${chemBlock([m])}${chemByType([m])}<h3 style="margin:1rem 0 .25rem">Хранилище химии за смену</h3><div id="stg"></div></section>
+    <section class="pn2" data-p="day:chem">${tabBar('chem', [['stor', 'Хранилище и остатки'], ['use', 'Расход по рецептам']])}
+      <div data-p="chem:stor"><p class="hint">Сколько химии сейчас в каждом дозаторе и в запасе. Если в дозаторе было другое количество, нажмите «Указать реальный уровень».</p><div id="stg"></div></div>
+      <div data-p="chem:use">${chemBlock([m])}${chemByType([m])}</div></section>
     <section class="pn2" data-p="day:blk"><p class="hint">Вес каждой стирки по машинам: так же, как в листе дня Excel.</p><div class="blkwrap box" style="margin-top:0">${Blank.html(m)}</div></section>`;
 }
 

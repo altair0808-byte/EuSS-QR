@@ -94,11 +94,6 @@ body{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-ri
 .qa.ch .qi{background:var(--cht);color:var(--chd)}
 .tg{display:inline-flex;align-items:center;gap:.3rem;height:1.5rem;padding:0 .55rem;border-radius:99px;font-size:.68rem;font-weight:800;white-space:nowrap}
 .tg.ld{background:color-mix(in oklab,var(--pri) 14%,#fff);color:oklch(.5 .125 208)}.tg.ch{background:var(--cht);color:var(--chd)}
-.ops{display:grid;gap:.5rem;margin-top:.25rem}
-.op{display:grid;gap:.3rem;padding:.75rem .9rem;border:1px solid var(--bd);border-left:5px solid var(--pri);border-radius:var(--r);background:var(--card);box-shadow:0 1px 2px rgb(0 0 0/.05)}
-.op.ch{border-left-color:var(--ch)}
-.op .r1{display:flex;justify-content:space-between;align-items:center;gap:.5rem}.op .tm{font-size:.8rem;font-weight:700;color:var(--mf)}
-.op .tt{font-weight:700;font-size:.92rem}.op .mt{font-size:.78rem;color:var(--mf)}
 .lnk{display:inline-flex;align-items:center;min-height:2.5rem;font-size:.85rem;font-weight:700;color:var(--pri)}
 .cur.ld{border-left:5px solid var(--pri)}
 @media(max-width:639px){
@@ -200,26 +195,14 @@ function bindLeftover(){
   const el=document.getElementById('lov');if(!el||S.pool==null)return;
   Leftover.bind(el,S.pool,S.refs.chemicals,S.names,{can:canConnect(),canWriteoff:S.isSuper,today:shiftDate()},async()=>{await loadLoads();dashView();});
 }
-function feedBlock(){
-  const hhmm=ts=>new Date(new Date(ts).getTime()+S.tz*3600e3).toISOString().slice(11,16);
-  const wn=id=>S.refs.washTypes.find(x=>x.id===id)?.name||'Вид '+id,cn=id=>S.refs.chemicals.find(x=>+x.id===+id)?.name||'Химия';
-  const items=[
-    ...S.loads.map(l=>({ts:l.ts,k:'ld',t:`Машина ${String(l.machine).padStart(2,'0')} · ${wn(l.wash_type_id)}`,m:`${fmt(l.weight_kg,1)} кг`,by:l.created_by})),
-    ...S.changes.map(x=>{const left=x.leftover_l>0?fmt(+x.leftover_l,1)+' л':x.leftover_kg>0?fmt(+x.leftover_kg,1)+' кг':'бутыль пустая';return{ts:x.ts,k:'ch',t:`${cn(x.chemical_id)} · дозатор ${x.machine_group==='11_12'?'11–12':'1–10'}`,m:'остаток: '+left+(x.connect_id?' · подключён':''),by:x.created_by};})
-  ].sort((a,b)=>new Date(b.ts)-new Date(a.ts)).slice(0,10);
-  if(!items.length)return'';
-  return `<section aria-label="Последние операции"><div class="sh"><div><h2>Последние операции</h2><p>Синие — загрузка белья, оранжевые — замена химии</p></div>${S.can?'<a class="lnk" href="journal.html">Весь журнал →</a>':''}</div>
-   <div class="ops">${items.map(i=>`<article class="op ${i.k}"><div class="r1"><span class="tg ${i.k}">${i.k==='ld'?'🧺 Загрузка белья':'⚗ Замена химии'}</span><span class="tm">${hhmm(i.ts)}</span></div><div class="tt">${esc(i.t)}</div><div class="mt">${esc(i.m)}${who(i.by)?' · внёс: '+esc(who(i.by)):''}</div></article>`).join('')}</div></section>`;
-}
-
 function dashView(){
   const ms=machines(),em=showLogin(S.session.user.email),ini=em.slice(0,2).toUpperCase();
   const loc=new Date(Date.now()+S.tz*3600e3),first=S.forms.find(f=>f.type==='laundry_load'&&canFill(f)),firstChem=S.forms.find(f=>f.type==='laundry_chem'&&canFill(f));
   const hh=n=>String(n).padStart(2,'0'),acts=[];
-  S.forms.filter(canFill).forEach(f=>acts.push([f.type==='laundry_chem'?'⚗':'▤',f.name,f.type==='laundry_chem'?'Замена химии':'Загрузка белья','form.html?f='+encodeURIComponent(f.slug),f.type==='laundry_chem'?'ch':'']));
-  if(S.can){acts.push(['▦','Бланк за смену','Проверить и подготовить отчёт','blank.html']);acts.push(['▥','Отчёт по сменам','Теория и факт по химии','report.html']);acts.push(['☰','Журнал изменений','Кто что добавил, исправил и удалил','journal.html']);}
-  if(S.isSuper){acts.push(['⚙','Настройки','Химия, рецепты, бланки','settings.html']);acts.push(['☺','Пользователи','Создать и выдать доступ','admin.html']);
-    S.forms.forEach(f=>acts.push(['▣','QR: '+f.name,'Печать QR-кода','qr.html?f='+encodeURIComponent(f.slug)]));}
+  S.forms.filter(canFill).forEach(f=>acts.push([f.type==='laundry_chem'?'⚗':'▤',f.name,f.type==='laundry_chem'?'Замена химии':'Загрузка белья','form.html?f='+encodeURIComponent(f.slug),f.type==='laundry_chem'?'ch':'',0]));
+  if(S.can){acts.push(['▦','Бланк за смену','Проверить и подготовить отчёт','blank.html','',1]);acts.push(['▥','Отчёт по сменам','Теория и факт по химии','report.html','',1]);acts.push(['☰','Журнал','Все операции: кто что добавил, исправил и удалил','journal.html','',1]);}
+  if(S.isSuper){acts.push(['⚙','Настройки','Химия, рецепты, бланки','settings.html','',2]);acts.push(['☺','Пользователи','Создать и выдать доступ','admin.html','',2]);
+    S.forms.forEach(f=>acts.push(['▣','QR: '+f.name,'Печать QR-кода','qr.html?f='+encodeURIComponent(f.slug),'',2]));}
   const vis=ms.filter(m=>tab==='all'||(tab==='main'?m.id<=10:m.id>=11));
   const T=[['all','Все машины'],['main','Дозатор 1 · 1–10'],['extra','Дозатор 2 · 11–12']];
   app.innerHTML=`
@@ -235,8 +218,7 @@ function dashView(){
     <span class="ct"><i></i><i></i><i></i></span><span class="dr"><strong>${hh(m.id)}</strong></span>
     <span class="st">${m.status==='working'?'Стирка · '+m.left+' мин':'Свободна'}</span></button>
     <button class="btn s ${m.status==='working'?'p':''}" data-m="${m.id}">${m.status==='working'?'Открыть':'Добавить загрузку'} →</button></article>`).join('')}</div></section>
-  ${feedBlock()}
-  ${acts.length?`<section class="qg" aria-label="Быстрые действия">${acts.map(a=>`<a class="qa ${a[4]||''}" href="${a[3]}"><span class="qi">${a[0]}</span><span><b>${esc(a[1])}</b><small>${esc(a[2])}</small></span><span>→</span></a>`).join('')}</section>`
+  ${acts.length?`<section aria-label="Разделы сайта">${[['Записи смены',0],['Отчёты и журнал',1],['Администрирование',2]].map(([t,g],k,all)=>{const l=acts.filter(a=>a[5]===g);return l.length?`<p class="gl">${t}</p><div class="qg" style="margin-top:.25rem;padding-bottom:.5rem">${l.map(a=>`<a class="qa ${a[4]||''}" href="${a[3]}"><span class="qi">${a[0]}</span><span><b>${esc(a[1])}</b><small>${esc(a[2])}</small></span><span>→</span></a>`).join('')}</div>`:''}).join('')}</section>`
    :'<p class="hint">Вам пока не выдан доступ ни к одному бланку. Обратитесь к суперадмину.</p>'}
   </main><div id="ovl"></div>`;
   $('#out').onclick=async()=>{await sb.auth.signOut();loginView();};

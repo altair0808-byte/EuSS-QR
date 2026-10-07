@@ -7,11 +7,9 @@ const data={report_changes:[{id:'A',ts:'2026-10-06T10:00:00Z',shift_date:'2026-1
 const sb={rpc:(fn)=>{const r={then:(res)=>res({data:data[fn]||[],error:null}),range:()=>r};return r}};
 const cache={};const mkEl=()=>new Proxy({style:{},classList:{toggle(){}},dataset:{}},{get:(t,k)=>k in t?t[k]:undefined,set:(t,k,v)=>{t[k]=v;return true}});
 const el=mkEl();el.querySelector=s=>s.includes(':focus')?null:(cache[s]||(cache[s]=mkEl()));el.isConnected=true;
-let raf=null;const ctx={sb,document:{head:{insertAdjacentHTML(){}}},requestAnimationFrame:f=>{raf=f},Date,Math,String,Promise,Object,Array,JSON};
+let raf=null;const ctx={setInterval:()=>0,clearInterval(){},sb,document:{head:{insertAdjacentHTML(){}}},requestAnimationFrame:f=>{raf=f},Date:class extends Date{static now(){return Date.parse('2026-10-07T20:59:00Z')}},Math,String,Promise,Object,Array,JSON};
 vm.createContext(ctx);vm.runInContext(fs.readFileSync('storage-anim.js','utf8')+';this.SA=StorageAnim;',ctx);
 const refs={water:55,chemicals:chems,recipes:[{wash_type_id:1,chemical_id:1,ml_per_l:3}]};
 (async()=>{await ctx.SA.mount(el,{refs,date:'2026-10-07',st:6,tz:5,can:true});
- el.onclick({target:{closest:()=>({dataset:{a:'go'},textContent:''})}});
- for(let t=0,k=0;k<400;k++){t+=400;raf&&raf(t)}   // ~ быстро прокручиваем сутки (3×: 30 с)
- const tb=cache['[data-r=tb]'].innerHTML.replace(/<[^>]+>/g,'|').replace(/\|+/g,'|');console.log(tb);
- const pan=cache['[data-r=pan]'].innerHTML.replace(/<[^>]+>/g,'|').replace(/\|+/g,'|').slice(0,260);console.log(pan);})();
+  const tb=el.innerHTML.replace(/<[^>]+>/g,'|').replace(/\|+/g,'|');console.log(tb);
+ })();
