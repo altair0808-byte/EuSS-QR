@@ -132,22 +132,34 @@ body{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-ri
 .rg b,.rg small{position:relative;line-height:1}.rg b{font-family:Sora,sans-serif;font-size:1.1rem}.rg small{font-size:.58rem;color:var(--mf)}
 .sb{display:flex;height:.5rem;border-radius:99px;overflow:hidden;background:oklch(.93 .01 200)}.sb i{display:block;background:oklch(.72 .11 174)}.sb i+i{background:oklch(.69 .17 48)}
 /* плитки машин */
-.mt{display:grid;grid-template-columns:repeat(auto-fill,minmax(4.5rem,1fr));gap:.5rem}
-.t1{position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:center;gap:.1rem;padding:.55rem .2rem .6rem;border:1px solid var(--bd);border-radius:.8rem;background:var(--card);cursor:pointer;font:inherit;color:inherit}
+.mt{display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem}
+.t1{position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:center;gap:.1rem;min-height:8.6rem;padding:.8rem .3rem 1rem;border:1px solid var(--bd);border-radius:1rem;background:var(--card);cursor:pointer;font:inherit;color:inherit}
 .t1:hover{filter:brightness(.97)}.t1:active{transform:scale(.97)}
-.t1 b{font-family:Sora,sans-serif;font-size:1.2rem;line-height:1.1}
-.t1 small{font-size:.66rem;color:var(--mf)}
-.t1 i{position:absolute;top:.4rem;right:.4rem;width:.5rem;height:.5rem;border-radius:50%;background:oklch(.72 .15 150)}
+.t1 b{font-family:Sora,sans-serif;font-size:1.3rem;line-height:1.1}
+.t1 small{max-width:100%;padding:0 .3rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.74rem;font-weight:700;color:var(--mf)}.t1.on small{color:var(--pri)}.t1 small.wn{font-weight:600;color:var(--ink,var(--fg));opacity:.75}
+.t1 i{position:absolute;top:.55rem;right:.55rem;width:.6rem;height:.6rem;border-radius:50%;background:oklch(.72 .15 150)}
 .t1.on{background:oklch(.975 .025 55);border-color:oklch(.69 .17 48)}.t1.on i{background:oklch(.69 .17 48);animation:tp 1.6s infinite}
-.t1 em{position:absolute;left:0;bottom:0;height:.2rem;background:oklch(.69 .17 48)}
+.t1 em{position:absolute;left:0;bottom:0;height:.3rem;background:oklch(.69 .17 48)}
 @keyframes tp{50%{opacity:.35}}
-.t1 .dm{position:relative;display:grid;place-items:center;width:2.9rem;aspect-ratio:1;margin:.15rem 0 .25rem;border:.28rem solid var(--sec);border-radius:99px;background:var(--mut);box-shadow:inset 0 0 0 1px var(--bd)}
-.t1 .dm b{font-size:1.05rem}
+.t1 .dm{position:relative;display:grid;place-items:center;width:4.2rem;aspect-ratio:1;margin:.1rem 0 .45rem;border:.34rem solid var(--sec);border-radius:99px;background:var(--mut);box-shadow:inset 0 0 0 1px var(--bd)}
+.t1 .dm b{font-size:1.45rem}
 .t1.on .dm{animation:bsh .35s linear infinite;border-color:color-mix(in oklab,var(--pri) 28%,#fff);background:color-mix(in oklab,var(--pri) 7%,#fff);color:var(--pri)}
-.t1.on .dm::after{content:"";position:absolute;inset:-.28rem;border:.14rem solid transparent;border-top-color:var(--pri);border-radius:99px;animation:sp 3.2s linear infinite}
+.t1.on .dm::after{content:"";position:absolute;inset:-.34rem;border:.18rem solid transparent;border-top-color:var(--pri);border-radius:99px;animation:sp 3.2s linear infinite}
 @media(prefers-reduced-motion:reduce){.t1.on .dm,.t1.on .dm::after,.t1.on i{animation:none}}
 
 @media(min-width:768px){.ag{grid-template-columns:repeat(4,1fr)}}
+@media(min-width:520px){.mt{grid-template-columns:repeat(4,1fr)}}
+@media(min-width:800px){.mt{grid-template-columns:repeat(6,1fr)}}
+@media(max-width:380px){.t1{min-height:7.8rem}.t1 .dm{width:3.6rem}.ah .hv{font-size:1.8rem}}
+
+.pc{margin:.9rem 0 0;padding:.9rem 1rem;border:1px solid color-mix(in oklab,var(--pri) 35%,var(--bd));border-radius:1rem;background:color-mix(in oklab,var(--pri) 6%,#fff)}
+.pc .pi{display:flex;justify-content:space-between;align-items:baseline;gap:.5rem}.pc .pi b{font-family:Sora,sans-serif;font-size:1.15rem}.pc .pk{font-weight:800;color:var(--pri)}
+.pc .pbar{height:.7rem;margin:.7rem 0 .4rem;border-radius:99px;background:oklch(.92 .01 200);overflow:hidden}.pc .pbar i{display:block;height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,var(--pri),oklch(.69 .17 48));transition:width .6s}
+.pc .pst{display:flex;justify-content:space-between;gap:.5rem;font-size:.78rem;color:var(--mf)}.pc .pst b{display:block;font-size:1rem;color:var(--fg)}
+.pc .pw{margin:.6rem 0 0;font-size:.8rem;color:var(--mf)}
+.pc .pch{margin:.7rem 0 0;padding:.6rem .7rem;border-radius:.7rem;background:#fff;font-size:.82rem}.pc .pch p{margin:0 0 .25rem;font-size:.68rem;font-weight:800;text-transform:uppercase;color:var(--mf)}
+.pc .pch div{display:flex;justify-content:space-between;gap:.5rem;padding:.12rem 0}
+.pc .btn{margin-top:.8rem;width:100%}
 </style></head>
 <body><div id="app"><p class="hint" style="padding:1rem">Загрузка…</p></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
@@ -281,11 +293,12 @@ function dashView(){
    <div class="av">${esc(ini)}</div><button class="ib" id="out" aria-label="Выйти" title="Выйти">⎋</button></div></div></header>
   <main><div class="top"><div><p class="eb">Сегодня, ${loc.getUTCDate()} ${MON[loc.getUTCMonth()]}</p><h1>Обзор текущей смены</h1></div>
    <div class="acts">${first?`<a class="btn p" href="form.html?f=${encodeURIComponent(first.slug)}">🧺 Загрузка белья</a>`:''}${firstChem?`<a class="btn c" href="form.html?f=${encodeURIComponent(firstChem.slug)}">⚗ Замена химии</a>`:''}</div></div>
-  ${isAdm?'<div id="asum"></div><div id="rsd"></div>':''}
-  ${(()=>{const M=metrics(ms);return leftoverBlock()+M.blocks.map(b=>`<section aria-label="${esc(b.title)}"><p class="gl">${esc(b.title)}</p><div class="mg">${b.cards.map(([l,v,u,n,c])=>`<article class="m ${c}"><p class="l">${l}</p><p class="v">${v} ${u?`<small>${u}</small>`:''}</p><p class="n">${n}</p></article>`).join('')}</div></section>`).join('')+`<p class="hint" style="margin:.75rem 0 0">Всего по двум дозаторам: ${fmt(M.total.n)} стирок · ${fmt(M.total.kg)} кг</p>`;})()}
+  ${isAdm?'<div id="asum"></div>':''}
   <section><div class="sh"><div><h2>Стиральные машины</h2><p>Нажмите на машину, чтобы открыть запись</p></div>
    <div class="tabs" role="tablist">${T.map(([id,l])=>`<button role="tab" aria-selected="${tab===id}" data-t="${id}">${l}</button>`).join('')}</div></div>
-   <div class="mt">${vis.map(m=>{const on=m.status==='working',pr=on&&m.w?.minutes?Math.min(100,Math.max(0,(1-m.left/m.w.minutes)*100)):0;return `<button class="t1 ${on?'on':''}" data-m="${m.id}" aria-label="Машина ${m.id}: ${on?'стирка, осталось '+m.left+' мин':'свободна'}"><i></i><span class="dm"><b>${hh(m.id)}</b></span><small>${on?m.left+' мин':'свободна'}</small>${on?`<em style="width:${pr.toFixed(0)}%"></em>`:''}</button>`;}).join('')}</div></section>
+   <div class="mt">${vis.map(m=>{const on=m.status==='working',pr=on&&m.w?.minutes?Math.min(100,Math.max(0,(1-m.left/m.w.minutes)*100)):0;return `<button class="t1 ${on?'on':''}" data-m="${m.id}" aria-label="Машина ${m.id}: ${on?'стирка, осталось '+m.left+' мин':'свободна'}"><i></i><span class="dm"><b>${hh(m.id)}</b></span><small>${on?'осталось '+m.left+' мин':'свободна'}</small>${on?`<small class="wn">${esc(m.w?.name||'Стирка')}</small>`:''}${on?`<em style="width:${pr.toFixed(0)}%"></em>`:''}</button>`;}).join('')}</div></section>
+  ${isAdm?'<div id="rsd"></div>':''}
+  ${(()=>{const M=metrics(ms);return leftoverBlock()+M.blocks.map(b=>`<section aria-label="${esc(b.title)}"><p class="gl">${esc(b.title)}</p><div class="mg">${b.cards.map(([l,v,u,n,c])=>`<article class="m ${c}"><p class="l">${l}</p><p class="v">${v} ${u?`<small>${u}</small>`:''}</p><p class="n">${n}</p></article>`).join('')}</div></section>`).join('')+`<p class="hint" style="margin:.75rem 0 0">Всего по двум дозаторам: ${fmt(M.total.n)} стирок · ${fmt(M.total.kg)} кг</p>`;})()}
   ${acts.length?`<section aria-label="Разделы сайта">${[['Записи смены',0],['Отчёты и журнал',1],['Администрирование',2]].map(([t,g],k,all)=>{const l=acts.filter(a=>a[5]===g);return l.length?`<p class="gl">${t}</p><div class="qg" style="margin-top:.25rem;padding-bottom:.5rem">${l.map(a=>`<a class="qa ${a[4]||''}" href="${a[3]}"><span class="qi">${a[0]}</span><span><b>${esc(a[1])}</b><small>${esc(a[2])}</small></span><span>→</span></a>`).join('')}</div>`:''}).join('')}</section>`
    :'<p class="hint">Вам пока не выдан доступ ни к одному бланку. Обратитесь к суперадмину.</p>'}
   </main><div id="ovl"></div>`;
@@ -297,24 +310,37 @@ function dashView(){
   if(sel){const m=ms.find(m=>m.id===sel);if(m)panel(m,first);}
 }
 
+function chemBlock(l){
+  const rows=calcReport([l],[],S.refs).groups.all.chem.map(c=>{const ref=S.refs.chemicals.find(x=>x.id===c.id)||{};
+    const g=c.kind==='extra'&&ref.per_unit_unit==='g',v=g?c.theory?.kg:c.theory?.l;return v>0?`<div><span>${esc(c.name)}</span><b>${fmt(v,3)} ${g?'кг':'л'}</b></div>`:'';}).join('');
+  return rows?`<div class="pch"><p>Химия по рецепту (теория)</p>${rows}</div>`:'';
+}
 function panel(m,first){
+  clearInterval(window.__ptm);
   const l=m.last,busy=m.status==='working',wt=S.refs.washTypes,ex=S.refs.chemicals.filter(c=>c.kind==='extra');
   const hhmm=ts=>new Date(new Date(ts).getTime()+S.tz*3600e3).toISOString().slice(11,16);
   let w=null;
   $('#ovl').innerHTML=`<div class="ov" id="bg"><section class="pn" role="dialog" aria-modal="true" aria-label="Машина ${m.id}">
    <div class="ph"><div><p class="eb">${busy?'Стирка идёт':'Свободна'}</p><h2>Машина ${String(m.id).padStart(2,'0')}</h2><p>${m.id<=10?'Основной дозатор · 1–10':'Отдельный дозатор · 11–12'}</p></div><button class="ib" id="cl" aria-label="Закрыть">✕</button></div>
-   ${busy?`<div class="cur ld"><div><b>🧺 ${esc(m.w?.name||'Загрузка')}</b><span>${fmt(l.weight_kg,1)} кг · с ${hhmm(l.ts)} · осталось ${m.left} мин${who(l.created_by)?'<br>Загрузил: '+esc(who(l.created_by)):''}</span></div><button class="btn p" id="fin">✓ Постиралось</button></div>`:''}
+   ${busy?`<div class="pc"><div class="pi"><b>🧺 ${esc(m.w?.name||'Загрузка')}</b><span class="pk">${fmt(l.weight_kg,1)} кг</span></div>
+   <div class="pbar"><i id="pbi"></i></div>
+   <div class="pst"><span>Начало<b>${hhmm(l.ts)}</b></span><span>Прошло<b id="ppc">0%</b></span><span>Осталось<b id="plf">${m.left} мин</b></span><span>Конец<b>${hhmm(new Date(new Date(l.ts).getTime()+(m.w?.minutes||0)*60000))}</b></span></div>
+   ${who(l.created_by)?`<p class="pw">Загрузил: ${esc(who(l.created_by))}</p>`:''}${chemBlock(l)}
+   <button class="btn p" id="fin">✓ Постиралось</button></div>`:''}
    ${first?`<h3>${busy?'Следующая стирка':'Вид стирки'}</h3>
    <div class="wl" id="wl">${wt.map(x=>`<button data-v="${x.id}"><span>${esc(x.name)}</span>${x.minutes?`<small>${x.minutes} мин</small>`:''}</button>`).join('')}</div>
    <h3>Вес, кг</h3><div class="kgr"><button id="mi" aria-label="Меньше">−</button><input id="kg" type="number" inputmode="decimal" min="0" step="any" value="25"><button id="pl" aria-label="Больше">+</button></div>
    ${ex.length?`<h3>Дополнительно, количество (шт)</h3><div class="xg">${ex.map(x=>`<label>${esc(x.name)}<input type="number" min="0" step="1" inputmode="numeric" data-x="${x.id}" data-u="${+x.per_unit||0}" data-un="${x.per_unit_unit==='g'?'г':'мл'}" placeholder="0"><small class="xs">1 шт = ${+x.per_unit||0} ${x.per_unit_unit==='g'?'г':'мл'}</small></label>`).join('')}</div>`:''}
    <button class="btn p wide" id="save">${busy?'Записать и начать следующую':'Записать загрузку'}</button>`
    :'<p class="hint" style="margin-top:1rem">Нет доступа к бланку загрузки.</p>'}</section></div>`;
-  const close=()=>{sel=null;$('#ovl').innerHTML='';document.onkeydown=null;};
+  const close=()=>{clearInterval(window.__ptm);sel=null;$('#ovl').innerHTML='';document.onkeydown=null;};
   document.onkeydown=e=>{if(e.key==='Escape')close();};
   $('#cl').onclick=close;$('#bg').onmousedown=e=>{if(e.target.id==='bg')close();};
   const fin=async()=>{const{error}=await sb.rpc('finish_load',{p_id:l.id});if(error){toast('Не удалось: '+error.message);return false;}return true;};
   if($('#fin'))$('#fin').onclick=async()=>{$('#fin').disabled=true;if(await fin()){await loadLoads();toast('Машина '+m.id+' свободна');dashView();}else $('#fin').disabled=false;};
+  if(busy&&$('#pbi')){const t0=new Date(l.ts).getTime(),tot=(m.w?.minutes||0)*60000,tick=()=>{const now=Date.now(),pc=tot>0?Math.min(100,Math.max(0,(now-t0)/tot*100)):0,lf=Math.max(0,Math.ceil((t0+tot-now)/60000));
+    if($('#pbi'))$('#pbi').style.width=pc+'%';if($('#ppc'))$('#ppc').textContent=Math.round(pc)+'%';if($('#plf'))$('#plf').textContent=lf>0?lf+' мин':'время вышло';};
+    tick();window.__ptm=setInterval(tick,15000);}
   if(!first)return;
   document.querySelectorAll('[data-x]').forEach(i=>i.oninput=()=>{const n=+i.value||0,u=+i.dataset.u;i.nextElementSibling.textContent=n>0?n+' шт × '+u+' = '+fmt(n*u)+' '+i.dataset.un:'1 шт = '+u+' '+i.dataset.un;});
   $('#wl').onclick=e=>{const b=e.target.closest('button');if(!b)return;w=+b.dataset.v;$('#wl').querySelectorAll('button').forEach(x=>x.classList.toggle('sel',x===b));};
