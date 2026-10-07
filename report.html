@@ -1,6 +1,26 @@
 <!doctype html>
 <html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#2aa3b5">
-<title>Отчёт по сменам — EuSS</title><link rel="icon" href="favicon.png" type="image/png"><link rel="stylesheet" href="style.css"></head>
+<title>Отчёт по сменам — EuSS</title><link rel="icon" href="favicon.png" type="image/png"><link rel="stylesheet" href="style.css"><style>
+.rv{margin:1rem 0 .25rem;display:grid;gap:.6rem}
+.sbx{padding:.7rem .9rem;border:1px solid var(--ln);border-radius:var(--r);background:var(--card);box-shadow:var(--sh)}
+.sbx .sl{display:flex;justify-content:space-between;gap:.5rem;font-size:.78rem;color:var(--mut)}.sbx .sl b{color:var(--ink)}
+.sbx .sb2{display:flex;height:.6rem;margin:.4rem 0;border-radius:99px;overflow:hidden;background:var(--tint)}
+.sbx .sb2 i{display:block;background:var(--ac)}.sbx .sb2 i+i{background:oklch(.69 .17 48)}
+.sbx>p{margin:0 0 .1rem;font-size:.68rem;font-weight:800;text-transform:uppercase;color:var(--mut)}
+.sgrid{display:grid;gap:.6rem}@media(min-width:720px){.sgrid{grid-template-columns:1fr 1fr}}
+.rtabs{margin:.9rem 0 0}
+.gh{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:.5rem;margin:1.25rem 0 .1rem}.gh h2{margin:0}.gh small{color:var(--mut)}
+.csum{display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem;margin:.6rem 0}
+.csum div{padding:.65rem .8rem;border:1px solid var(--ln);border-radius:var(--r);background:var(--card);box-shadow:var(--sh)}
+.csum span{display:block;font-size:.66rem;font-weight:800;text-transform:uppercase;color:var(--mut)}.csum b{font-family:Sora,sans-serif;font-size:1.15rem}
+.csum .bad b{color:#b42318}.csum .good b{color:oklch(.5 .12 160)}
+.cn3{margin:.2rem 0 .6rem;font-size:.75rem;color:var(--mut)}
+.cmw{display:grid;gap:.6rem}.cmw .cm+.cm{margin-top:0}@media(min-width:1000px){.cmw{grid-template-columns:1fr 1fr}}
+.wb .bz{width:38%}.wb .bz span{display:block;height:.55rem;border-radius:99px;background:var(--tint);overflow:hidden}.wb .bz i{display:block;height:100%;border-radius:99px;background:var(--ac)}
+.wb td:last-child,.wb th:last-child{text-align:right;white-space:nowrap}
+@media(max-width:639px){.wb .bz{display:none}}
+</style>
+</head>
 <body>
 <header class="hd"><div><a class="lg" href="index.html" aria-label="На панель смены"><img src="euss-logo.png" alt="EuSS"><span class="sep"></span><span class="sub">Отчёты</span></a><nav class="nav"><a class="btn s" href="index.html">← Панель</a></nav></div></header>
 <main class="wide">
@@ -18,7 +38,7 @@
 <script>
 const esc=t=>String(t??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const f=n=>Num.fmt(n);   // без округления: 0,175 → «0,175», 0,350 → «0,35»
-let refs=null,tz=5,st=6,seq=0,canEdit=false,byId={},byCh={},nm={},cache={loads:[],changes:[],conns:[]},kindF='all';
+let tabR='all',R=null,refs=null,tz=5,st=6,seq=0,canEdit=false,byId={},byCh={},nm={},cache={loads:[],changes:[],conns:[]},kindF='all';
 const who=id=>(id&&nm[id])||'';
 const shiftToday=()=>new Date(Date.now()+(tz-st)*3600e3).toISOString().slice(0,10);
 const addDays=(d,n)=>new Date(new Date(d+'T00:00:00Z').getTime()+n*864e5).toISOString().slice(0,10);
@@ -37,16 +57,40 @@ function chemTable(g){
       <div><span>Разница</span><b>${dif(c)}</b></div>
       <div class="st"><span>Остаток</span>${ex?'<b>–</b>':`<b>${has?'в запасе: '+two(c.stock).replace('<br>',' · '):'в запасе: нет'}</b>${con?`<small>подключено: ${two(c.connected).replace('<br>',' · ')}</small>`:''}`}</div>
     </div></div>`;}).join('');
-  return `<div>${body}</div>`;
+  return `<div class="cmw">${body}</div>`;
 }
 function washTable(g){
-  return `<div class="box"><table class="tbl"><tr><th>Вид стирки</th><th>Стирок</th><th>Кг</th></tr>
-  ${refs.washTypes.filter(w=>g.byWash[w.id]).map(w=>`<tr><td>${esc(w.name)}</td><td>${g.byWash[w.id].n}</td><td>${f(g.byWash[w.id].kg,0)}</td></tr>`).join('')||'<tr><td colspan="3">За период стирок нет</td></tr>'}</table></div>`;
+  const rows=refs.washTypes.filter(w=>g.byWash[w.id]),mx=Math.max(1,...rows.map(w=>g.byWash[w.id].kg)),tk=rows.reduce((x,w)=>x+g.byWash[w.id].kg,0);
+  return `<div class="box"><table class="tbl wb"><tr><th>Вид стирки</th><th>Стирок</th><th>Кг</th><th class="bz"></th><th>Доля</th></tr>
+  ${rows.map(w=>{const v=g.byWash[w.id];return `<tr><td>${esc(w.name)}</td><td>${v.n}</td><td>${f(v.kg,0)}</td><td class="bz"><span><i style="width:${(v.kg/mx*100).toFixed(0)}%"></i></span></td><td>${tk>0?Math.round(v.kg/tk*100)+'%':'–'}</td></tr>`;}).join('')||'<tr><td colspan="5">За период стирок нет</td></tr>'}</table></div>`;
+}
+function chemSum(g){
+  const m=g.chem.filter(c=>c.kind==='main'&&c.theory&&c.theory.l!=null),th=m.reduce((x,c)=>x+c.theory.l,0);
+  const w=m.filter(c=>c.changes&&c.actual&&c.actual.l!=null),thW=w.reduce((x,c)=>x+c.theory.l,0),ac=w.reduce((x,c)=>x+c.actual.l,0),pct=thW>0?(ac-thW)/thW*100:null;
+  const cls=pct==null?'':pct>10?'bad':pct<-10?'good':'';
+  return `<div class="csum"><div><span>Теория, основная химия</span><b>${f(th)} л</b></div><div><span>Факт, по заменам</span><b>${w.length?f(ac)+' л':'–'}</b></div><div class="${cls}"><span>Отклонение</span><b>${pct==null?'–':(pct>0?'+':'')+Num.fmt(pct,1)+'%'}</b></div></div>
+  <p class="cn3">Итоги по основной химии. Факт и отклонение считаются только по позициям, где были замены бутылей (${w.length} из ${m.length}). Доп. средства — в карточках ниже, по загрузкам.</p>`;
 }
 function groupBlock(title,g){
-  return `<section><h2>${title}</h2><div class="kpi"><div><b>${g.total}</b><span>стирок</span></div><div><b>${f(g.kg,0)}</b><span>кг белья</span></div></div>
-  <h2>Стирки по видам</h2>${washTable(g)}
-  <h2>Химия: теория и факт</h2>${chemTable(g)}</section>`;
+  return `<section><div class="gh"><h2>${title}</h2></div>
+  <div class="kpi"><div><b>${g.total}</b><span>стирок</span></div><div><b>${f(g.kg,0)}</b><span>кг белья</span></div><div><b>${g.total?Num.fmt(g.kg/g.total,1):'–'}</b><span>средний вес загрузки, кг</span></div></div>
+  <div class="gh"><h2>Стирки по видам</h2></div>${washTable(g)}
+  <div class="gh"><h2>Химия: теория и факт</h2></div>${chemSum(g)}${chemTable(g)}</section>`;
+}
+const split=(t,a,b,la,lb,fa,fb)=>{const sum=a+b,pa=sum>0?a/sum*100:50;return `<div class="sbx"><p>${t}</p><div class="sb2"><i style="width:${pa.toFixed(0)}%"></i><i style="width:${(100-pa).toFixed(0)}%"></i></div><div class="sl"><span>${la}: <b>${fa}</b></span><span>${lb}: <b>${fb}</b></span></div></div>`;};
+const RT=[['all','Итого'],['1_10','Дозатор 1'],['11_12','Дозатор 2'],['ops','Журнал операций']];
+function draw(){
+  const r=R,A=r.groups.all,g1=r.groups['1_10'],g2=r.groups['11_12'];
+  const chL=g=>g.chem.filter(c=>c.kind==='main').reduce((x,c)=>x+(c.theory?.l||0),0);
+  let body;
+  if(tabR==='ops')body=`<div class="gh"><h2>Журнал операций</h2></div><p class="hint">Синие записи — загрузка белья, оранжевые — замена химии, фиолетовые — подключение остатка.</p>
+    <div class="seg" id="kf" role="group" aria-label="Что показывать"><button data-v="all">Все</button><button data-v="ld">🧺 Загрузки</button><button data-v="ch">⚗ Химия</button></div>
+    <div class="ops" id="opsw" style="margin-top:.75rem"></div>`;
+  else body=groupBlock(tabR==='all'?'Итого · оба дозатора':tabR==='1_10'?'Дозатор 1 · машины 1–10':'Дозатор 2 · машины 11–12',r.groups[tabR]);
+  $('#out').innerHTML=`<div class="rv"><div class="kpi"><div><b>${r.total}</b><span>стирок всего</span></div><div><b>${f(r.kg,0)}</b><span>кг всего</span></div><div><b>${r.total?Num.fmt(r.kg/r.total,1):'–'}</b><span>средний вес, кг</span></div><div><b>${f(chL(A))} л</b><span>химия, теория</span></div></div>
+    <div class="sgrid">${split('День / ночь',r.byPart.day,r.byPart.night,'день',' ночь',r.byPart.day+' стирок',r.byPart.night+' стирок')}${split('Дозатор 1 / Дозатор 2 · вес',g1.kg,g2.kg,'Д1 (1–10)','Д2 (11–12)',f(g1.kg,0)+' кг · '+g1.total+' ст.',f(g2.kg,0)+' кг · '+g2.total+' ст.')}</div></div>
+    <div class="seg rtabs" role="tablist">${RT.map(([id,l])=>`<button role="tab" aria-selected="${tabR===id}" class="${tabR===id?'on':''}" data-rt="${id}">${l}</button>`).join('')}</div>${body}`;
+  if(tabR==='ops')renderOps();
 }
 
 async function show(){
@@ -58,17 +102,7 @@ async function show(){
   if(error||e2||e3){$('#out').innerHTML='<p class="err">Не удалось загрузить данные. Выполните supabase.sql, затем stage3.sql … stage12.sql.</p>';return;}
   nm=Object.fromEntries(((sn&&sn.data)||[]).map(x=>[x.id,x.name]));
   const loads=data||[],chgAll=chg||[],cnAll=cn||[],changes=chgAll.filter(x=>x.shift_date>=d1),conns=cnAll.filter(x=>x.shift_date>=d1),r=calcReport(loads,changes,refs,conns,{changes:chgAll,connects:cnAll,levels:lv||[]});
-  cache={loads,changes,conns};
-  $('#out').innerHTML=`
-    <div class="kpi"><div><b>${r.total}</b><span>стирок всего</span></div><div><b>${f(r.kg,0)}</b><span>кг всего</span></div><div><b>${r.byPart.day}</b><span>день</span></div><div><b>${r.byPart.night}</b><span>ночь</span></div></div>
-    ${groupBlock('Дозатор 1 · машины 1–10',r.groups['1_10'])}
-    ${groupBlock('Дозатор 2 · машины 11–12',r.groups['11_12'])}
-    <section><h2>Общий итог · оба дозатора</h2>${groupBlock('Стирки и химия вместе',r.groups.all)}</section>
-    <h2>Журнал операций</h2>
-    <p class="hint">Синие записи — загрузка белья, оранжевые — замена химии, фиолетовые — подключение остатка.</p>
-    <div class="seg" id="kf" role="group" aria-label="Что показывать"><button data-v="all">Все</button><button data-v="ld">🧺 Загрузки</button><button data-v="ch">⚗ Химия</button></div>
-    <div class="ops" id="opsw" style="margin-top:.75rem"></div>`;
-  renderOps();
+  cache={loads,changes,conns};R=r;draw();
 }
 function renderOps(){
   const wn={},cn2={};refs.washTypes.forEach(w=>wn[w.id]=w.name);refs.chemicals.forEach(c=>cn2[c.id]=c.name);
@@ -184,6 +218,7 @@ function editPanel(l){
   $('#rm').onclick=()=>{close();delRec('ld',l.id);};
 }
 $('#out').onclick=e=>{
+  const tb=e.target.closest('[data-rt]');if(tb){tabR=tb.dataset.rt;draw();return;}
   const k=e.target.closest('#kf [data-v]');if(k){kindF=k.dataset.v;renderOps();return;}
   const b=e.target.closest('[data-ed]');if(b&&byId[b.dataset.ed]){editPanel(byId[b.dataset.ed]);return;}
   const c=e.target.closest('[data-edc]');if(c&&byCh[c.dataset.edc]){chemEdit(byCh[c.dataset.edc]);return;}

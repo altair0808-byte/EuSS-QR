@@ -38,16 +38,27 @@
     const tzH = sv('tz_offset') ?? 5, stH = sv('shift_start') ?? 6;
     const state = new Map();
     let lastIds = null, tab = 'all', busy = new Map();
-    async function loadBusy() {                                  // какие машины сейчас стирают (как в главном меню)
-      const since = new Date(Date.now() - 864e5).toISOString();
-      const { data } = await sb.from('loads').select('machine,ts,wash_type_id,finished_at').gte('ts', since).order('ts');
+    let names = {};
+    try { const n = await sb.rpc('staff_names'); names = Object.fromEntries(((n && n.data) || []).map(x => [x.id, x.name])); } catch (e) {}
+    const hhmm = t => new Date(t + tzH * 3600e3).toISOString().slice(11, 16);
+    async function loadBusy() {                       // что сейчас стирается: видно ВСЕМ сотрудникам (machine_status из stage14.sql)
+      const sd = new Date(Date.now() + (tzH - stH) * 3600e3), d0 = sd.toISOString().slice(0, 10), d1 = new Date(sd.getTime() - 864e5).toISOString().slice(0, 10);
+      const [r0, r1] = await Promise.all([sb.rpc('machine_status', { d: d0 }), sb.rpc('machine_status', { d: d1 })]);
+      let data;
+      if (!r0.error) data = [...(r1.data || []), ...(r0.data || [])];
+      else { const since = new Date(Date.now() - 864e5).toISOString(); data = (await sb.from('loads').select('machine,ts,wash_type_id,weight_kg,finished_at,created_by').gte('ts', since).order('ts')).data || []; }   // до stage14.sql: только свои
+      data.sort((a, b) => new Date(a.ts) - new Date(b.ts));
       const now = Date.now(), last = {}; busy = new Map();
-      (data || []).forEach(l => { last[l.machine] = l; });
+      data.forEach(l => { last[l.machine] = l; });
       Object.values(last).forEach(l => {
-        const w = washTypes.find(x => x.id === l.wash_type_id), end = new Date(l.ts).getTime() + (w?.minutes || 0) * 60000;
-        if (!l.finished_at && now < end) busy.set(l.machine, Math.max(1, Math.ceil((end - now) / 60000)));
+        const w = washTypes.find(x => x.id === l.wash_type_id), t0 = new Date(l.ts).getTime(), tot = (w?.minutes || 0) * 60000, end = t0 + tot;
+        if (!l.finished_at && now < end) busy.set(l.machine, { left: Math.max(1, Math.ceil((end - now) / 60000)), name: w?.name || 'Стирка', kg: +l.weight_kg || 0,
+          start: hhmm(t0), end: hhmm(end), pc: tot > 0 ? Math.min(100, Math.max(0, (now - t0) / tot * 100)) : 0, who: names[l.created_by] || '' });
       });
     }
+    { const st = document.createElement('style'); st.textContent = '.bi{margin:.75rem 0;padding:.85rem 1rem;border:1px solid var(--ac);border-radius:1rem;background:color-mix(in oklab,var(--ac) 7%,#fff)}.bi .bt{display:flex;justify-content:space-between;gap:.5rem;font-size:1.05rem}.bi .bt span{font-weight:800;color:var(--ac)}.bi .bp{height:.65rem;margin:.6rem 0 .4rem;border-radius:99px;background:rgb(0 0 0/.08);overflow:hidden}.bi .bp i{display:block;height:100%;border-radius:99px;background:var(--ac)}.bi .bs{display:flex;justify-content:space-between;gap:.5rem;font-size:.78rem;opacity:.8}.bi .bs b{display:block;font-size:1rem}.bi p{margin:.5rem 0 0;font-size:.8rem;opacity:.8}'; document.head.appendChild(st); }
+    const busyInfo = m => { const b = busy.get(m); if (!b) return ''; return `<div class="bi"><div class="bt"><b>🧺 Сейчас в машине: ${esc(b.name)}</b><span>${fmt(b.kg)} кг</span></div><div class="bp"><i style="width:${b.pc.toFixed(0)}%"></i></div><div class="bs"><span>Начало<b>${b.start}</b></span><span>Осталось<b>${b.left} мин</b></span><span>Конец<b>${b.end}</b></span></div>${b.who ? `<p>Загрузил: ${esc(b.who)}</p>` : ''}</div>`; };
+    const busyLine = m => { const b = busy.get(m); return `${esc(b.name)} · ${fmt(b.kg)} кг · ${b.left} мин`; };
     if (!document.getElementById('busy-css')) { const st = document.createElement('style'); st.id = 'busy-css';
       st.textContent = '.on .dr::after{content:"";position:absolute;inset:-.45rem;border:.22rem solid transparent;border-top-color:var(--ac);border-radius:99px;animation:bsp 3.2s linear infinite}.on .dr{animation:bsh .35s linear infinite}@keyframes bsp{to{transform:rotate(360deg)}}@keyframes bsh{25%{transform:translate(.6px,-.4px)}75%{transform:translate(-.5px,.4px)}}@media(prefers-reduced-motion:reduce){.on .dr,.on .dr::after{animation:none}}';
       document.head.appendChild(st); }
@@ -69,7 +80,7 @@
         <section class="mg" aria-label="Итоги">${M.map(([l, v, u, n, c]) => `<article class="m ${c}"><p class="l">${l}</p><p class="v">${v} ${u ? `<small>${u}</small>` : ''}</p><p class="n">${n}</p></article>`).join('')}</section>
         <div class="sh"><div><h2>Стиральные машины</h2><p>Выберите машину, задайте вид стирки и вес, затем проверьте всё и отправьте</p></div>
           <div class="seg" role="tablist">${T.map(([id, l]) => `<button role="tab" aria-selected="${tab === id}" class="${tab === id ? 'on' : ''}" data-t="${id}">${l}</button>`).join('')}</div></div>
-        <div class="mgr">${vis.map(m => { const v = state.get(m); const b = busy.get(m); return `<article class="mc ${v ? 'set' : ''} ${b ? 'on' : ''}"><button class="mv" data-m="${m}" aria-label="Машина ${m}"><span class="ct"><i></i><i></i><i></i></span><span class="dr"><strong>${hh(m)}</strong></span><span class="st">${v ? esc(wname(v.wash_type_id)) + ' · ' + fmt(v.weight_kg) + ' кг' : b ? 'Стирка · ' + b + ' мин' : 'Не настроена'}</span></button><button class="btn s ${v ? '' : 'p'}" data-m="${m}">${v ? 'Изменить' : 'Настроить'} →</button></article>`; }).join('')}</div>
+        <div class="mgr">${vis.map(m => { const v = state.get(m); const b = busy.get(m); return `<article class="mc ${v ? 'set' : ''} ${b ? 'on' : ''}"><button class="mv" data-m="${m}" aria-label="Машина ${m}"><span class="ct"><i></i><i></i><i></i></span><span class="dr"><strong>${hh(m)}</strong></span><span class="st">${v ? esc(wname(v.wash_type_id)) + ' · ' + fmt(v.weight_kg) + ' кг' : b ? busyLine(m) : 'Не настроена'}</span></button><button class="btn s ${v ? '' : 'p'}" data-m="${m}">${v ? 'Изменить' : 'Настроить'} →</button></article>`; }).join('')}</div>
         <div class="bar"><button class="go" id="review">Проверить всё${state.size ? ' · ' + state.size + ' ' + mw(state.size) : ''}</button>
         <button class="ghost" id="undo" hidden>Отменить последнюю запись</button></div><div id="ovl"></div>`;
       document.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { tab = b.dataset.t; render(); });
@@ -84,6 +95,7 @@
       let w = old.wash_type_id;
       $('#ovl').innerHTML = `<div class="ov" id="bg"><section class="pn" role="dialog" aria-modal="true" aria-label="Машина ${machine}">
         <div class="ph"><div><p class="eb">${state.has(machine) ? 'Настроена' : 'Новая настройка'}</p><h2>Машина ${hh(machine)}</h2><p class="hint">${dos(machine)}</p></div><button class="ib" id="cl" aria-label="Закрыть">✕</button></div>
+        ${busyInfo(machine)}
         <h3>Вид стирки</h3>
         <div class="list" id="wg">${washTypes.map(x => `<button data-v="${x.id}" class="${+old.wash_type_id === x.id ? 'on' : ''}"><span>${esc(x.name)}</span>${x.minutes ? `<small>${x.minutes} мин</small>` : ''}</button>`).join('')}</div>
         <h3>Вес, кг</h3>
