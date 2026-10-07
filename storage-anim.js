@@ -66,6 +66,7 @@ const StorageAnim = (() => {
     function levelPanel(j) {
       const c = D.chems[sel], d = dens(c), g = G[j], last = [...D.ch, ...D.cn].filter(x => +x.chemical_id === +c.id && (x.machine_group || '1_10') === g).map(T).sort((a, b) => a - b).pop();
       const now = Date.now(), def = Math.min(now, last || D.d0), ov = document.createElement('div');
+      let exact = def;   // точный момент в мс; поле datetime-local режет секунды и уводило уровень раньше замены
       ov.style.cssText = 'position:fixed;inset:0;z-index:90;display:flex;align-items:center;justify-content:center;background:rgb(0 0 0/.35);padding:1rem';
       ov.innerHTML = `<section role="dialog" aria-modal="true" style="background:#fff;color:#123;border-radius:.75rem;max-width:26rem;width:100%;padding:1.1rem;max-height:92dvh;overflow:auto;box-shadow:0 20px 50px rgb(0 0 0/.3)">
         <h3 style="margin:0 0 .3rem">${E(c.name)} · дозатор ${GN[j]}</h3>
@@ -81,13 +82,14 @@ const StorageAnim = (() => {
       document.body.appendChild(ov);
       const $ = q => ov.querySelector(q), close = () => { ov.remove(); document.removeEventListener('keydown', esc); }, esc = e => { if (e.key === 'Escape') close(); };
       document.addEventListener('keydown', esc); ov.onmousedown = e => { if (e.target === ov) close(); }; $('#lv-no').onclick = close;
-      const upd = () => { const v = parseFloat($('#lv-a').value.replace(',', '.')), kg = $('#lv-u').value === 'kg', at = new Date($('#lv-t').value).getTime();
+      const atMs = () => exact != null ? exact : new Date($('#lv-t').value).getTime();
+      const upd = () => { const v = parseFloat($('#lv-a').value.replace(',', '.')), kg = $('#lv-u').value === 'kg', at = atMs();
         $('#lv-cv').textContent = d && isFinite(v) ? '≈ ' + f(kg ? v / d : v * d) + (kg ? ' л' : ' кг') : '';
         $('#lv-h').textContent = last && at < last ? 'Этот момент раньше последней замены бутыли: замена сбрасывает уровень, поэтому текущий остаток это не изменит.' : ''; };
-      ov.oninput = ov.onchange = upd; upd();
-      ov.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { $('#lv-t').value = loc(+b.dataset.p); upd(); });
+      ov.oninput = ov.onchange = e => { if (e && e.target && e.target.id === 'lv-t') exact = null; upd(); }; upd();
+      ov.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { exact = +b.dataset.p; $('#lv-t').value = loc(exact); upd(); });
       $('#lv-ok').onclick = async () => {
-        const v = parseFloat($('#lv-a').value.replace(',', '.')), kg = $('#lv-u').value === 'kg', at = new Date($('#lv-t').value).getTime();
+        const v = parseFloat($('#lv-a').value.replace(',', '.')), kg = $('#lv-u').value === 'kg', at = atMs();
         if (!isFinite(v) || v < 0) { o.toast && o.toast('Укажите, сколько было'); return; }
         if (!isFinite(at) || at > Date.now() + 3e5) { o.toast && o.toast('Выберите момент не позже текущего'); return; }
         const b = $('#lv-ok'); b.disabled = true;
