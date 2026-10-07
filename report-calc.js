@@ -154,4 +154,199 @@ function calcReport(loads, changes, refs, connects, ctx, moves, levels) {
     byWash: groups.all.byWash
   };
 }
-if (typeof module !== 'undefined') module.exports = { calcReport, chemUsed, addDaysISO };
+
+// ===================== Закрытие по замерам (этап 15) =====================
+// Факт расхода химии БАЛАНСОМ между двумя замерами остатка В ДОЗАТОРЕ (кг), отдельно по химикату и дозатору:
+//   расход факт = остаток на начало + приход − остаток на конец
+// «Приход» (нетто) строится из событий, которые сайт уже ведёт, и считается тем же проходом по событиям, что и chemUsed:
+//   + новая бутыль при замене (номинал «1 шт = кг» из настроек)
+//   − остаток старой бутыли, который при замене ушёл из дозатора в запас (его вводит бригадир)
+//   + подключённый остаток; при этом подключение ЗАМЕНЯЕТ бутыль (как в chemUsed: ёмкость = подключённый остаток),
+//     поэтому не поставленная бутыль вычитается (строка «вместо бутыли»)
+//   + залили из запаса (pour), + добавил суперадмин (add)
+//   − забрали из дозатора (take)
+//   ± поправка «в дозаторе реально было X» (levels): ёмкость заменяется на X, разница идёт в поправку
+// Период полуоткрытый: [t0, t1). Событие ровно в момент замера относится к СЛЕДУЮЩЕМУ периоду, поэтому замеры
+// стыкуются без разрывов и без пересечений. Всё считается в кг; литры и штуки получаются через плотность.
+const CLOSE_GROUPS = ['1_10', '11_12'];
+
+// момент замера: дата смены + shift_start (местное время) → UTC ISO. Для tz=5, st=6: 2026-10-07 → 2026-10-07T01:00:00.000Z
+function boundaryTs(dateISO, tz, st) {
+  const [y, m, d] = String(dateISO).split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d, (st == null ? 6 : +st) - (tz == null ? 5 : +tz))).toISOString();
+}
+// какие химикаты закрываются по замеру: вся основная + доп. средства, отмеченные «ведётся на дозаторе» (chemicals.in_closing)
+const closingChems = chemicals => (chemicals || []).filter(c => c.kind === 'main' || c.in_closing === true);
+
+// Потоки одного химиката в одном дозаторе за период [t0, t1), в кг.
+// ev = { changes, connects, moves, levels } с запасом назад по времени (как для chemUsed), чтобы знать состояние на t0.
+function dispenserFlows(c, group, t0, t1, ev) {
+  const T = x => new Date(x.ts).getTime() || 0;
+  const A = new Date(t0).getTime(), B = new Date(t1).getTime();
+  const dn = (+c.bottle_l > 0 && +c.bottle_kg > 0) ? +c.bottle_kg / +c.bottle_l : null;
+  const size = +c.bottle_kg > 0 ? +c.bottle_kg : null;
+  const f = { bottles: 0, leftovers: 0, connects: 0, replacedByConnect: 0, pours: 0, adds: 0, takes: 0, levelAdj: 0,
+              nBottles: 0, noLeft: 0, clipped: 0, needDensity: false, needSize: false };
+  // значение в кг: kg, если есть; иначе литры через плотность. null — значения нет, undefined — есть только литры, а плотности нет
+  const kgOf = (x, key) => {
+    const kg = x[key + '_kg'], l = x[key + '_l'];
+    if (kg != null && isFinite(+kg)) return +kg;
+    if (l != null && isFinite(+l)) return dn ? +l * dn : undefined;
+    return null;
+  };
+  const mine = a => (a || []).filter(x => +x.chemical_id === +c.id && (x.machine_group || '1_10') === group);
+  const ev2 = [];
+  mine(ev.changes).forEach(x => ev2.push({ k: 0, t: T(x), x }));
+  mine(ev.connects).forEach(x => ev2.push({ k: 1, t: T(x), x }));
+  mine(ev.moves).forEach(x => ev2.push({ k: -1, t: T(x), x }));
+  mine(ev.levels).forEach(x => ev2.push({ k: 2, t: T(x), x }));
+  ev2.sort((a, b) => a.t - b.t || a.k - b.k);                // тот же порядок, что в chemUsed
+  let pending = 0, adj = 0, lvl = null;
+  const base = () => pending > 0 ? pending : lvl != null ? lvl : size;
+  for (const e of ev2) {
+    if (e.t >= B) break;
+    const inP = e.t >= A;
+    if (e.k === -1) {                                          // перемещение: take / pour / add
+      const a = kgOf(e.x, 'amount');
+      if (a === undefined && inP) f.needDensity = true;
+      if (!(a > 0)) continue;
+      const kind = e.x.kind === 'take' ? 'take' : e.x.kind === 'add' ? 'add' : 'pour';
+      adj += kind === 'take' ? -a : a;
+      if (inP) f[kind === 'take' ? 'takes' : kind === 'add' ? 'adds' : 'pours'] += a;
+    } else if (e.k === 1) {                                    // подключение остатка
+      const a = kgOf(e.x, 'amount');
+      if (a === undefined && inP) f.needDensity = true;
+      if (!(a > 0)) continue;
+      if (inP && base() == null) f.needSize = true;
+      const old = pending > 0 ? 0 : (base() || 0);             // первое подключение заменяет бутыль (или уровень); следующие только добавляются
+      pending += a;
+      if (inP) { f.connects += a; f.replacedByConnect -= old; }
+    } else if (e.k === 2) {                                    // «в дозаторе реально было X»
+      const a = kgOf(e.x, 'amount');
+      if (a === undefined && inP) f.needDensity = true;
+      if (a == null || !isFinite(a) || a < 0) continue;
+      if (inP && base() == null) f.needSize = true;
+      if (inP) f.levelAdj += a - ((base() || 0) + adj);
+      pending = 0; adj = 0; lvl = a;
+    } else {                                                   // замена бутыли
+      let left = kgOf(e.x, 'leftover');
+      if (left === undefined && inP) f.needDensity = true;
+      const noLeft = left == null || !isFinite(left);
+      if (noLeft) left = 0;
+      if (size == null) { if (inP) f.needSize = true; }
+      const cap = Math.max(0, (base() || 0) + adj);
+      const eff = Math.max(0, Math.min(cap, left));
+      if (inP) {
+        f.bottles += size || 0; f.leftovers += eff; f.nBottles++;
+        if (noLeft) f.noLeft++;
+        if (!noLeft && left > cap + 1e-9) f.clipped++;
+      }
+      pending = 0; adj = 0; lvl = null;
+    }
+  }
+  f.inflow = f.bottles + f.connects + f.replacedByConnect + f.pours + f.adds + f.levelAdj - f.leftovers - f.takes;   // «приход, нетто»
+  return f;
+}
+
+// Расчёт закрытия за период.
+// inp: {
+//   from, to      — даты замеров (смена, с которой начинается замер), 'YYYY-MM-DD'; период = смены from … to−1
+//   tz, st        — settings: tz_offset, shift_start
+//   startKg, endKg — замеры { '<id химии>:<дозатор>': кг }; startKg берётся из предыдущего закрытия
+//   loads         — загрузки (любые; берутся только с ts внутри периода)
+//   changes, connects, moves, levels — события с запасом назад (60 дней), как в отчёте
+//   residents     — { 'YYYY-MM-DD': число } или null, если нет доступа / не введено
+//   warnPct       — порог «больше теории», % (settings.close_warn_pct), по умолчанию 25
+// }
+// Возвращает { rows, totals, problems, warnings, canClose }. problems мешают закрытию, warnings требуют подтверждения.
+function calcClosing(refs, inp) {
+  const tz = inp.tz == null ? 5 : +inp.tz, st = inp.st == null ? 6 : +inp.st;
+  const t0 = boundaryTs(inp.from, tz, st), t1 = boundaryTs(inp.to, tz, st);
+  const A = new Date(t0).getTime(), B = new Date(t1).getTime();
+  const inPeriod = x => { const t = new Date(x.ts).getTime(); return t >= A && t < B; };
+  const warnPct = inp.warnPct == null ? 25 : +inp.warnPct;
+  const problems = [], warnings = [];
+  const chems = closingChems(refs.chemicals);
+  const loads = (inp.loads || []).filter(inPeriod);
+  const ev = { changes: inp.changes || [], connects: inp.connects || [], moves: inp.moves || [], levels: inp.levels || [] };
+  // теория и старый факт «по замене» — прежним расчётом сайта, на тех же данных
+  const rep = calcReport(loads, ev.changes.filter(inPeriod), refs, ev.connects.filter(inPeriod),
+    { changes: ev.changes, connects: ev.connects, moves: ev.moves, levels: ev.levels }, ev.moves.filter(inPeriod), ev.levels);
+  // дни периода и проживающие
+  const days = []; for (let d = inp.from; d < inp.to; d = addDaysISO(d, 1)) days.push(d);
+  let residentDays = null, residentMissing = 0;
+  if (inp.residents) {
+    residentDays = 0; days.forEach(d => { const n = inp.residents[d]; if (n == null) residentMissing++; else residentDays += +n || 0; });
+    if (!(residentDays > 0)) residentDays = null;
+    else if (residentMissing) warnings.push({ type: 'residents', text: `Не введены проживающие за ${residentMissing} из ${days.length} смен: показатели «на жителя» занижены/неполные` });
+  }
+  const dens = c => (+c.bottle_l > 0 && +c.bottle_kg > 0) ? +c.bottle_kg / +c.bottle_l : null;
+  const rows = [];
+  chems.forEach(c => {
+    const d = dens(c), name = c.name;
+    const tRow = {};
+    CLOSE_GROUPS.forEach(g => { tRow[g] = rep.groups[g].chem.find(x => +x.id === +c.id); });
+    const mk = (g, label) => {
+      const key = c.id + ':' + g;
+      const f = dispenserFlows(c, g, t0, t1, ev);
+      const th = tRow[g].theory, old = tRow[g].actual;
+      let start = inp.startKg ? inp.startKg[key] : undefined, end = inp.endKg ? inp.endKg[key] : undefined;
+      const base = { chemical_id: c.id, name, kind: c.kind, group: g };
+      if (end == null || !isFinite(+end)) problems.push({ type: 'missing', chemical_id: c.id, group: g, text: `Нет замера на конец: ${name}, ${label}` });
+      if (start == null || !isFinite(+start)) { warnings.push({ type: 'start_assumed', chemical_id: c.id, group: g, text: `Нет начального замера: ${name}, ${label}. Принят 0 кг (новый химикат?)` }); start = 0; }
+      if (c.kind === 'main' && !d) problems.push({ type: 'density', chemical_id: c.id, group: g, text: `${name}: задайте в настройках «1 шт = литров» и «1 шт = кг» (плотность)` });
+      if (c.kind === 'main' && !(+c.bottle_kg > 0) && !problems.some(p => p.type === 'density' && p.chemical_id === c.id)) problems.push({ type: 'density', chemical_id: c.id, group: g, text: `${name}: задайте в настройках «1 шт = кг»` });
+      if (f.needDensity) problems.push({ type: 'density', chemical_id: c.id, group: g, text: `${name}: есть записи только в литрах, а плотность не задана (настройки)` });
+      if (f.needSize) problems.push({ type: 'density', chemical_id: c.id, group: g, text: `${name}: не задано «1 шт = кг» (настройки)` });
+      if (th.kg == null) problems.push({ type: 'density', chemical_id: c.id, group: g, text: `${name}: теорию нельзя перевести в кг, задайте плотность (настройки)` });
+      const have = end != null && isFinite(+end);
+      const fact = have ? +start + f.inflow - +end : null;
+      const theory = th.kg;
+      const dev = fact != null && theory != null ? fact - theory : null;
+      const pct = dev != null && theory > 0 ? dev / theory * 100 : null;
+      return { ...base, start_kg: +start, end_kg: have ? +end : null, flows: f, inflow_kg: f.inflow, fact_kg: fact, theory_kg: theory,
+               dev_kg: dev, dev_pct: pct, ratio: fact != null && theory > 0 ? fact / theory : null,
+               old_fact_kg: old ? old.kg : null, density: d, bottle_kg: +c.bottle_kg > 0 ? +c.bottle_kg : null };
+    };
+    const g1 = mk('1_10', 'дозатор 1 (машины 1–10)'), g2 = mk('11_12', 'дозатор 2 (машины 11–12)');
+    const sum = (a, b) => a == null || b == null ? null : a + b;
+    const fl = {}; Object.keys(g1.flows).forEach(k => { fl[k] = typeof g1.flows[k] === 'boolean' ? g1.flows[k] || g2.flows[k] : g1.flows[k] + g2.flows[k]; });
+    const all = { chemical_id: c.id, name, kind: c.kind, group: 'all', start_kg: g1.start_kg + g2.start_kg, end_kg: sum(g1.end_kg, g2.end_kg), flows: fl, inflow_kg: fl.inflow,
+      fact_kg: sum(g1.fact_kg, g2.fact_kg), theory_kg: sum(g1.theory_kg, g2.theory_kg), old_fact_kg: sum(g1.old_fact_kg, g2.old_fact_kg), density: d, bottle_kg: g1.bottle_kg };
+    all.dev_kg = all.fact_kg != null && all.theory_kg != null ? all.fact_kg - all.theory_kg : null;
+    all.dev_pct = all.dev_kg != null && all.theory_kg > 0 ? all.dev_kg / all.theory_kg * 100 : null;
+    all.ratio = all.fact_kg != null && all.theory_kg > 0 ? all.fact_kg / all.theory_kg : null;
+    [g1, g2, all].forEach(r => {
+      const gk = r.group === 'all' ? rep.groups.all : rep.groups[r.group];
+      const lmk = gk.kg, wsh = gk.total;                        // кг белья и число стирок этого дозатора (или обоих)
+      const lit = r.fact_kg != null && d ? r.fact_kg / d : null;
+      r.fact_l = lit;
+      r.fact_pc = r.fact_kg != null && r.bottle_kg ? r.fact_kg / r.bottle_kg : null;
+      r.theory_l = r.theory_kg != null && d ? r.theory_kg / d : null;
+      // «мл» для жидкой химии (есть плотность), «г» для остальной (порошок)
+      const small = r.fact_kg == null ? null : d ? r.fact_l * 1000 : r.fact_kg * 1000;
+      r.unit_small = d ? 'мл' : 'г';
+      r.per_kg_laundry = small != null && lmk > 0 ? small / lmk : null;
+      r.per_wash = small != null && wsh > 0 ? small / wsh : null;
+      r.per_resident_day = small != null && r.group === 'all' && residentDays ? small / residentDays : null;   // на жителя в сутки: сумма проживающих по сменам
+      r.laundry_kg = lmk; r.washes = wsh;
+      if (r.group !== 'all' && r.fact_kg != null) {
+        const nm = `${r.name}, ${r.group === '1_10' ? 'дозатор 1' : 'дозатор 2'}`;
+        if (r.fact_kg < -1e-9) warnings.push({ type: 'negative', chemical_id: r.chemical_id, group: r.group, value: r.fact_kg, text: `Расход отрицательный: ${nm}. Проверьте замеры, заливки и замены` });
+        else if (r.dev_pct != null && r.dev_pct > warnPct) warnings.push({ type: 'over', chemical_id: r.chemical_id, group: r.group, value: r.dev_pct, limit: warnPct, text: `Расход больше теории сверх порога: ${nm}` });
+        if (r.flows.noLeft) warnings.push({ type: 'noLeft', chemical_id: r.chemical_id, group: r.group, text: `${nm}: у ${r.flows.noLeft} замен не указан остаток (принят 0)` });
+        if (r.flows.clipped) warnings.push({ type: 'clipped', chemical_id: r.chemical_id, group: r.group, text: `${nm}: у ${r.flows.clipped} замен остаток больше ёмкости (учтена только ёмкость)` });
+      }
+      rows.push(r);
+    });
+  });
+  // убрать дубли проблем (одна и та же проблема для двух дозаторов)
+  const seen = new Set(), uniq = problems.filter(p => { const k = p.type + '|' + p.chemical_id + '|' + (p.type === 'missing' ? p.group : p.text); if (seen.has(k)) return false; seen.add(k); return true; });
+  return {
+    from: inp.from, to: inp.to, t0, t1, days: days.length,
+    totals: { washes: rep.total, laundry_kg: rep.kg, byGroup: { '1_10': { washes: rep.groups['1_10'].total, laundry_kg: rep.groups['1_10'].kg }, '11_12': { washes: rep.groups['11_12'].total, laundry_kg: rep.groups['11_12'].kg } },
+              resident_days: residentDays, resident_missing_days: residentMissing },
+    rows, problems: uniq, warnings, canClose: uniq.length === 0
+  };
+}
+if (typeof module !== 'undefined') module.exports = { calcReport, chemUsed, addDaysISO, calcClosing, dispenserFlows, boundaryTs, closingChems };
