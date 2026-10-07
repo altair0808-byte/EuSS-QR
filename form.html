@@ -5,7 +5,7 @@
 <header class="hd"><div><a class="lg" href="index.html" aria-label="На панель смены"><img src="euss-logo.png" alt="EuSS"><span class="sep"></span><span class="sub">Бланки</span></a><nav class="nav"><a class="btn s" href="index.html">← Панель</a></nav></div></header>
 <main id="app"><p class="hint">Загрузка…</p></main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="config.js"></script><script src="num.js"></script><script src="app.js"></script><script src="leftover.js"></script>
+<script src="config.js"></script><script src="num.js"></script><script src="app.js"></script><script src="leftover.js"></script><script src="wm.js"></script>
 <script>
 (async () => {
   const ses = await need(); if (!ses) return;
@@ -62,6 +62,7 @@
     if (!document.getElementById('busy-css')) { const st = document.createElement('style'); st.id = 'busy-css';
       st.textContent = '.on .dr::after{content:"";position:absolute;inset:-.45rem;border:.22rem solid transparent;border-top-color:var(--ac);border-radius:99px;animation:bsp 3.2s linear infinite}.on .dr{animation:bsh .35s linear infinite}@keyframes bsp{to{transform:rotate(360deg)}}@keyframes bsh{25%{transform:translate(.6px,-.4px)}75%{transform:translate(-.5px,.4px)}}@media(prefers-reduced-motion:reduce){.on .dr,.on .dr::after{animation:none}}';
       document.head.appendChild(st); }
+    { const st2 = document.createElement('style'); st2.textContent = '.mv .wm{max-width:min(82%,8.5rem)}'; document.head.appendChild(st2); }
     await loadBusy();
     setInterval(async () => { if (document.querySelector('.mgr') && !document.querySelector('#ovl .ov')) { await loadBusy(); render(); } }, 30000);
     const hh = n => String(n).padStart(2, '0');
@@ -80,7 +81,7 @@
         <section class="mg" aria-label="Итоги">${M.map(([l, v, u, n, c]) => `<article class="m ${c}"><p class="l">${l}</p><p class="v">${v} ${u ? `<small>${u}</small>` : ''}</p><p class="n">${n}</p></article>`).join('')}</section>
         <div class="sh"><div><h2>Стиральные машины</h2><p>Выберите машину, задайте вид стирки и вес, затем проверьте всё и отправьте</p></div>
           <div class="seg" role="tablist">${T.map(([id, l]) => `<button role="tab" aria-selected="${tab === id}" class="${tab === id ? 'on' : ''}" data-t="${id}">${l}</button>`).join('')}</div></div>
-        <div class="mgr">${vis.map(m => { const v = state.get(m); const b = busy.get(m); return `<article class="mc ${v ? 'set' : ''} ${b ? 'on' : ''}"><button class="mv" data-m="${m}" aria-label="Машина ${m}"><span class="ct"><i></i><i></i><i></i></span><span class="dr"><strong>${hh(m)}</strong></span><span class="st">${v ? esc(wname(v.wash_type_id)) + ' · ' + fmt(v.weight_kg) + ' кг' : b ? busyLine(m) : 'Не настроена'}</span></button><button class="btn s ${v ? '' : 'p'}" data-m="${m}">${v ? 'Изменить' : 'Настроить'} →</button></article>`; }).join('')}</div>
+        <div class="mgr">${vis.map(m => { const v = state.get(m); const b = busy.get(m); return `<article class="mc ${v ? 'set' : ''} ${b ? 'on' : ''}"><button class="mv" data-m="${m}" aria-label="Машина ${m}">${WM.html({n:m,on:!!b,left:b?b.left:null,set:!!v,scr:v?'✓':undefined})}<span class="st">${v ? esc(wname(v.wash_type_id)) + ' · ' + fmt(v.weight_kg) + ' кг' : b ? busyLine(m) : 'Не настроена'}</span></button><button class="btn s ${v ? '' : 'p'}" data-m="${m}">${v ? 'Изменить' : 'Настроить'} →</button></article>`; }).join('')}</div>
         <div class="bar"><button class="go" id="review">Проверить всё${state.size ? ' · ' + state.size + ' ' + mw(state.size) : ''}</button>
         <button class="ghost" id="undo" hidden>Отменить последнюю запись</button></div><div id="ovl"></div>`;
       document.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { tab = b.dataset.t; render(); });
