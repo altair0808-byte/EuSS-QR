@@ -275,7 +275,8 @@ const ChemStats = (() => {
       const miss = T.all - T.poured.n;
       // факт по закрытым отрезкам месяца: сумма фактического расхода основной химии из сохранённых закрытий (если они есть)
       let fact = '<b>–</b><small>появится после закрытия</small>';
-      const cls = (cl && cl.data) || [];
+      // только отрезки, которые начались в этом месяце: закрытие на 1 число закрывает ПРОШЛЫЙ месяц и сюда не относится
+      const cls = ((cl && cl.data) || []).filter(c => c.snapshot && c.snapshot.from ? c.snapshot.from >= d1 : c.boundary_date > d1);
       if (cls.length) {
         const kg = cls.reduce((s, c) => s + ((c.snapshot && c.snapshot.rows) || []).filter(x => x.group === 'all' && x.kind === 'main').reduce((a, x) => a + (+x.fact_kg || 0), 0), 0);
         fact = `<b>${fmt(kg)} <i>кг</i></b><small>по закрытым сменам (${cls.length})</small>`;
