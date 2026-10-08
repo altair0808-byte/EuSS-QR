@@ -163,7 +163,7 @@ body{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-ri
 </style></head>
 <body><div id="app"><p class="hint" style="padding:1rem">Загрузка…</p></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="config.js"></script><script src="num.js"></script><script src="app.js"></script><script src="report-calc.js"></script><script src="leftover.js"></script><script src="residents.js"></script><script src="wm.js"></script><script src="closing-dash.js"></script>
+<script src="config.js"></script><script src="num.js"></script><script src="app.js"></script><script src="report-calc.js"></script><script src="leftover.js"></script><script src="residents.js"></script><script src="wm.js"></script><script src="closing-dash.js"></script><script src="chem-stats.js"></script>
 <script>
 const esc=t=>String(t??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const fmt=n=>Num.fmt(n);   // без округления: 0,175 → «0,175», 0,350 → «0,35»
@@ -297,7 +297,7 @@ function dashView(){
   <main><div class="top"><div><p class="eb">Сегодня, ${loc.getUTCDate()} ${MON[loc.getUTCMonth()]}</p><h1>Обзор текущей смены</h1></div>
    <div class="acts">${first?`<a class="btn p" href="form.html?f=${encodeURIComponent(first.slug)}">🧺 Загрузка белья</a>`:''}${firstChem?`<a class="btn c" href="form.html?f=${encodeURIComponent(firstChem.slug)}">⚗ Замена химии</a>`:''}</div></div>
   ${isAdm?'<div id="asum"></div>':''}
-  ${isAdm||S.isSuper?'<div id="clp"></div>':''}
+  ${isAdm||S.isSuper?'<div id="cmo"></div><div id="clp"></div>':''}
   <section><div class="sh"><div><h2>Стиральные машины</h2><p>Нажмите на машину, чтобы открыть запись</p></div>
    <div class="tabs" role="tablist">${T.map(([id,l])=>`<button role="tab" aria-selected="${tab===id}" data-t="${id}">${l}</button>`).join('')}</div></div>
    <div class="mt">${vis.map(m=>{const on=m.status==='working',pr=on&&m.w?.minutes?Math.min(100,Math.max(0,(1-m.left/m.w.minutes)*100)):0;return `<button class="t1 ${on?'on':''}" data-m="${m.id}" aria-label="Машина ${m.id}: ${on?'стирка, осталось '+m.left+' мин':'свободна'}">${WM.html({n:m.id,on,left:m.left})}<small class="wn">${on?esc(m.w?.name||'Стирка'):'свободна'}</small>${on?`<em style="width:${pr.toFixed(0)}%"></em>`:''}</button>`;}).join('')}</div></section>
@@ -308,7 +308,7 @@ function dashView(){
   </main><div id="ovl"></div>`;
   $('#out').onclick=async()=>{await sb.auth.signOut();Residents.reset();isAdm=false;loginView();};
   bindLeftover();
-  if(isAdm||S.isSuper)ClosingDash.mount($('#clp'),{tz:S.tz,st:S.st,refs:S.refs||null});
+  if(isAdm||S.isSuper){ChemStats.mountMonth($('#cmo'),{tz:S.tz,st:S.st,refs:S.refs||null});ClosingDash.mount($('#clp'),{tz:S.tz,st:S.st,refs:S.refs||null});}
   if(isAdm){drawSummary();Residents.mount($('#rsd'),shiftDate(),{today:shiftDate(),toast,onValue:drawSummary});}
   document.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{tab=b.dataset.t;dashView();});
   document.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{sel=+b.dataset.m;panel(ms.find(m=>m.id===sel),first);});

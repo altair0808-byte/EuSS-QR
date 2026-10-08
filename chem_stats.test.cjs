@@ -34,17 +34,21 @@ const M = CS.calc(refs, rep, ev, from, to, tz, st), R = id => M.rows.find(r => r
 
 console.log('1. Расчёт «залито» и «израсходовано»');
 t('теория: 2 загрузки в разных дозаторах', () => { near(R(1).g['1_10'].theory.l, 55 * 2 / 1000); near(R(1).g['11_12'].theory.l, 55 * 4 / 1000); near(R(1).g.all.theory.l, 0.33); });
-t('залито дозатор 1: бутыль 22 кг + добавил 5 − забрал 1 = 26 кг', () => { near(R(1).g['1_10'].poured.kg, 26); near(R(1).g['1_10'].poured.l, 26 / 1.1); });
+t('залито дозатор 1 (нетто): бутыль 22 + добавил 5 − убранный остаток 2 − забрал 1 = 24 кг', () => { near(R(1).g['1_10'].poured.kg, 24); near(R(1).g['1_10'].poured.l, 24 / 1.1); });
 t('залито дозатор 2: пусто = 0', () => near(R(1).g['11_12'].poured.kg, 0));
-t('залито итого = сумма дозаторов', () => near(R(1).g.all.poured.kg, 26));
-t('штуки через бутыль 22 кг', () => near(R(1).g['1_10'].poured.pc, 26 / 22));
+t('залито итого = сумма дозаторов', () => near(R(1).g.all.poured.kg, 24));
+t('штуки через бутыль 22 кг', () => near(R(1).g['1_10'].poured.pc, 24 / 22));
 t('нет плотности и кг бутыли: залито не считаем, нужна подсказка', () => { assert.strictEqual(R(2).g['1_10'].poured, null); assert.strictEqual(R(2).g['1_10'].need, true); });
 t('доп. средство без «ведётся на дозаторе»: залито не считается, теория есть', () => { assert.strictEqual(R(3).tracked, false); assert.strictEqual(R(3).g.all.poured, null); near(R(3).g.all.theory.l, 2 * 50 / 1000); });
 t('доп. средство «ведётся на дозаторе» попадает в залито', () => assert.strictEqual(R(4).tracked, true));
 t('замена в другую смену не попадает в период', () => { const m2 = CS.calc(refs, rep, ev, '2026-10-09', '2026-10-09', tz, st); near(m2.rows[0].g.all.poured.kg, 0); });
 
+t('перевзвешивание: реальный уровень 10 кг при расчётном 26 → залито уменьшается на 16', () => {
+  const ev2 = { ...ev, levels: [{ id: 'l1', ts: at(7), shift_date: from, chemical_id: 1, machine_group: '1_10', amount_kg: 10, amount_l: null, created_by: 'u3' }] };
+  const m2 = CS.calc(refs, rep, ev2, from, to, tz, st); near(m2.rows[0].g['1_10'].poured.kg, 24 - 16); });
+
 console.log('\n2. Итоги');
-t('итоги: теория по основной химии и отмеченным доп.', () => { const T = CS.totals(M, 'all'); assert.strictEqual(T.all, 3); assert.ok(T.theory.nL >= 1); near(T.poured.kg, 26); });
+t('итоги: теория по основной химии и отмеченным доп.', () => { const T = CS.totals(M, 'all'); assert.strictEqual(T.all, 3); assert.ok(T.theory.nL >= 1); near(T.poured.kg, 24); });
 
 console.log('\n3. Кто, где, во сколько');
 const nm = { u1: 'Иванов', u2: 'Петров', u3: 'Бригадир' };
@@ -56,6 +60,7 @@ t('сводка по сотрудникам и машинам', () => { const e 
 t('сумма строк расхода = теория по химикату', () => { const e = CS.events(refs, ctx, refs.chemicals[0], 'all'); near(e.use.reduce((s, r) => s + r.amt.l, 0), R(1).g.all.theory.l); });
 t('доп. средство: расход есть, залитого нет', () => { const e = CS.events(refs, ctx, refs.chemicals[2], 'all'); assert.strictEqual(e.use.length, 1); assert.strictEqual(e.fill.length, 0); });
 t('неизвестный сотрудник не ломает список', () => { const e = CS.events(refs, { ...ctx, nm: {} }, refs.chemicals[0], 'all'); assert.strictEqual(e.use[0].who, ''); });
+t('замена в списке: вклад = бутыль минус убранный остаток, сумма строк = итогу', () => { const e = CS.events(refs, ctx, refs.chemicals[0], 'all'); near(e.fill.find(x => x.k === 'chg').amt.kg, 20); near(e.fill.reduce((s, x) => s + x.sign * x.amt.kg, 0), R(1).g.all.poured.kg); });
 
 console.log('\n4. Вывод');
 t('render: названия, «Залито», «Израсходовано», подсказки', () => { const h = CS.render(M, 'all'); assert.ok(h.includes('Щёлочь') && h.includes('Всего залито') && h.includes('Израсходовано (теория)') && h.includes('задайте литры и кг') && h.includes('не ведётся на дозаторе')); });
@@ -77,4 +82,22 @@ console.log('\n5. Экран: список и окно «кто, где, во с
     el.onclick({ target: { closest: s => s === '[data-cs]' ? { dataset: { cs: '1' } } : null } });
     const h = doc.last.innerHTML; assert.ok(h.includes('Щёлочь') && h.includes('Петров') && h.includes('Машина 11') && h.includes('Смена 07.10.2026'), h.slice(0, 300)); });
 }
-console.log(`\nИтого: ${ok} прошло, ${bad} не прошло`); process.exit(bad ? 1 : 0);
+
+console.log('\n6. Главная: статистика за месяц');
+t('границы месяца и надпись обнуления', () => { const i = CS.monthInfo('2026-12-15', 6); assert.strictEqual(i.from, '2026-12-01'); assert.strictEqual(i.name, 'декабрь'); assert.strictEqual(i.nextName, 'января'); assert.strictEqual(i.nextYear, 2027); assert.strictEqual(i.hh, '06'); });
+{
+  const now = vm.runInContext('Date.now()', ctxVm), today = vm.runInContext(`new Date(${now} + (${tz} - ${st}) * 3600e3).toISOString().slice(0, 10)`, ctxVm);
+  const nowIso = new Date(now).toISOString();
+  const mLoads = [{ id: 'x', ts: nowIso, shift_date: today, part: 'day', machine: 2, wash_type_id: 1, weight_kg: 25, extras: {}, created_by: 'u1' }];
+  const mCh = [{ id: 'q', ts: nowIso, shift_date: today, machine_group: '1_10', chemical_id: 1, leftover_kg: 2, leftover_l: null, created_by: 'u3' }];
+  ctxVm.sb = { rpc: (n) => Promise.resolve({ data: n === 'report_loads' ? mLoads : n === 'report_changes' ? mCh : [] }),
+    from: () => { const o = { select: () => o, gte: () => o, neq: () => Promise.resolve({ data: [{ kind: 'month', boundary_date: today.slice(0, 8) + '01', snapshot: { rows: [{ group: 'all', kind: 'main', fact_kg: 7 }, { group: '1_10', kind: 'main', fact_kg: 99 }] } }] }) }; return o; } };
+  const el = { innerHTML: '' };
+  CS.mountMonth(el, { tz, st, refs }).then(() => {
+    t('mountMonth нарисовал строку', () => { assert.ok(el.innerHTML.includes('За этот месяц') && el.innerHTML.includes('Залито за месяц') && el.innerHTML.includes('Расход за месяц') && el.innerHTML.includes('обнулится 1 ')); });
+    t('залито за месяц = 20 кг (22 − остаток 2)', () => assert.ok(/<b>20 <i>кг<\/i><\/b>|<small>20 <i>кг<\/i><\/small>/.test(el.innerHTML), el.innerHTML.slice(0, 700)));
+    t('теория 0,11 л и факт 7 кг (только строка «все дозаторы»)', () => { assert.ok(el.innerHTML.includes('0,11 <i>л</i>')); assert.ok(el.innerHTML.includes('7 <i>кг</i>') && !el.innerHTML.includes('99')); });
+    t('список по химикатам', () => assert.ok(el.innerHTML.includes('По каждому химикату') && el.innerHTML.includes('Щёлочь')));
+    console.log(`\nИтого: ${ok} прошло, ${bad} не прошло`); process.exit(bad ? 1 : 0);
+  });
+}

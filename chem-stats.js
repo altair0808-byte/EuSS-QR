@@ -2,8 +2,9 @@
 // Нажатие на химикат открывает список: кто, где (машина, дозатор) и во сколько потратил или залил.
 // Расчёты берут то, что уже есть в report-calc.js (calcReport, dispenserFlows), новых способов не придумывают.
 //
-// Что такое «залито»: полные бутыли по заменам + подключённый остаток + «залили» + «добавил суперадмин» − «забрал»
-// (то же, что «приход» в закрытии, но без вычета остатка из убранной бутыли). Показания «реальный уровень» сюда не входят.
+// Что такое «залито» (нетто): полные бутыли по заменам + подключённый остаток + «залили» + «добавил суперадмин»
+// − остаток, который убрали вместе со старой бутылью − «забрали» ± поправка, когда реальный уровень (перевзвешивание) отличается от расчётного.
+// Это то же «приход», что в закрытии: списали, забрали или взвесили меньше — залитое уменьшается.
 // Считается только для основной химии и для доп. средств, отмеченных «ведётся на дозаторе» (chemicals.in_closing).
 // Что такое «израсходовано (теория)»: по рецептам и загрузкам, как в отчёте по сменам.
 const ChemStats = (() => {
@@ -50,8 +51,7 @@ const ChemStats = (() => {
         if (out.tracked) {
           const f = dispenserFlows(c, g, t0, t1, ev);
           need = !!(f.needDensity || f.needSize);
-          const gross = f.bottles + f.connects + f.replacedByConnect + f.pours + f.adds - f.takes;
-          poured = need ? null : both(c, gross, 'kg');
+          poured = need ? null : both(c, f.inflow, 'kg');       // нетто, как «приход» в закрытии
         }
         const th = rep && rep.groups[g].chem.find(x => +x.id === +c.id);
         out.g[g] = { poured, need, theory: th ? th.theory : null };
@@ -105,7 +105,9 @@ const ChemStats = (() => {
       const mine = a => (a || []).filter(x => +x.chemical_id === +c.id && inP(x) && ok(x));
       mine(ev.changes).forEach(x => {
         const lf = x.leftover_l != null && +x.leftover_l > 0 ? both(c, +x.leftover_l, 'l') : x.leftover_kg != null && +x.leftover_kg > 0 ? both(c, +x.leftover_kg, 'kg') : null;
-        fill.push({ k: 'chg', ts: x.ts, shift_date: x.shift_date, who: who(x.created_by), group: x.machine_group || '1_10', title: 'Замена бутыли', amt: +c.bottle_kg > 0 ? both(c, +c.bottle_kg, 'kg') : (+c.bottle_l > 0 ? both(c, +c.bottle_l, 'l') : null), left: lf, sign: 1 });
+        const full = +c.bottle_kg > 0 ? +c.bottle_kg : null;
+        const lkg = x.leftover_kg != null && +x.leftover_kg > 0 ? +x.leftover_kg : (x.leftover_l != null && +x.leftover_l > 0 && dens(c) ? +x.leftover_l * dens(c) : 0);
+        fill.push({ k: 'chg', ts: x.ts, shift_date: x.shift_date, who: who(x.created_by), group: x.machine_group || '1_10', title: 'Замена бутыли', amt: full != null ? both(c, Math.max(0, full - lkg), 'kg') : null, left: lf, sign: 1 });
       });
       mine(ev.connects).forEach(x => fill.push({ k: 'con', ts: x.ts, shift_date: x.shift_date, who: who(x.created_by), group: x.machine_group || '1_10', title: 'Подключён остаток', amt: amtP(x), sign: 1 }));
       mine(ev.moves).forEach(x => {
@@ -152,7 +154,19 @@ const ChemStats = (() => {
 .cs-e>div:first-child{min-width:0}.cs-e b{font-variant-numeric:tabular-nums}.cs-e .m{display:block;color:var(--mut);font-size:.78rem}
 .cs-e>div:last-child{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
 .cs-e.neg>div:last-child b{color:var(--bad,#c33)}
-.cs-sg{display:flex;flex-wrap:wrap;gap:.35rem;margin:.4rem 0}.cs-sg span{padding:.2rem .5rem;border:1px solid var(--ln);border-radius:99px;font-size:.78rem;background:#fff}`;
+.cs-sg{display:flex;flex-wrap:wrap;gap:.35rem;margin:.4rem 0}.cs-sg span{padding:.2rem .5rem;border:1px solid var(--ln);border-radius:99px;font-size:.78rem;background:#fff}
+.cs-mo{margin:1rem 0}.cs-mo .t{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:.25rem .75rem}
+.cs-mo .row{margin-top:.4rem;display:grid;grid-template-columns:repeat(3,1fr);border:1px solid color-mix(in oklab,var(--ac,#0a7) 30%,var(--ln));border-radius:var(--r);background:linear-gradient(135deg,var(--tint,#eef8f6),#fff);box-shadow:var(--sh)}
+.cs-mo .row>div{padding:.8rem 1rem;min-width:0}.cs-mo .row>div+div{border-left:1px solid var(--ln)}
+.cs-mo .row span{display:block;font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.02em;color:var(--mut)}
+.cs-mo .row b{display:block;margin-top:.15rem;font-family:Sora,Manrope,sans-serif;font-size:1.45rem;line-height:1.2;font-variant-numeric:tabular-nums}
+.cs-mo .row b i{font-style:normal;font-family:Manrope,sans-serif;font-size:.85rem;font-weight:600;color:var(--mut)}
+.cs-mo .row small{display:block;margin-top:.1rem;font-size:.74rem;color:var(--mut)}
+.cs-mo details{margin-top:.4rem;border:1px solid var(--ln);border-radius:var(--r);background:#fff}
+.cs-mo summary{padding:.55rem .9rem;cursor:pointer;font-size:.85rem;font-weight:700;list-style:none}.cs-mo summary::-webkit-details-marker{display:none}
+.cs-mo .ch{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:.5rem;padding:.45rem .9rem;border-top:1px solid color-mix(in oklab,var(--ln) 60%,#fff);font-size:.84rem;font-variant-numeric:tabular-nums}
+.cs-mo .ch b{font-weight:700}.cs-mo .ch.h{font-size:.66rem;font-weight:800;text-transform:uppercase;color:var(--mut)}
+@media(max-width:560px){.cs-mo .row{grid-template-columns:1fr}.cs-mo .row>div+div{border-left:0;border-top:1px solid var(--ln)}.cs-mo .row b{font-size:1.25rem}}`;
   function ensureCss() { if (typeof document === 'undefined' || document.getElementById('cs-css')) return; const s = document.createElement('style'); s.id = 'cs-css'; s.textContent = css; document.head.appendChild(s); }
 
   const totBox = (label, t, note) => {
@@ -169,7 +183,7 @@ const ChemStats = (() => {
     }).join('');
     return `<div class="cs"><div class="cs-tot">${totBox('Всего залито', t.poured, miss > 0 ? `по ${t.poured.n} из ${t.all} химикатов` : '')}${totBox('Всего израсходовано (теория)', t.theory, '')}<div><span>Факт по замерам</span><b>–</b><small>считается при закрытии периода</small></div></div>
       <div class="cs-l">${rows || '<p class="hint">Нет химикатов.</p>'}</div>
-      <p class="cs-n">Нажмите на химикат, чтобы увидеть, кто, где и во сколько потратил или залил за выбранный период. Залито = полные бутыли по заменам + подключённые остатки + залитое − забранное. Теория — по рецептам и загрузкам.</p></div>`;
+      <p class="cs-n">Нажмите на химикат, чтобы увидеть, кто, где и во сколько потратил или залил за выбранный период. Залито — нетто: бутыли по заменам + подключённые остатки + залитое − убранный остаток − забранное ± поправка при перевзвешивании. Теория — по рецептам и загрузкам.</p></div>`;
   }
 
   const timeOf = (ts, tz) => new Date(new Date(ts).getTime() + tz * 3600e3).toISOString().slice(11, 16);
@@ -198,7 +212,7 @@ const ChemStats = (() => {
         <div class="cs-sm"><div><span>Залито</span><b>${!tracked(c) ? '–' : x.need ? 'нет плотности' : esc(one(c, x.poured))}</b></div><div><span>Израсходовано (теория)</span><b>${esc(one(c, x.theory))}</b></div></div>
         <div class="cs-tb"><button type="button" data-t="use" class="${tab === 'use' ? 'on' : ''}">Израсходовано</button><button type="button" data-t="fill" class="${tab === 'fill' ? 'on' : ''}">Залито</button></div>
         ${tab === 'use' ? `<p class="hint">Расход по загрузкам белья (теория). Кто запустил, на какой машине и во сколько.</p>${chips(ev.byWho)}${chips(ev.byMachine)}${days(ev.use, useLine)}`
-          : tracked(c) ? `<p class="hint">Замены бутылей, подключённые остатки и перемещения. Показание «реальный уровень» в сумму не входит.</p>${days(ev.fill, fillLine)}` : '<p class="hint">Это доп. средство не ведётся на дозаторе: залитое не считается. Включить можно в настройках.</p>'}</section>`;
+          : tracked(c) ? `<p class="hint">Замены бутылей (за вычетом убранного остатка), подключённые остатки и перемещения. Поправка при перевзвешивании («реальный уровень») входит в итог сверху.</p>${days(ev.fill, fillLine)}` : '<p class="hint">Это доп. средство не ведётся на дозаторе: залитое не считается. Включить можно в настройках.</p>'}</section>`;
       wrap.querySelector('.cs-x').onclick = close;
       wrap.querySelectorAll('[data-t]').forEach(b => { b.onclick = () => draw(b.dataset.t); });
     };
@@ -230,6 +244,54 @@ const ChemStats = (() => {
     return model;
   }
 
-  return { calc, totals, events, render, mount, loadTheory, both };
+
+  // ---------- главная: статистика за календарный месяц (админ и суперадмин) ----------
+  // Месяц идёт по сменам: с 1 числа 06:00 до 1 числа 06:00 следующего месяца, потом счётчики с нуля. Данные не удаляются, старые месяцы в отчётах.
+  const MON_N = ['январь', 'февраль', 'март', 'апрель', 'май', 'июнь', 'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь'];
+  const MON_G = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+  // pure: подписи и границы месяца по дате смены 'YYYY-MM-DD'
+  function monthInfo(today, st) {
+    const y = +today.slice(0, 4), m = +today.slice(5, 7) - 1, hh = String(st == null ? 6 : st).padStart(2, '0');
+    return { from: today.slice(0, 8) + '01', name: MON_N[m], year: y, nextName: MON_G[(m + 1) % 12], nextYear: m === 11 ? y + 1 : y, hh };
+  }
+  const mc = { html: '', at: 0 };
+  async function mountMonth(el, o) {
+    if (!el) return;
+    ensureCss();
+    if (mc.html) el.innerHTML = mc.html;                                  // панель перерисовывается каждые 30 с — без мигания
+    if (Date.now() - mc.at < 5 * 60e3) return;
+    mc.at = Date.now();
+    const { tz = 5, st = 6, refs } = o; if (!refs) return;
+    try {
+      const today = new Date(Date.now() + (tz - st) * 3600e3).toISOString().slice(0, 10), mi = monthInfo(today, st), d1 = mi.from, back = addDaysISO(d1, -60);
+      const q = n => sb.rpc(n, { d1: back, d2: today }).then(r => r, () => ({ data: [] }));
+      const [lo, ch, cn, mv, lv, cl] = await Promise.all([sb.rpc('report_loads', { d1, d2: today }), q('report_changes'), q('report_connects'), q('report_moves'), q('report_levels'),
+        sb.from('closings').select('kind,boundary_date,snapshot').gte('boundary_date', d1).neq('kind', 'start').then(r => r, () => ({ data: [] }))]);
+      if (lo.error || ch.error) { mc.at = 0; return; }
+      const loads = lo.data || [], ev = { changes: ch.data || [], connects: cn.data || [], moves: (mv && mv.data) || [], levels: (lv && lv.data) || [] };
+      const rep = calcReport(loads, [], refs, [], null, [], []);
+      const model = calc(refs, rep, ev, d1, today, tz, st), T = totals(model, 'all');
+      const two = (t, k) => { const l = t[k].nL ? fmt(t[k].l) + ' <i>л</i>' : '', kg = t[k].nKg ? fmt(t[k].kg) + ' <i>кг</i>' : ''; return l || kg ? `<b>${l || kg}</b>${l && kg ? `<small>${kg}</small>` : ''}` : '<b>–</b>'; };
+      const miss = T.all - T.poured.n;
+      // факт по закрытым отрезкам месяца: сумма фактического расхода основной химии из сохранённых закрытий (если они есть)
+      let fact = '<b>–</b><small>появится после закрытия</small>';
+      const cls = (cl && cl.data) || [];
+      if (cls.length) {
+        const kg = cls.reduce((s, c) => s + ((c.snapshot && c.snapshot.rows) || []).filter(x => x.group === 'all' && x.kind === 'main').reduce((a, x) => a + (+x.fact_kg || 0), 0), 0);
+        fact = `<b>${fmt(kg)} <i>кг</i></b><small>по закрытым сменам (${cls.length})</small>`;
+      }
+      const rows = model.rows.filter(r => r.tracked || (r.g.all.theory && (r.g.all.theory.l > 0 || r.g.all.theory.kg > 0)));
+      const list = rows.map(r => `<div class="ch"><b>${esc(r.name)}</b><span>${!r.tracked ? '–' : r.g.all.need ? 'нет плотности' : esc(one(r.c, r.g.all.poured))}</span><span>${esc(one(r.c, r.g.all.theory))}</span></div>`).join('');
+      el.innerHTML = mc.html = `<section class="cs-mo" aria-label="Статистика химии за месяц">
+        <div class="t"><p class="gl" style="margin:0">За этот месяц · ${mi.name} ${mi.year}</p><span class="hint" style="margin:0">с 1 числа ${mi.hh}:00 · обнулится 1 ${mi.nextName} в ${mi.hh}:00</span></div>
+        <div class="row"><div><span>Залито за месяц</span>${two(T, 'poured')}<small>${miss > 0 ? `по ${T.poured.n} из ${T.all} химикатов` : 'нетто: минус остатки и забранное'}</small></div>
+          <div><span>Расход за месяц · теория</span>${two(T, 'theory')}<small>по рецептам и загрузкам</small></div>
+          <div><span>Расход факт · замеры</span>${fact}</div></div>
+        ${list ? `<details><summary>По каждому химикату ▾</summary><div class="ch h"><span>Химикат</span><span>Залито</span><span>Расход (теория)</span></div>${list}</details>` : ''}</section>`;
+      const cur = typeof document !== 'undefined' && document.getElementById('cmo'); if (cur && cur !== el) cur.innerHTML = mc.html;
+    } catch (e) { mc.at = 0; }
+  }
+
+  return { calc, totals, events, render, mount, mountMonth, monthInfo, loadTheory, both };
 })();
 if (typeof module !== 'undefined') module.exports = ChemStats;
