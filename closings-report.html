@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#2aa3b5">
+<title>Отчёт по закрытиям — EuSS</title><link rel="icon" href="favicon.png" type="image/png"><link rel="stylesheet" href="style.css"><style>
+.cl{display:grid;gap:.5rem;margin:.6rem 0}
+.cl button{display:flex;flex-wrap:wrap;justify-content:space-between;gap:.3rem .8rem;width:100%;padding:.7rem .9rem;border:1px solid var(--ln);border-radius:var(--r);background:var(--card);box-shadow:var(--sh);font:inherit;text-align:left;cursor:pointer}
+.cl button b{font-size:.95rem}.cl button small{color:var(--mut);font-size:.8rem}
+.tg2{display:inline-block;margin-left:.3rem;padding:.05rem .45rem;border-radius:99px;font-size:.68rem;font-weight:800;text-transform:uppercase;background:var(--tint);color:var(--mut)}
+.tg2.et{background:#e7f6ef;color:#14532d}.tg2.rc{background:#fdecea;color:#7a1a12}
+.tot{display:grid;grid-template-columns:repeat(2,1fr);gap:.6rem;margin:.6rem 0}@media(min-width:720px){.tot{grid-template-columns:repeat(4,1fr)}}
+.tot div{padding:.65rem .8rem;border:1px solid var(--ln);border-radius:var(--r);background:var(--card);box-shadow:var(--sh)}
+.tot span{display:block;font-size:.66rem;font-weight:800;text-transform:uppercase;color:var(--mut)}.tot b{font-family:Sora,sans-serif;font-size:1.1rem}
+.tw{overflow-x:auto;margin:.5rem 0;border:1px solid var(--ln);border-radius:var(--r);background:var(--card)}
+.tw table{width:100%;border-collapse:collapse;font-size:.84rem}.tw th,.tw td{padding:.45rem .6rem;border-bottom:1px solid var(--ln);text-align:right;white-space:nowrap}
+.tw th:first-child,.tw td:first-child{text-align:left;position:sticky;left:0;background:var(--card)}.tw th{font-size:.68rem;text-transform:uppercase;color:var(--mut)}
+.bad{color:#b42318}.good{color:oklch(.5 .12 160)}
+.msg{margin:.6rem 0;padding:.7rem .9rem;border-radius:var(--r);font-size:.88rem}.msg.wr{background:#fff6e0;color:#6b4a00;border:1px solid #f1d58a}.msg.er{background:#fdecea;color:#7a1a12;border:1px solid #f3b8b1}
+.ab{display:flex;flex-wrap:wrap;gap:.5rem;margin:.6rem 0}
+</style></head>
+<body>
+<header class="hd"><div><a class="lg" href="index.html" aria-label="На панель смены"><img src="euss-logo.png" alt="EuSS"><span class="sep"></span><span class="sub">Закрытия</span></a><nav class="nav"><a class="btn s" href="report.html">Отчёт по сменам</a><a class="btn s" href="index.html">← Панель</a></nav></div></header>
+<main class="wide">
+<div class="top" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.75rem"><h1>Отчёт по закрытиям</h1><a class="btn" id="tocl" href="closing.html" hidden>⚖ Новое закрытие</a></div>
+<div class="seg" role="group" aria-label="Вид"><button data-v="list" class="on">Закрытия</button><button data-v="months">Динамика по месяцам</button></div>
+<div id="out"><p class="hint">Загрузка…</p></div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script><script src="num.js"></script><script src="app.js"></script><script src="report-calc.js"></script>
+<script>
+// Этап 3: список закрытий, карточка закрытия, сравнение с эталоном и с предыдущим закрытием, динамика по месяцам.
+// Данные — снимок closings.snapshot (calcClosing на момент закрытия). Смена эталона / отмена / пересчёт — только суперадмин, паролем.
+const esc=t=>String(t??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const f=(n,m)=>Num.fmt(n,m),sign=n=>n>0?'+':'',dmy=d=>String(d).split('-').reverse().join('.');
+const MONTHS=['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
+const mName=k=>{const [y,m]=k.split('-');return MONTHS[+m-1]+' '+y;};
+const KIND={start:'Начальный замер',interval:'Закрытие внутри месяца',month:'Закрытие месяца'};
+const GL={'1_10':'Дозатор 1 (1–10)','11_12':'Дозатор 2 (11–12)','all':'Оба дозатора'};
+let L=[],isSuper=false,view='list',refs=null,tz=5,st=6,warnPct=25;
+
+const allRows=c=>(c.snapshot?.rows||[]).filter(r=>r.group==='all');
+const rowOf=(c,id,g='all')=>(c?.snapshot?.rows||[]).find(r=>+r.chemical_id===+id&&r.group===g);
+const pctCh=(a,b)=>a!=null&&b!=null&&Math.abs(b)>1e-12?(a-b)/Math.abs(b)*100:null;
+const pc=p=>p==null?'–':`<span class="${p>10?'bad':p<-10?'good':''}">${sign(p)}${f(p,2)}%</span>`;
+const etalon=()=>L.find(c=>c.is_etalon);
+const prevOf=c=>{const i=L.indexOf(c);for(let j=i+1;j<L.length;j++)if(L[j].kind!=='start')return L[j];return null;};   // L отсортирован по убыванию
+const factTheory=c=>{const a=allRows(c).filter(r=>r.kind==='main');const fs=a.reduce((s,r)=>s+(r.fact_kg||0),0),ts=a.reduce((s,r)=>s+(r.theory_kg||0),0);return ts>0?fs/ts:null;};
+
+function list(){
+  if(!L.length) return '<p class="hint">Закрытий ещё нет.</p>';
+  return `<div class="cl">${L.map(c=>{const s=c.snapshot,per=c.period_from&&s?`смены ${dmy(s.from)} – ${dmy(addDaysISO(s.to,-1))} · ${f(s.days)} дн.`:'точка отсчёта';
+    const r=factTheory(c);
+    return `<button data-id="${c.id}"><span><b>${KIND[c.kind]} · ${dmy(c.boundary_date)}</b>${c.is_etalon?'<span class="tg2 et">эталон</span>':''}${c.needs_recalc?'<span class="tg2 rc">нужен пересчёт</span>':''}${c.late?'<span class="tg2">позднее</span>':''}<br><small>${per}</small></span>
+     <small>${s?`${f(s.totals.washes)} стирок · ${f(s.totals.laundry_kg)} кг белья${r!=null?' · факт/теория '+f(r,3):''}`:''}</small></button>`;}).join('')}</div>`;
+}
+
+function card(c){
+  const s=c.snapshot,E=etalon(),P=prevOf(c);
+  let h=`<div class="ab"><button class="btn s" id="back">← Ко всем закрытиям</button></div>
+   <h2 style="margin-top:.2rem">${KIND[c.kind]} · ${dmy(c.boundary_date)} ${String(st).padStart(2,'0')}:00 ${c.is_etalon?'<span class="tg2 et">эталон</span>':''}</h2>`;
+  if(c.note) h+=`<p class="hint">Комментарий: ${esc(c.note)}</p>`;
+  if(c.needs_recalc) h+='<div class="msg er">После закрытия суперадмин поправил запись внутри периода. Цифры ниже — на момент закрытия, нужен пересчёт.</div>';
+  if(!s){h+='<p class="hint">Начальный замер: расчёта нет. Остатки:</p>'+measTable(c);return h+adminBtns(c);}
+  const T=s.totals,r=factTheory(c);
+  h+=`<p class="hint">Смены ${dmy(s.from)} – ${dmy(addDaysISO(s.to,-1))} · ${f(s.days)} дн. · ${E&&E.id!==c.id?'эталон: '+dmy(E.boundary_date):c.is_etalon?'это закрытие — эталон':'эталона нет'}${P?' · предыдущее: '+dmy(P.boundary_date):''}</p>
+   <div class="tot"><div><span>Стирок</span><b>${f(T.washes)}</b></div><div><span>Белья, кг</span><b>${f(T.laundry_kg)}</b></div><div><span>Жителе-суток</span><b>${T.resident_days==null?'–':f(T.resident_days)}</b></div><div><span>Факт / теория</span><b>${r==null?'–':f(r,3)}</b></div></div>`;
+  if(s.warnings?.length) h+=`<div class="msg wr"><b>Предупреждения при закрытии:</b><br>${s.warnings.map(w=>esc(w.text)).join('<br>')}</div>`;
+  // итог по химикатам
+  h+=`<h2>Итоги по химикатам</h2><div class="tw"><table><thead><tr><th>Химикат</th><th>Факт, кг</th><th>Теория, кг</th><th>Откл.</th><th>Ед. на кг белья</th><th>Ед. на стирку</th><th>Ед. на жителя</th><th>к эталону</th><th>к пред.</th></tr></thead><tbody>${allRows(c).map(x=>{
+    const e=rowOf(E,x.chemical_id),p=rowOf(P,x.chemical_id);
+    return `<tr><td>${esc(x.name)}</td><td>${x.fact_kg==null?'–':f(x.fact_kg)}</td><td>${x.theory_kg==null?'–':f(x.theory_kg)}</td><td>${x.dev_kg==null?'–':sign(x.dev_kg)+f(x.dev_kg)+' кг<br>'+pc(x.dev_pct)}</td>
+     <td>${x.per_kg_laundry==null?'–':f(x.per_kg_laundry,3)+' '+x.unit_small}</td><td>${x.per_wash==null?'–':f(x.per_wash,2)+' '+x.unit_small}</td><td>${x.per_resident_day==null?'–':f(x.per_resident_day,2)+' '+x.unit_small}</td>
+     <td>${E&&E.id!==c.id?pc(pctCh(x.per_kg_laundry,e?.per_kg_laundry)):'–'}</td><td>${P?pc(pctCh(x.per_kg_laundry,p?.per_kg_laundry)):'–'}</td></tr>`;}).join('')}</tbody></table></div>
+   <p class="hint">«к эталону» и «к пред.» — рост или падение расхода на кг белья. Ед. — мл для жидкой химии, г для порошка.</p>`;
+  if(E&&E.id!==c.id) h+=`<h2>Сравнение с эталоном (${dmy(E.boundary_date)})</h2><div class="tw"><table><thead><tr><th>Химикат</th><th>на кг белья</th><th>на стирку</th><th>на жителя</th><th>факт/теория</th></tr></thead><tbody>${allRows(c).map(x=>{const e=rowOf(E,x.chemical_id)||{};
+    const cell=(a,b,m)=>`${a==null?'–':f(a,m)} / ${b==null?'–':f(b,m)}<br>${pc(pctCh(a,b))}`;
+    return `<tr><td>${esc(x.name)}</td><td>${cell(x.per_kg_laundry,e.per_kg_laundry,3)}</td><td>${cell(x.per_wash,e.per_wash,2)}</td><td>${cell(x.per_resident_day,e.per_resident_day,2)}</td><td>${cell(x.ratio,e.ratio,3)}</td></tr>`;}).join('')}</tbody></table></div><p class="hint">Сейчас / эталон, ниже — изменение.</p>`;
+  // детали по дозаторам
+  h+='<h2>По дозаторам</h2>';
+  allRows(c).forEach(x=>{
+    const rs=(s.rows||[]).filter(r=>+r.chemical_id===+x.chemical_id);
+    h+=`<details class="box"><summary><b>${esc(x.name)}</b></summary><div class="tw"><table><thead><tr><th></th><th>На начало</th><th>Приход</th><th>На конец</th><th>Факт</th><th>Теория</th><th>Откл.</th><th>Факт, л</th><th>Факт, шт</th><th>Справочно: по замене</th></tr></thead><tbody>${rs.map(r=>`<tr><td>${GL[r.group]}</td><td>${f(r.start_kg)}</td><td>${f(r.inflow_kg)}</td><td>${r.end_kg==null?'–':f(r.end_kg)}</td><td><b>${r.fact_kg==null?'–':f(r.fact_kg)}</b></td><td>${r.theory_kg==null?'–':f(r.theory_kg)}</td><td>${r.dev_kg==null?'–':sign(r.dev_kg)+f(r.dev_kg)+'<br>'+pc(r.dev_pct)}</td><td>${r.fact_l==null?'–':f(r.fact_l)}</td><td>${r.fact_pc==null?'–':f(r.fact_pc,2)}</td><td>${r.old_fact_kg==null?'–':f(r.old_fact_kg)}</td></tr>`).join('')}</tbody></table></div><p class="hint">Все значения в кг, если не указано иное. Факт = на начало + приход − на конец.</p></details>`;
+  });
+  return h+adminBtns(c);
+}
+function measTable(c){const nm={};(refs?.chemicals||[]).forEach(x=>nm[x.id]=x.name);return `<div class="tw"><table><thead><tr><th>Химикат</th><th>Дозатор 1</th><th>Дозатор 2</th></tr></thead><tbody>${Object.entries((c.m||[]).reduce((o,m)=>{(o[m.chemical_id]=o[m.chemical_id]||{})[m.machine_group]=m.amount_kg;return o;},{})).map(([id,v])=>`<tr><td>${esc(nm[id]||id)}</td><td>${v['1_10']==null?'–':f(v['1_10'])} кг</td><td>${v['11_12']==null?'–':f(v['11_12'])} кг</td></tr>`).join('')}</tbody></table></div>`;}
+function adminBtns(c){
+  if(!isSuper) return '';
+  const b=[];
+  if(c.kind!=='start'&&!c.is_etalon) b.push('<button class="btn" data-a="etalon">Сделать эталоном</button>');
+  if(c.kind!=='start') b.push(`<button class="btn" data-a="recalc">Пересчитать по текущим данным</button>`);
+  if(L[0]&&L[0].id===c.id) b.push('<button class="btn danger" data-a="delete">Отменить это закрытие</button>');
+  return b.length?`<h2>Суперадмин</h2><div class="ab">${b.join('')}</div>`:'';
+}
+
+function months(){
+  const cs=L.filter(c=>c.kind!=='start'&&c.snapshot).slice().reverse(),by={};
+  cs.forEach(c=>(by[c.month_key]=by[c.month_key]||[]).push(c));
+  const keys=Object.keys(by).sort();
+  if(!keys.length) return '<p class="hint">Закрытых периодов ещё нет.</p>';
+  const chems=[];cs.forEach(c=>allRows(c).forEach(r=>{if(!chems.some(x=>+x.id===+r.chemical_id))chems.push({id:+r.chemical_id,name:r.name,unit:r.unit_small,d:r.density});}));
+  const M=keys.map(k=>{const a=by[k],o={k,n:a.length,washes:0,kg:0,chem:{},closed:a.some(c=>c.kind==='month')||a[a.length-1].snapshot.to.slice(0,7)>k};
+    a.forEach(c=>{o.washes+=c.snapshot.totals.washes||0;o.kg+=c.snapshot.totals.laundry_kg||0;allRows(c).forEach(r=>{const x=o.chem[r.chemical_id]=o.chem[r.chemical_id]||{f:0,t:0};x.f+=r.fact_kg||0;x.t+=r.theory_kg||0;});});
+    return o;});
+  const E=etalon();
+  const perKg=(o,ch)=>{const x=o.chem[ch.id];if(!x||!(o.kg>0))return null;return (ch.d?x.f/ch.d:x.f)*1000/o.kg;};
+  let h=`<p class="hint">Месячный итог = сумма отрезков месяца (замеры стыкуются без разрывов). Незакрытый месяц помечен «идёт».</p>
+   <div class="tw"><table><thead><tr><th>Месяц</th><th>Отрезков</th><th>Стирок</th><th>Белья, кг</th></tr></thead><tbody>${M.map(o=>`<tr><td>${mName(o.k)}${o.closed?'':' <span class="tg2">идёт</span>'}</td><td>${o.n}</td><td>${f(o.washes)}</td><td>${f(o.kg)}</td></tr>`).join('')}</tbody></table></div>`;
+  chems.forEach(ch=>{
+    const vals=M.map(o=>perKg(o,ch)),max=Math.max(...vals.filter(v=>v!=null),0),ev=E?rowOf(E,ch.id)?.per_kg_laundry:null;
+    h+=`<h2>${esc(ch.name)}</h2><div class="tw"><table><thead><tr><th>Месяц</th><th>Факт, кг</th><th>Теория, кг</th><th>Факт/теория</th><th>${ch.unit} на кг белья</th><th>к пред. мес.</th><th>к эталону</th><th></th></tr></thead><tbody>${M.map((o,i)=>{const x=o.chem[ch.id]||{f:null,t:null},v=vals[i];
+      return `<tr><td>${mName(o.k)}</td><td>${x.f==null?'–':f(x.f)}</td><td>${x.t==null?'–':f(x.t)}</td><td>${x.t>0?f(x.f/x.t,3):'–'}</td><td>${v==null?'–':f(v,3)}</td><td>${i?pc(pctCh(v,vals[i-1])):'–'}</td><td>${pc(pctCh(v,ev))}</td>
+      <td style="min-width:6rem"><span style="display:block;height:.5rem;border-radius:99px;background:var(--tint);overflow:hidden"><i style="display:block;height:100%;width:${max>0&&v!=null?Math.max(0,v/max*100).toFixed(0):0}%;background:var(--ac)"></i></span></td></tr>`;}).join('')}</tbody></table></div>`;
+  });
+  return h;
+}
+
+function render(id){
+  const c=id&&L.find(x=>x.id===id);
+  $('#out').innerHTML=c?card(c):view==='months'?months():list();
+  $('#out').onclick=e=>{const b=e.target.closest('button');if(!b)return;
+    if(b.id==='back')return render();
+    if(b.dataset.id){render(b.dataset.id);scrollTo(0,0);return;}
+    if(b.dataset.a&&c)act(b.dataset.a,c);};
+}
+
+async function act(a,c){
+  if(a==='etalon'){if(await withPw('Сделать эталоном?',`Закрытие ${dmy(c.boundary_date)}. Все сравнения пересчитаются относительно него.`,pw=>rpcAsk('closing_set_etalon',{p_id:c.id,p_pw:pw}))){toast('Эталон изменён');await load(c.id);}return;}
+  if(a==='delete'){if(await withPw('Отменить закрытие?',`Закрытие ${dmy(c.boundary_date)} будет удалено (запись останется в журнале). Записи периода снова можно будет править.`,pw=>rpcAsk('closing_delete_last',{p_id:c.id,p_pw:pw}))){toast('Закрытие отменено');await load();}return;}
+  if(a==='recalc'){
+    try{
+      const P=L[L.indexOf(c)+1];if(!P)throw new Error('Нет предыдущего замера');
+      const mm=async id=>{const {data}=await sb.from('closing_measures').select('*').eq('closing_id',id);const o={};(data||[]).forEach(x=>o[x.chemical_id+':'+x.machine_group]=+x.amount_kg);return o;};
+      const from=P.boundary_date,to=c.boundary_date,back=addDaysISO(from,-60),d2=addDaysISO(to,-1),R=async(fn,a)=>{const {data,error}=await sb.rpc(fn,a);if(error)throw new Error(error.message);return data||[];};
+      const [s0,s1,loads,changes,connects,moves,levels]=await Promise.all([mm(P.id),mm(c.id),R('report_loads',{d1:from,d2}),R('report_changes',{d1:back,d2:to}),R('report_connects',{d1:back,d2:to}),R('report_moves',{d1:back,d2:to}).catch(()=>[]),R('report_levels',{d1:back,d2:to}).catch(()=>[])]);
+      let residents=null;try{const rr=await R('get_residents',{d1:from,d2});residents={};rr.forEach(x=>residents[x.day]=x.cnt);}catch(e){}
+      const res=calcClosing(refs,{from,to,tz,st,startKg:s0,endKg:s1,loads,changes,connects,moves,levels,residents,warnPct});
+      const old=allRows(c),diff=allRows({snapshot:res}).map(r=>{const o=old.find(x=>+x.chemical_id===+r.chemical_id);return `${r.name}: ${o?.fact_kg==null?'–':f(o.fact_kg)} → ${r.fact_kg==null?'–':f(r.fact_kg)} кг`;}).join('\n');
+      if(await withPw('Сохранить пересчёт?','Факт, кг (было → стало):\n'+diff,pw=>rpcAsk('closing_recalc',{p_id:c.id,p_snapshot:{...res,warn_pct:warnPct,version:1,recalc:true},p_pw:pw}))){toast('Пересчитано');await load(c.id);}
+    }catch(e){toast('Не удалось пересчитать: '+e.message);}
+  }
+}
+
+async function load(openId){
+  const {data,error}=await sb.from('closings').select('*').order('at_ts',{ascending:false});
+  if(error){$('#out').innerHTML=`<div class="msg er">${esc(/closings/.test(error.message)?'Выполните stage15.sql в Supabase.':error.message)}</div>`;return;}
+  L=data||[];
+  const st0=L.find(c=>c.kind==='start');if(st0){const {data:m}=await sb.from('closing_measures').select('*').eq('closing_id',st0.id);st0.m=m||[];}
+  render(openId);
+}
+
+(async()=>{
+  const ses=await need();if(!ses)return;
+  const {data:ok}=await sb.rpc('can_report');
+  if(!ok){$('#out').innerHTML='<p>Нет доступа к отчётам. Обратитесь к администратору.</p>';return;}
+  const [{data:pr},{data:adm},s,c,w,r]=await Promise.all([sb.from('profiles').select('role').eq('id',ses.user.id).maybeSingle(),sb.rpc('is_admin'),sb.from('settings').select('*'),sb.from('chemicals').select('*').order('sort'),sb.from('wash_types').select('id,name').order('sort'),sb.from('recipes').select('*')]);
+  isSuper=pr?.role==='superadmin';$('#tocl').hidden=!(adm||isSuper);
+  const g=k=>{const x=(s.data||[]).find(y=>y.key===k);return x?+x.value:null};
+  tz=g('tz_offset')??5;st=g('shift_start')??6;warnPct=g('close_warn_pct')??25;
+  refs={water:g('water_l')??55,washTypes:w.data||[],chemicals:c.data||[],recipes:r.data||[]};
+  document.querySelector('.seg').onclick=e=>{const b=e.target.closest('button');if(!b)return;view=b.dataset.v;document.querySelectorAll('.seg button').forEach(x=>x.classList.toggle('on',x===b));render();};
+  await load(new URLSearchParams(location.search).get('id'));
+})();
+</script>
+</body></html>

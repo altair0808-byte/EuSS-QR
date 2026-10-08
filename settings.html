@@ -11,6 +11,7 @@
   <label>Вода на загрузку, л<input type="number" step="1" data-k="water_l"></label>
   <label>Часовой пояс, часы от UTC<input type="number" step="1" data-k="tz_offset"></label>
   <label>Начало смены, час<input type="number" min="0" max="23" step="1" data-k="shift_start"></label>
+  <label>Закрытие: предупреждать, если расход больше теории на, %<input type="number" min="0" step="any" inputmode="decimal" data-k="close_warn_pct"></label>
   <button class="go" id="sg">Сохранить</button>
 </div>
 
@@ -74,7 +75,8 @@ async function load() {
       <div class="acc"><label>1 шт = литров<input type="number" min="0" step="any" inputmode="decimal" data-f="bottle_l" value="${nv(c.bottle_l)}"></label>
       <label>1 шт = кг<input type="number" min="0" step="any" inputmode="decimal" data-f="bottle_kg" value="${nv(c.bottle_kg)}"></label></div>
       ${c.kind === 'extra' ? `<div class="acc"><label>Расход на единицу<input type="number" min="0" step="1" inputmode="numeric" data-f="per_unit" value="${nv(c.per_unit)}"></label>
-      <label>Расход измеряется в<select data-f="per_unit_unit"><option value="ml"${c.per_unit_unit === 'g' ? '' : ' selected'}>мл</option><option value="g"${c.per_unit_unit === 'g' ? ' selected' : ''}>г</option></select></label></div>` : ''}
+      <label>Расход измеряется в<select data-f="per_unit_unit"><option value="ml"${c.per_unit_unit === 'g' ? '' : ' selected'}>мл</option><option value="g"${c.per_unit_unit === 'g' ? ' selected' : ''}>г</option></select></label></div>
+      <label class="chk" style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" data-f="in_closing"${c.in_closing ? ' checked' : ''} style="width:auto"> Ведётся на дозаторе (закрывать по замеру остатков)</label>` : ''}
     </div>`).join('') + '<button class="go" id="sc">Сохранить</button>';
   imgFallback($('#chem'));
 
@@ -103,7 +105,7 @@ $('#chem').onclick = async e => {
     const row = {};
     d.querySelectorAll('[data-f]').forEach(i => {
       const k = i.dataset.f;
-      row[k] = k === 'per_unit_unit' ? i.value : k === 'name' ? i.value.trim() : k === 'image_url' ? (i.value.trim() || null) : num(i.value);
+      row[k] = k === 'in_closing' ? i.checked : k === 'per_unit_unit' ? i.value : k === 'name' ? i.value.trim() : k === 'image_url' ? (i.value.trim() || null) : num(i.value);
     });
     if (!row.name) { toast('У химиката должно быть название'); return; }
     if (row.image_url && !safeUrl(row.image_url)) { toast('Ссылка на фото должна начинаться с http:// или https:// (' + row.name + ')'); return; }
