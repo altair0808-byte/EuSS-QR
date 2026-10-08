@@ -155,18 +155,27 @@ const ChemStats = (() => {
 .cs-e>div:last-child{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
 .cs-e.neg>div:last-child b{color:var(--bad,#c33)}
 .cs-sg{display:flex;flex-wrap:wrap;gap:.35rem;margin:.4rem 0}.cs-sg span{padding:.2rem .5rem;border:1px solid var(--ln);border-radius:99px;font-size:.78rem;background:#fff}
-.cs-mo{margin:1rem 0}.cs-mo .t{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:.25rem .75rem}
-.cs-mo .row{margin-top:.4rem;display:grid;grid-template-columns:repeat(3,1fr);border:1px solid color-mix(in oklab,var(--ac,#0a7) 30%,var(--ln));border-radius:var(--r);background:linear-gradient(135deg,var(--tint,#eef8f6),#fff);box-shadow:var(--sh)}
-.cs-mo .row>div{padding:.8rem 1rem;min-width:0}.cs-mo .row>div+div{border-left:1px solid var(--ln)}
-.cs-mo .row span{display:block;font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.02em;color:var(--mut)}
-.cs-mo .row b{display:block;margin-top:.15rem;font-family:Sora,Manrope,sans-serif;font-size:1.45rem;line-height:1.2;font-variant-numeric:tabular-nums}
-.cs-mo .row b i{font-style:normal;font-family:Manrope,sans-serif;font-size:.85rem;font-weight:600;color:var(--mut)}
-.cs-mo .row small{display:block;margin-top:.1rem;font-size:.74rem;color:var(--mut)}
-.cs-mo details{margin-top:.4rem;border:1px solid var(--ln);border-radius:var(--r);background:#fff}
-.cs-mo summary{padding:.55rem .9rem;cursor:pointer;font-size:.85rem;font-weight:700;list-style:none}.cs-mo summary::-webkit-details-marker{display:none}
-.cs-mo .ch{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:.5rem;padding:.45rem .9rem;border-top:1px solid color-mix(in oklab,var(--ln) 60%,#fff);font-size:.84rem;font-variant-numeric:tabular-nums}
-.cs-mo .ch b{font-weight:700}.cs-mo .ch.h{font-size:.66rem;font-weight:800;text-transform:uppercase;color:var(--mut)}
-@media(max-width:560px){.cs-mo .row{grid-template-columns:1fr}.cs-mo .row>div+div{border-left:0;border-top:1px solid var(--ln)}.cs-mo .row b{font-size:1.25rem}}`;
+.cs-mo{margin:1rem 0;color:#0f2f3a;--mi:#0f2f3a;--mm:#46606c;--ml:#c9dae1;--ms:#eef5f8}
+.cs-mo .mh{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.4rem .75rem}
+.cs-mo .mh .gl{margin:0;font-size:.85rem;letter-spacing:.03em;color:var(--mi)}
+.cs-mo .mh .pd{padding:.28rem .7rem;border-radius:99px;background:#dff0f4;color:#0a4f60;font-size:.78rem;font-weight:700}
+.cs-mo .mr{margin-top:.55rem;display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem}
+.cs-mo .mr>div{min-width:0;padding:.85rem 1rem .8rem;background:#fff;border:1px solid var(--ml);border-top:4px solid var(--c,#0d7f93);border-radius:.5rem;box-shadow:0 1px 3px rgb(15 47 58/.1)}
+.cs-mo .mr>div:nth-child(2){--c:#c97a14}.cs-mo .mr>div:nth-child(3){--c:#2f855a}
+.cs-mo .mr span{display:block;font-size:.74rem;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:var(--mm)}
+.cs-mo .mr b{display:block;margin-top:.3rem;font-family:Sora,Manrope,sans-serif;font-size:1.7rem;font-weight:700;line-height:1.15;color:var(--mi);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.cs-mo .mr b i{font-style:normal;font-family:Manrope,sans-serif;font-size:.95rem;font-weight:700;color:var(--mm)}
+.cs-mo .mr small i{font-style:normal}.cs-mo .mr small{display:block;margin-top:.3rem;font-size:.84rem;font-weight:600;line-height:1.35;color:var(--mm);font-variant-numeric:tabular-nums}
+.cs-mo details{margin-top:.6rem;overflow:hidden;border:1px solid var(--ml);border-radius:.5rem;background:#fff;box-shadow:0 1px 3px rgb(15 47 58/.1)}
+.cs-mo summary{display:flex;align-items:center;justify-content:space-between;gap:.5rem;padding:.75rem 1rem;background:var(--ms);color:var(--mi);font-size:.95rem;font-weight:800;list-style:none;cursor:pointer}
+.cs-mo summary::-webkit-details-marker{display:none}.cs-mo summary::after{content:"▾";font-size:1rem;color:var(--mm);transition:transform .15s}.cs-mo details[open]>summary::after{transform:rotate(180deg)}
+.cs-mo .cr{display:grid;grid-template-columns:1fr 1.5fr 1.5fr;gap:.4rem 1rem;align-items:start;padding:.7rem 1rem;border-top:1px solid #dfeaef;font-size:.9rem;color:var(--mi)}
+.cs-mo .cr:nth-of-type(even){background:#f7fafb}
+.cs-mo .cr .nm{font-size:.95rem;font-weight:800}
+.cs-mo .cr .v{display:flex;flex-wrap:wrap;gap:.1rem .8rem;font-variant-numeric:tabular-nums}.cs-mo .cr .v span{display:inline;white-space:nowrap;font-size:.9rem;font-weight:400;text-transform:none;letter-spacing:0;color:var(--mi)}
+.cs-mo .cr .v b{font-weight:700}.cs-mo .cr .v em{font-style:normal;font-weight:600;color:var(--mm)}
+.cs-mo .crh{background:#fff;font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:var(--mm)}
+@media(max-width:640px){.cs-mo .mr{grid-template-columns:1fr}.cs-mo .mr b{font-size:1.5rem}.cs-mo .crh{display:none}.cs-mo .cr{grid-template-columns:1fr}.cs-mo .cr [data-l]::before{content:attr(data-l);display:block;margin-bottom:.1rem;font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:var(--mm)}}`;
   function ensureCss() { if (typeof document === 'undefined' || document.getElementById('cs-css')) return; const s = document.createElement('style'); s.id = 'cs-css'; s.textContent = css; document.head.appendChild(s); }
 
   const totBox = (label, t, note) => {
@@ -255,10 +264,29 @@ const ChemStats = (() => {
     return { from: today.slice(0, 8) + '01', name: MON_N[m], year: y, nextName: MON_G[(m + 1) % 12], nextYear: m === 11 ? y + 1 : y, hh };
   }
   const mc = { html: '', at: 0 };
+  let mOpen = false;                                                    // «По каждому химикату» не схлопывается при обновлении панели
+  function bindMonth(el) { const d = el && el.querySelector && el.querySelector('.cs-mo details'); if (!d) return; d.open = mOpen; d.ontoggle = () => { mOpen = d.open; }; }
+  const parts = (c, o) => {
+    if (!o) return '–';
+    const a = []; if (o.pc != null) a.push([fmt(o.pc), 'шт']); if (o.l != null) a.push([fmt(o.l), 'л']); if (o.kg != null) a.push([fmt(o.kg), 'кг']);
+    return a.length ? `<div class="v">${a.map(([n, u]) => `<span><b>${n}</b> <em>${u}</em></span>`).join('')}</div>` : '–';
+  };
+  const two = (t, k) => { const l = t[k].nL ? fmt(t[k].l) + ' <i>л</i>' : '', kg = t[k].nKg ? fmt(t[k].kg) + ' <i>кг</i>' : ''; return l || kg ? `<b>${l || kg}</b>${l && kg ? `<small>${kg}</small>` : ''}` : '<b>–</b>'; };
+  // pure: разметка блока «За этот месяц» (отдельно от загрузки данных, чтобы её можно было проверить без базы)
+  function monthMarkup(mi, T, miss, fact, rows) {
+    const list = rows.filter(r => r.tracked || (r.g.all.theory && (r.g.all.theory.l > 0 || r.g.all.theory.kg > 0))).map(r =>
+      `<div class="cr"><b class="nm">${esc(r.name)}</b><div data-l="Залито">${!r.tracked ? '–' : r.g.all.need ? 'нет плотности' : parts(r.c, r.g.all.poured)}</div><div data-l="Расход (теория)">${parts(r.c, r.g.all.theory)}</div></div>`).join('');
+    return `<section class="cs-mo" aria-label="Статистика химии за месяц">
+        <div class="mh"><p class="gl">За этот месяц · ${mi.name} ${mi.year}</p><span class="pd">с 1 числа ${mi.hh}:00 · обнулится 1 ${mi.nextName} в ${mi.hh}:00</span></div>
+        <div class="mr"><div><span>Залито за месяц</span>${two(T, 'poured')}<small>${miss > 0 ? `по ${T.poured.n} из ${T.all} химикатов` : 'нетто: минус остатки и забранное'}</small></div>
+          <div><span>Расход за месяц · теория</span>${two(T, 'theory')}<small>по рецептам и загрузкам</small></div>
+          <div><span>Расход факт · замеры</span>${fact}</div></div>
+        ${list ? `<details><summary>По каждому химикату</summary><div class="cr crh"><span>Химикат</span><span>Залито</span><span>Расход (теория)</span></div>${list}</details>` : ''}</section>`;
+  }
   async function mountMonth(el, o) {
     if (!el) return;
     ensureCss();
-    if (mc.html) el.innerHTML = mc.html;                                  // панель перерисовывается каждые 30 с — без мигания
+    if (mc.html) { el.innerHTML = mc.html; bindMonth(el); }               // панель перерисовывается каждые 30 с — без мигания
     if (Date.now() - mc.at < 5 * 60e3) return;
     mc.at = Date.now();
     const { tz = 5, st = 6, refs } = o; if (!refs) return;
@@ -271,9 +299,7 @@ const ChemStats = (() => {
       const loads = lo.data || [], ev = { changes: ch.data || [], connects: cn.data || [], moves: (mv && mv.data) || [], levels: (lv && lv.data) || [] };
       const rep = calcReport(loads, [], refs, [], null, [], []);
       const model = calc(refs, rep, ev, d1, today, tz, st), T = totals(model, 'all');
-      const two = (t, k) => { const l = t[k].nL ? fmt(t[k].l) + ' <i>л</i>' : '', kg = t[k].nKg ? fmt(t[k].kg) + ' <i>кг</i>' : ''; return l || kg ? `<b>${l || kg}</b>${l && kg ? `<small>${kg}</small>` : ''}` : '<b>–</b>'; };
       const miss = T.all - T.poured.n;
-      // факт по закрытым отрезкам месяца: сумма фактического расхода основной химии из сохранённых закрытий (если они есть)
       let fact = '<b>–</b><small>появится после закрытия</small>';
       // только отрезки, которые начались в этом месяце: закрытие на 1 число закрывает ПРОШЛЫЙ месяц и сюда не относится
       const cls = ((cl && cl.data) || []).filter(c => c.snapshot && c.snapshot.from ? c.snapshot.from >= d1 : c.boundary_date > d1);
@@ -281,18 +307,12 @@ const ChemStats = (() => {
         const kg = cls.reduce((s, c) => s + ((c.snapshot && c.snapshot.rows) || []).filter(x => x.group === 'all' && x.kind === 'main').reduce((a, x) => a + (+x.fact_kg || 0), 0), 0);
         fact = `<b>${fmt(kg)} <i>кг</i></b><small>по закрытым сменам (${cls.length})</small>`;
       }
-      const rows = model.rows.filter(r => r.tracked || (r.g.all.theory && (r.g.all.theory.l > 0 || r.g.all.theory.kg > 0)));
-      const list = rows.map(r => `<div class="ch"><b>${esc(r.name)}</b><span>${!r.tracked ? '–' : r.g.all.need ? 'нет плотности' : esc(one(r.c, r.g.all.poured))}</span><span>${esc(one(r.c, r.g.all.theory))}</span></div>`).join('');
-      el.innerHTML = mc.html = `<section class="cs-mo" aria-label="Статистика химии за месяц">
-        <div class="t"><p class="gl" style="margin:0">За этот месяц · ${mi.name} ${mi.year}</p><span class="hint" style="margin:0">с 1 числа ${mi.hh}:00 · обнулится 1 ${mi.nextName} в ${mi.hh}:00</span></div>
-        <div class="row"><div><span>Залито за месяц</span>${two(T, 'poured')}<small>${miss > 0 ? `по ${T.poured.n} из ${T.all} химикатов` : 'нетто: минус остатки и забранное'}</small></div>
-          <div><span>Расход за месяц · теория</span>${two(T, 'theory')}<small>по рецептам и загрузкам</small></div>
-          <div><span>Расход факт · замеры</span>${fact}</div></div>
-        ${list ? `<details><summary>По каждому химикату ▾</summary><div class="ch h"><span>Химикат</span><span>Залито</span><span>Расход (теория)</span></div>${list}</details>` : ''}</section>`;
-      const cur = typeof document !== 'undefined' && document.getElementById('cmo'); if (cur && cur !== el) cur.innerHTML = mc.html;
+      el.innerHTML = mc.html = monthMarkup(mi, T, miss, fact, model.rows);
+      bindMonth(el);
+      const cur = typeof document !== 'undefined' && document.getElementById('cmo'); if (cur && cur !== el) { cur.innerHTML = mc.html; bindMonth(cur); }
     } catch (e) { mc.at = 0; }
   }
 
-  return { calc, totals, events, render, mount, mountMonth, monthInfo, loadTheory, both };
+  return { calc, totals, events, render, mount, mountMonth, monthMarkup, monthInfo, loadTheory, both };
 })();
 if (typeof module !== 'undefined') module.exports = ChemStats;
