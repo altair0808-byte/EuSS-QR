@@ -149,10 +149,11 @@ async function load(openId){
 
 (async()=>{
   const ses=await need();if(!ses)return;
-  const {data:ok}=await sb.rpc('can_report');
-  if(!ok){$('#out').innerHTML='<p>Нет доступа к отчётам. Обратитесь к администратору.</p>';return;}
-  const [{data:pr},{data:adm},s,c,w,r]=await Promise.all([sb.from('profiles').select('role').eq('id',ses.user.id).maybeSingle(),sb.rpc('is_admin'),sb.from('settings').select('*'),sb.from('chemicals').select('*').order('sort'),sb.from('wash_types').select('id,name').order('sort'),sb.from('recipes').select('*')]);
-  isSuper=pr?.role==='superadmin';$('#tocl').hidden=!(adm||isSuper);
+  const [{data:pr},{data:adm}]=await Promise.all([sb.from('profiles').select('role').eq('id',ses.user.id).maybeSingle(),sb.rpc('is_admin')]);
+  isSuper=pr?.role==='superadmin';
+  if(!adm&&!isSuper){$('#out').innerHTML='<p>Отчёт по закрытиям доступен админам и суперадмину.</p>';return;}
+  const [s,c,w,r]=await Promise.all([sb.from('settings').select('*'),sb.from('chemicals').select('*').order('sort'),sb.from('wash_types').select('id,name').order('sort'),sb.from('recipes').select('*')]);
+  $('#tocl').hidden=false;
   const g=k=>{const x=(s.data||[]).find(y=>y.key===k);return x?+x.value:null};
   tz=g('tz_offset')??5;st=g('shift_start')??6;warnPct=g('close_warn_pct')??25;
   refs={water:g('water_l')??55,washTypes:w.data||[],chemicals:c.data||[],recipes:r.data||[]};
