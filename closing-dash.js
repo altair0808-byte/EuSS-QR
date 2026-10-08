@@ -5,12 +5,19 @@ const ClosingDash = (() => {
   const E = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const dmy = d => String(d).split('-').reverse().join('.');
   const MON = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
-  // pure: что напомнить. last = { boundary_date, kind } | null, today = 'YYYY-MM-DD'
-  function reminder(last, today) {
+  // pure: что напомнить. last = { at_ts, boundary_date, kind, opens_month } | null, today = дата смены 'YYYY-MM-DD',
+  // o.newMonthWash — уже была стирка нового месяца (после неё закрыть месяц в срок уже нельзя)
+  // Правило: месяц закрывается в последний день месяца или 1 числа, до первой стирки 1 числа; закрыть отчёт внутри месяца можно в любое время.
+  const addDays = (d, n) => { const t = new Date(d + 'T00:00:00Z'); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); };
+  function reminder(last, today, o = {}) {
     if (!last) return { level: 'info', text: 'Замеров остатков ещё нет. Внесите начальный замер, чтобы считать точный факт расхода.' };
-    const lastM = last.boundary_date.slice(0, 7), curM = today.slice(0, 7);
-    if (today.slice(8) === '01' && last.boundary_date !== today) return { level: 'warn', text: 'Сегодня 1 число — пора закрыть месяц: взвесьте остатки в 06:00 и закройте.' };
-    if (lastM < curM && !(last.kind === 'month' && last.boundary_date === curM + '-01')) return { level: 'bad', text: `Прошлый месяц не закрыт (последний замер ${dmy(last.boundary_date)}). Закрытие задним числом делает суперадмин.` };
+    const open = last.opens_month || last.boundary_date.slice(0, 7);          // месяц текущего открытого периода
+    const [y, m] = open.split('-').map(Number), next = new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10);   // 1 число следующего месяца
+    if (today >= next) {
+      if (o.newMonthWash) return { level: 'bad', text: `Месяц ${open} не закрыт до первой стирки нового месяца. Закрытие задним числом делает суперадмин.` };
+      return { level: 'warn', text: 'Месяц закончился — закройте месяц: взвесьте остатки после последней стирки и до первой стирки 1 числа.' };
+    }
+    if (today === addDays(next, -1)) return { level: 'info', text: 'Сегодня последний день месяца. Закрыть месяц можно после последней стирки или утром 1 числа, до первой стирки.' };
     return null;
   }
   let cache = { html: '', at: 0 };
@@ -22,22 +29,27 @@ const ClosingDash = (() => {
     const { tz = 5, st = 6, refs } = o;
     try {
       const [{ data: cl, error }, { data: td }] = await Promise.all([
-        sb.from('closings').select('id,kind,boundary_date,is_etalon,snapshot').order('at_ts', { ascending: false }).limit(1),
+        sb.from('closings').select('id,kind,boundary_date,at_ts,opens_month,is_etalon,snapshot').order('at_ts', { ascending: false }).limit(1),
         sb.rpc('closing_today')]);
       if (error) { el.innerHTML = ''; return; }          // stage15.sql не выполнен — блок просто не показываем
       const last = (cl || [])[0] || null, today = td || new Date(Date.now() + (tz - st) * 3600e3).toISOString().slice(0, 10);
-      const rem = reminder(last, today);
+      let nw = false;
+      if (last) {                                   // нужна ли проверка «уже была стирка нового месяца»: только когда месяц закончился
+        const open = last.opens_month || last.boundary_date.slice(0, 7), [yy, mm] = open.split('-').map(Number), nx = new Date(Date.UTC(yy, mm, 1)).toISOString().slice(0, 10);
+        if (today >= nx) { const q = await sb.from('loads').select('id', { count: 'exact', head: true }).gte('shift_date', nx); nw = !q.error && (q.count || 0) > 0; }
+      }
+      const rem = reminder(last, today, { newMonthWash: nw });
       let stats = '';
-      if (last && today > last.boundary_date && refs) {
-        const d1 = last.boundary_date, back = addDaysISO(d1, -60);
+      if (last && last.at_ts && refs) {
+        const d1 = shiftDateOf(last.at_ts, tz, st), back = addDaysISO(d1, -60);
         const [lo, ch, cn, lv] = await Promise.all([sb.rpc('report_loads', { d1, d2: today }), sb.rpc('report_changes', { d1: back, d2: today }), sb.rpc('report_connects', { d1: back, d2: today }), sb.rpc('report_levels', { d1: back, d2: today })]);
-        const from = new Date(boundaryTs(d1, tz, st)).getTime(), inP = x => new Date(x.ts).getTime() >= from;
+        const from = new Date(last.at_ts).getTime(), inP = x => new Date(x.ts).getTime() >= from;
         const loads = (lo.data || []).filter(inP), chg = ch.data || [], con = cn.data || [];
         const r = calcReport(loads, chg.filter(inP), refs, con.filter(inP), { changes: chg, connects: con, levels: lv.data || [] });
         const days = Math.round((Date.parse(today) - Date.parse(d1)) / 864e5) + 1;
         const main = r.groups.all.chem.filter(c => c.kind === 'main' && c.theory && c.theory.kg != null);
         stats = `<div class="mg" style="margin-top:.5rem">
-          <article class="m"><p class="l">С замера</p><p class="v">${days} <small>смен</small></p><p class="n">с ${dmy(d1)} 06:00</p></article>
+          <article class="m"><p class="l">С замера</p><p class="v">${days} <small>смен</small></p><p class="n">с ${dmy(d1)} ${(() => { const q = new Date(new Date(last.at_ts).getTime() + tz * 3600e3); return String(q.getUTCHours()).padStart(2, '0') + ':' + String(q.getUTCMinutes()).padStart(2, '0'); })()}</p></article>
           <article class="m"><p class="l">Стирок</p><p class="v">${Num.fmt(r.total)}</p><p class="n">в текущем периоде</p></article>
           <article class="m"><p class="l">Белья</p><p class="v">${Num.fmt(r.kg)} <small>кг</small></p><p class="n">в текущем периоде</p></article>
           <article class="m"><p class="l">Теория химии</p><p class="v">${Num.fmt(main.reduce((s, c) => s + c.theory.kg, 0))} <small>кг</small></p><p class="n">${main.map(c => E(c.name) + ' ' + Num.fmt(c.theory.kg) + ' кг').join(' · ') || '–'}</p></article></div>`;

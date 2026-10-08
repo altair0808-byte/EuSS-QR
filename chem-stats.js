@@ -111,8 +111,10 @@ const ChemStats = (() => {
       });
       mine(ev.connects).forEach(x => fill.push({ k: 'con', ts: x.ts, shift_date: x.shift_date, who: who(x.created_by), group: x.machine_group || '1_10', title: 'Подключён остаток', amt: amtP(x), sign: 1 }));
       mine(ev.moves).forEach(x => {
-        const kind = x.kind === 'take' ? 'take' : x.kind === 'add' ? 'add' : 'pour';
-        fill.push({ k: kind, ts: x.ts, shift_date: x.shift_date, who: who(x.created_by), group: x.machine_group || '1_10', title: kind === 'take' ? 'Забрали из дозатора' : kind === 'add' ? 'Добавил суперадмин' : 'Залили из запаса', amt: amtP(x), sign: kind === 'take' ? -1 : 1 });
+        const kind = x.kind === 'take' ? 'take' : x.kind === 'add' ? 'add' : x.kind === 'receipt' ? 'receipt' : x.kind === 'writeoff' ? 'writeoff' : 'pour';
+        const T = { take: 'Забрали из дозатора', add: 'Добавил суперадмин', pour: 'Залили из запаса', receipt: 'Поступление в запас', writeoff: 'Списано из запаса' };
+        const stk = kind === 'receipt' || kind === 'writeoff';   // поступление и списание относятся к общему запасу, а не к дозатору
+        fill.push({ k: kind, ts: x.ts, shift_date: x.shift_date, who: who(x.created_by), group: x.machine_group || '1_10', stock: stk, note: x.note || '', title: T[kind], amt: amtP(x), sign: kind === 'take' || kind === 'writeoff' ? -1 : 1 });
       });
       mine(ev.levels).forEach(x => fill.push({ k: 'lvl', ts: x.ts, shift_date: x.shift_date, who: who(x.created_by), group: x.machine_group || '1_10', title: 'Указан реальный уровень', amt: amtP(x), sign: 0 }));
     }
@@ -213,7 +215,7 @@ const ChemStats = (() => {
       return html || '<p class="hint">За выбранный период записей нет.</p>';
     };
     const useLine = r => `<div class="cs-e"><div><b>${timeOf(r.ts, tz)} · ${esc(r.who || 'не указан')}</b><span class="m">Машина ${r.machine} (дозатор ${r.group === '1_10' ? '1–10' : '11–12'})${r.wash ? ' · ' + esc(r.wash) : ''} · ${fmt(r.weight)} кг белья</span></div><div><b>${esc(one(c, r.amt))}</b></div></div>`;
-    const fillLine = r => `<div class="cs-e${r.sign < 0 ? ' neg' : ''}"><div><b>${timeOf(r.ts, tz)} · ${esc(r.title)}</b><span class="m">${esc(r.who || 'не указан')} · дозатор ${r.group === '11_12' ? '11–12' : '1–10'}${r.left ? ' · остаток в бутыли ' + esc(one(c, r.left)) : ''}</span></div><div><b>${r.sign < 0 ? '−' : r.sign > 0 ? '+' : ''}${r.amt ? esc(one(c, r.amt)) : '–'}</b></div></div>`;
+    const fillLine = r => `<div class="cs-e${r.sign < 0 ? ' neg' : ''}"><div><b>${timeOf(r.ts, tz)} · ${esc(r.title)}</b><span class="m">${esc(r.who || 'не указан')} · ${r.stock ? 'общий запас' : 'дозатор ' + (r.group === '11_12' ? '11–12' : '1–10')}${r.note ? ' · ' + esc(r.note) : ''}${r.left ? ' · остаток в бутыли ' + esc(one(c, r.left)) : ''}</span></div><div><b>${r.sign < 0 ? '−' : r.sign > 0 ? '+' : ''}${r.amt ? esc(one(c, r.amt)) : '–'}</b></div></div>`;
     const chips = a => a.length ? `<div class="cs-sg">${a.map(e => `<span>${esc(e.name)}: ${e.n} ст. · ${fmt(e.v)} ${theoryUnit(c) === 'kg' ? 'кг' : 'л'}</span>`).join('')}</div>` : '';
     const wrap = document.createElement('div'); wrap.className = 'cs-ov';
     const draw = tab => {

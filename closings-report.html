@@ -24,10 +24,11 @@
 <div id="out"><p class="hint">Загрузка…</p></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="config.js"></script><script src="num.js"></script><script src="app.js"></script><script src="report-calc.js"></script>
+<script src="config.js"></script><script src="num.js"></script><script src="app.js"></script><script src="report-calc.js"></script><script src="xlsx-writer.js"></script><script src="closing-xlsx.js"></script>
 <script>
-// Этап 3: список закрытий, карточка закрытия, сравнение с эталоном и с предыдущим закрытием, динамика по месяцам.
-// Данные — снимок closings.snapshot (calcClosing на момент закрытия). Смена эталона / отмена / пересчёт — только суперадмин, паролем.
+// Отчёт по закрытиям: список, карточка закрытия, сравнение с эталоном и с предыдущим закрытием, динамика по месяцам, выгрузка в Excel.
+// Данные — снимок closings.snapshot (calcClosing на момент закрытия): после закрытия цифры зафиксированы и не пересчитываются.
+// Смена эталона / отмена последнего закрытия — только суперадмин, паролем. Пересчёт снимка возможен только если суперадмин поправил запись внутри периода (needs_recalc).
 const esc=t=>String(t??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const f=(n,m)=>Num.fmt(n,m),sign=n=>n>0?'+':'',dmy=d=>String(d).split('-').reverse().join('.');
 const MONTHS=['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
@@ -35,6 +36,11 @@ const mName=k=>{const [y,m]=k.split('-');return MONTHS[+m-1]+' '+y;};
 const KIND={start:'Начальный замер',interval:'Закрытие внутри месяца',month:'Закрытие месяца'};
 const GL={'1_10':'Дозатор 1 (1–10)','11_12':'Дозатор 2 (11–12)','all':'Оба дозатора'};
 let L=[],isSuper=false,view='list',refs=null,tz=5,st=6,warnPct=25;
+const pad2=n=>String(n).padStart(2,'0');
+const fmtTs=ts=>{if(!ts)return '–';const d=new Date(new Date(ts).getTime()+tz*3600e3);return `${pad2(d.getUTCDate())}.${pad2(d.getUTCMonth()+1)}.${d.getUTCFullYear()} ${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}`;};
+const fromOf=c=>c.snapshot?.from_ts||c.period_from;     // начало периода (у старых закрытий — момент прошлого замера)
+const periodTxt=c=>{const f0=fromOf(c);return f0?`${fmtTs(f0)} → ${fmtTs(c.at_ts)}`:`замер ${fmtTs(c.at_ts)}`;};
+const dur=c=>{const f0=fromOf(c);if(!f0)return '';const h=(new Date(c.at_ts)-new Date(f0))/3600e3,d=Math.floor(h/24),hh=Math.round((h-d*24)*10)/10;return (d?d+' сут. ':'')+String(hh).replace('.',',')+' ч';};
 
 const allRows=c=>(c.snapshot?.rows||[]).filter(r=>r.group==='all');
 const rowOf=(c,id,g='all')=>(c?.snapshot?.rows||[]).find(r=>+r.chemical_id===+id&&r.group===g);
@@ -46,21 +52,22 @@ const factTheory=c=>{const a=allRows(c).filter(r=>r.kind==='main');const fs=a.re
 
 function list(){
   if(!L.length) return '<p class="hint">Закрытий ещё нет.</p>';
-  return `<div class="cl">${L.map(c=>{const s=c.snapshot,per=c.period_from&&s?`смены ${dmy(s.from)} – ${dmy(addDaysISO(s.to,-1))} · ${f(s.days)} дн.`:'точка отсчёта';
+  return `<div class="cl">${L.map(c=>{const s=c.snapshot,per=c.period_from&&s?`${periodTxt(c)} · ${dur(c)}`:'точка отсчёта';
     const r=factTheory(c);
-    return `<button data-id="${c.id}"><span><b>${KIND[c.kind]} · ${dmy(c.boundary_date)}</b>${c.is_etalon?'<span class="tg2 et">эталон</span>':''}${c.needs_recalc?'<span class="tg2 rc">нужен пересчёт</span>':''}${c.late?'<span class="tg2">позднее</span>':''}<br><small>${per}</small></span>
+    return `<button data-id="${c.id}"><span><b>${KIND[c.kind]} · ${fmtTs(c.at_ts)}</b>${c.is_etalon?'<span class="tg2 et">эталон</span>':''}${c.needs_recalc?'<span class="tg2 rc">нужен пересчёт</span>':''}${c.late?'<span class="tg2">позднее</span>':''}<br><small>${per}</small></span>
      <small>${s?`${f(s.totals.washes)} стирок · ${f(s.totals.laundry_kg)} кг белья${r!=null?' · факт/теория '+f(r,3):''}`:''}</small></button>`;}).join('')}</div>`;
 }
 
 function card(c){
   const s=c.snapshot,E=etalon(),P=prevOf(c);
   let h=`<div class="ab"><button class="btn s" id="back">← Ко всем закрытиям</button></div>
-   <h2 style="margin-top:.2rem">${KIND[c.kind]} · ${dmy(c.boundary_date)} ${String(st).padStart(2,'0')}:00 ${c.is_etalon?'<span class="tg2 et">эталон</span>':''}</h2>`;
+   <h2 style="margin-top:.2rem">${KIND[c.kind]} · ${fmtTs(c.at_ts)} ${c.is_etalon?'<span class="tg2 et">эталон</span>':''}</h2>
+   <p class="hint" style="margin:0">🔒 Данные зафиксированы при закрытии (${fmtTs(c.closed_at)}) и не пересчитываются.</p>`;
   if(c.note) h+=`<p class="hint">Комментарий: ${esc(c.note)}</p>`;
-  if(c.needs_recalc) h+='<div class="msg er">После закрытия суперадмин поправил запись внутри периода. Цифры ниже — на момент закрытия, нужен пересчёт.</div>';
-  if(!s){h+='<p class="hint">Начальный замер: расчёта нет. Остатки:</p>'+measTable(c);return h+adminBtns(c);}
+  if(c.needs_recalc) h+='<div class="msg er">После закрытия суперадмин поправил запись внутри периода. Цифры ниже — на момент закрытия (в Excel это тоже указано). Пересчитать их может суперадмин кнопкой внизу.</div>';
+  if(!s){h+='<p class="hint">Начальный замер: расчёта нет. Остатки:</p>'+await_meas(c)+adminBtns(c);return h;}
   const T=s.totals,r=factTheory(c);
-  h+=`<p class="hint">Смены ${dmy(s.from)} – ${dmy(addDaysISO(s.to,-1))} · ${f(s.days)} дн. · ${E&&E.id!==c.id?'эталон: '+dmy(E.boundary_date):c.is_etalon?'это закрытие — эталон':'эталона нет'}${P?' · предыдущее: '+dmy(P.boundary_date):''}</p>
+  h+=`<p class="hint">${periodTxt(c)} · ${dur(c)} · смен: ${f(s.days)} · ${E&&E.id!==c.id?'эталон: '+fmtTs(E.at_ts):c.is_etalon?'это закрытие — эталон':'эталона нет'}${P?' · предыдущее: '+fmtTs(P.at_ts):''}</p>
    <div class="tot"><div><span>Стирок</span><b>${f(T.washes)}</b></div><div><span>Белья, кг</span><b>${f(T.laundry_kg)}</b></div><div><span>Жителе-суток</span><b>${T.resident_days==null?'–':f(T.resident_days)}</b></div><div><span>Факт / теория</span><b>${r==null?'–':f(r,3)}</b></div></div>`;
   if(s.warnings?.length) h+=`<div class="msg wr"><b>Предупреждения при закрытии:</b><br>${s.warnings.map(w=>esc(w.text)).join('<br>')}</div>`;
   // итог по химикатам
@@ -70,7 +77,7 @@ function card(c){
      <td>${x.per_kg_laundry==null?'–':f(x.per_kg_laundry,3)+' '+x.unit_small}</td><td>${x.per_wash==null?'–':f(x.per_wash,2)+' '+x.unit_small}</td><td>${x.per_resident_day==null?'–':f(x.per_resident_day,2)+' '+x.unit_small}</td>
      <td>${E&&E.id!==c.id?pc(pctCh(x.per_kg_laundry,e?.per_kg_laundry)):'–'}</td><td>${P?pc(pctCh(x.per_kg_laundry,p?.per_kg_laundry)):'–'}</td></tr>`;}).join('')}</tbody></table></div>
    <p class="hint">«к эталону» и «к пред.» — рост или падение расхода на кг белья. Ед. — мл для жидкой химии, г для порошка.</p>`;
-  if(E&&E.id!==c.id) h+=`<h2>Сравнение с эталоном (${dmy(E.boundary_date)})</h2><div class="tw"><table><thead><tr><th>Химикат</th><th>на кг белья</th><th>на стирку</th><th>на жителя</th><th>факт/теория</th></tr></thead><tbody>${allRows(c).map(x=>{const e=rowOf(E,x.chemical_id)||{};
+  if(E&&E.id!==c.id) h+=`<h2>Сравнение с эталоном (${fmtTs(E.at_ts)})</h2><div class="tw"><table><thead><tr><th>Химикат</th><th>на кг белья</th><th>на стирку</th><th>на жителя</th><th>факт/теория</th></tr></thead><tbody>${allRows(c).map(x=>{const e=rowOf(E,x.chemical_id)||{};
     const cell=(a,b,m)=>`${a==null?'–':f(a,m)} / ${b==null?'–':f(b,m)}<br>${pc(pctCh(a,b))}`;
     return `<tr><td>${esc(x.name)}</td><td>${cell(x.per_kg_laundry,e.per_kg_laundry,3)}</td><td>${cell(x.per_wash,e.per_wash,2)}</td><td>${cell(x.per_resident_day,e.per_resident_day,2)}</td><td>${cell(x.ratio,e.ratio,3)}</td></tr>`;}).join('')}</tbody></table></div><p class="hint">Сейчас / эталон, ниже — изменение.</p>`;
   // детали по дозаторам
@@ -81,14 +88,16 @@ function card(c){
   });
   return h+adminBtns(c);
 }
+function await_meas(c){return measTable(c);}
 function measTable(c){const nm={};(refs?.chemicals||[]).forEach(x=>nm[x.id]=x.name);return `<div class="tw"><table><thead><tr><th>Химикат</th><th>Дозатор 1</th><th>Дозатор 2</th></tr></thead><tbody>${Object.entries((c.m||[]).reduce((o,m)=>{(o[m.chemical_id]=o[m.chemical_id]||{})[m.machine_group]=m.amount_kg;return o;},{})).map(([id,v])=>`<tr><td>${esc(nm[id]||id)}</td><td>${v['1_10']==null?'–':f(v['1_10'])} кг</td><td>${v['11_12']==null?'–':f(v['11_12'])} кг</td></tr>`).join('')}</tbody></table></div>`;}
 function adminBtns(c){
-  if(!isSuper) return '';
-  const b=[];
-  if(c.kind!=='start'&&!c.is_etalon) b.push('<button class="btn" data-a="etalon">Сделать эталоном</button>');
-  if(c.kind!=='start') b.push(`<button class="btn" data-a="recalc">Пересчитать по текущим данным</button>`);
-  if(L[0]&&L[0].id===c.id) b.push('<button class="btn danger" data-a="delete">Отменить это закрытие</button>');
-  return b.length?`<h2>Суперадмин</h2><div class="ab">${b.join('')}</div>`:'';
+  const b=[`<button class="btn" data-a="xlsx">⬇ Скачать Excel</button>`];
+  if(isSuper){
+    if(c.kind!=='start'&&!c.is_etalon) b.push('<button class="btn" data-a="etalon">Сделать эталоном</button>');
+    if(c.kind!=='start'&&c.needs_recalc) b.push('<button class="btn" data-a="recalc">Пересчитать после правки записи</button>');
+    if(L[0]&&L[0].id===c.id) b.push('<button class="btn danger" data-a="delete">Отменить это закрытие</button>');
+  }
+  return `<h2>Файл и действия</h2><div class="ab">${b.join('')}</div><p class="hint" id="xs"></p>`;
 }
 
 function months(){
@@ -123,20 +132,35 @@ function render(id){
 }
 
 async function act(a,c){
-  if(a==='etalon'){if(await withPw('Сделать эталоном?',`Закрытие ${dmy(c.boundary_date)}. Все сравнения пересчитаются относительно него.`,pw=>rpcAsk('closing_set_etalon',{p_id:c.id,p_pw:pw}))){toast('Эталон изменён');await load(c.id);}return;}
-  if(a==='delete'){if(await withPw('Отменить закрытие?',`Закрытие ${dmy(c.boundary_date)} будет удалено (запись останется в журнале). Записи периода снова можно будет править.`,pw=>rpcAsk('closing_delete_last',{p_id:c.id,p_pw:pw}))){toast('Закрытие отменено');await load();}return;}
+  if(a==='xlsx')return xlsx(c);
+  if(a==='etalon'){if(await withPw('Сделать эталоном?',`Закрытие ${fmtTs(c.at_ts)}. Все сравнения пересчитаются относительно него.`,pw=>rpcAsk('closing_set_etalon',{p_id:c.id,p_pw:pw}))){toast('Эталон изменён');await load(c.id);}return;}
+  if(a==='delete'){if(await withPw('Отменить закрытие?',`Закрытие ${fmtTs(c.at_ts)} будет удалено (запись останется в журнале), остаток дозаторов вернётся из запаса. Записи периода снова можно будет править.`,pw=>rpcAsk('closing_delete_last',{p_id:c.id,p_pw:pw}))){toast('Закрытие отменено');await load();}return;}
   if(a==='recalc'){
     try{
+      if(!c.needs_recalc)throw new Error('Закрытие зафиксировано: пересчёт возможен только после правки записи внутри периода');
       const P=L[L.indexOf(c)+1];if(!P)throw new Error('Нет предыдущего замера');
       const mm=async id=>{const {data}=await sb.from('closing_measures').select('*').eq('closing_id',id);const o={};(data||[]).forEach(x=>o[x.chemical_id+':'+x.machine_group]=+x.amount_kg);return o;};
-      const from=P.boundary_date,to=c.boundary_date,back=addDaysISO(from,-60),d2=addDaysISO(to,-1),R=async(fn,a)=>{const {data,error}=await sb.rpc(fn,a);if(error)throw new Error(error.message);return data||[];};
-      const [s0,s1,loads,changes,connects,moves,levels]=await Promise.all([mm(P.id),mm(c.id),R('report_loads',{d1:from,d2}),R('report_changes',{d1:back,d2:to}),R('report_connects',{d1:back,d2:to}),R('report_moves',{d1:back,d2:to}).catch(()=>[]),R('report_levels',{d1:back,d2:to}).catch(()=>[])]);
-      let residents=null;try{const rr=await R('get_residents',{d1:from,d2});residents={};rr.forEach(x=>residents[x.day]=x.cnt);}catch(e){}
-      const res=calcClosing(refs,{from,to,tz,st,startKg:s0,endKg:s1,loads,changes,connects,moves,levels,residents,warnPct});
+      const fromTs=P.at_ts,toTs=c.at_ts,from=shiftDateOf(fromTs,tz,st),to=shiftDateOf(toTs,tz,st),back=addDaysISO(from,-60),R=async(fn,a)=>{const {data,error}=await sb.rpc(fn,a);if(error)throw new Error(error.message);return data||[];};
+      const [s0,s1,loads,changes,connects,moves,levels]=await Promise.all([mm(P.id),mm(c.id),R('report_loads',{d1:from,d2:to}),R('report_changes',{d1:back,d2:to}),R('report_connects',{d1:back,d2:to}),R('report_moves',{d1:back,d2:to}).catch(()=>[]),R('report_levels',{d1:back,d2:to}).catch(()=>[])]);
+      let residents=null;try{const rr=await R('get_residents',{d1:from,d2:to});residents={};rr.forEach(x=>residents[x.day]=x.cnt);}catch(e){}
+      const res=calcClosing(refs,{fromTs,toTs,tz,st,startKg:s0,endKg:s1,reserveStart:P.reserve||null,loads,changes,connects,moves,levels,residents,warnPct});
       const old=allRows(c),diff=allRows({snapshot:res}).map(r=>{const o=old.find(x=>+x.chemical_id===+r.chemical_id);return `${r.name}: ${o?.fact_kg==null?'–':f(o.fact_kg)} → ${r.fact_kg==null?'–':f(r.fact_kg)} кг`;}).join('\n');
-      if(await withPw('Сохранить пересчёт?','Факт, кг (было → стало):\n'+diff,pw=>rpcAsk('closing_recalc',{p_id:c.id,p_snapshot:{...res,warn_pct:warnPct,version:1,recalc:true},p_pw:pw}))){toast('Пересчитано');await load(c.id);}
+      if(await withPw('Сохранить пересчёт?','Факт, кг (было → стало):\n'+diff,pw=>rpcAsk('closing_recalc',{p_id:c.id,p_snapshot:{...res,warn_pct:warnPct,version:2,recalc:true},p_pw:pw}))){toast('Пересчитано');await load(c.id);}
     }catch(e){toast('Не удалось пересчитать: '+e.message);}
   }
+}
+
+// Excel: файл строится из сохранённого снимка закрытия, ничего не пересчитывается
+async function xlsx(c){
+  const xs=document.getElementById('xs'),say=t=>{if(xs)xs.textContent=t;};
+  try{
+    say('Готовлю файл…');
+    const idx=L.indexOf(c),P0=L[idx+1]||null;                         // предыдущий замер в цепочке (может быть начальным)
+    const mm=async cl=>{const o={};if(!cl)return o;const {data}=await sb.from('closing_measures').select('chemical_id,machine_group,amount_kg').eq('closing_id',cl.id);(data||[]).forEach(x=>o[x.chemical_id+':'+x.machine_group]=+x.amount_kg);return o;};
+    const [startMeas,endMeas]=await Promise.all([mm(P0),mm(c)]);
+    ClosingXlsx.download(c,{tz,st,warnPct,startMeas,endMeas,chemicals:refs.chemicals,prev:prevOf(c),etalon:etalon()||null});
+    say('Файл сформирован: '+ClosingXlsx.fileName(c,tz));
+  }catch(e){say('');toast('Не удалось сформировать файл: '+e.message);}
 }
 
 async function load(openId){

@@ -34,40 +34,50 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script><script src="num.js"></script><script src="app.js"></script><script src="report-calc.js"></script>
 <script>
-// Этап 2: экран «Закрытие». Ввод остатков в кг по химикатам и дозаторам, предпросмотр, закрытие паролем.
-// Расчёт — calcClosing (report-calc.js), запись — closing_create (stage15.sql). Права и пароль проверяет база.
+// Экран «Закрытие»: замер в любую минуту. Ввод остатков в кг по химикатам и дозаторам, предпросмотр, закрытие паролем.
+// Расчёт — calcClosing (report-calc.js), правила времени и запись — closing_check_time / closing_create (stage17.sql). Права и пароль проверяет база.
 const esc=t=>String(t??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const f=(n,m)=>Num.fmt(n,m);
 const dmy=d=>String(d).split('-').reverse().join('.');
 const GL={'1_10':'Дозатор 1 · машины 1–10','11_12':'Дозатор 2 · машины 11–12'};
-let refs=null,tz=5,st=6,warnPct=25,isSuper=false,today=null,last=null,lastMeas={},chems=[],kind=null,res=null,seq=0;
+let refs=null,tz=5,st=6,warnPct=25,isSuper=false,last=null,lastMeas={},chems=[],kind=null,res=null,seq=0;
 
 const page=async(fn,args)=>{const {data,error}=await sb.rpc(fn,args);if(error)throw new Error(fn+': '+error.message);return data||[];};
 const sign=n=>n>0?'+':'';
 const cls=p=>p==null?'':p>warnPct?'bad':p<-warnPct?'good':'';
 
-function kindAllowed(k,date,late){
-  if(!last) return k==='start';
-  if(k==='start') return false;
-  if(!date||date<=last.boundary_date) return false;
-  const d1=date.slice(8)==='01';
-  if(k==='month') return d1||late;
-  return !d1;
+const pad2=n=>String(n).padStart(2,'0');
+// «2026-10-07T14:30» (местное время сайта, tz_offset) <-> ISO UTC. Время не зависит от часового пояса браузера.
+const nowLocal=()=>new Date(Date.now()+tz*3600e3).toISOString().slice(0,16);
+const toIso=v=>{const m=/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(v||'');return m?new Date(Date.UTC(+m[1],+m[2]-1,+m[3],+m[4],+m[5])-tz*3600e3).toISOString():null;};
+const fmtTs=ts=>{if(!ts)return '–';const d=new Date(new Date(ts).getTime()+tz*3600e3);return `${pad2(d.getUTCDate())}.${pad2(d.getUTCMonth()+1)}.${d.getUTCFullYear()} ${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}`;};
+let at=null,chk={},seqD=0,lateUsed=false;
+const KINDS=()=>last?[['month','Закрыть месяц','В последний день месяца или 1 числа, до первой стирки нового месяца. Замер станет началом нового месяца'],['interval','Закрыть отчёт за прошедшие смены','В любое время внутри месяца. Все смены с прошлого замера']]:[['start','Начальный замер','Первая точка отсчёта. Расчёта нет, дальше закрываются периоды']];
+async function askTime(k,late){
+  const {data,error}=await sb.rpc('closing_check_time',{p_kind:k,p_at:at,p_late:late});
+  return error?{ok:false,error:error.message}:data;
 }
-function draw(){
-  const date=$('#bd')?$('#bd').value:today, late=$('#late')?$('#late').checked:false;
-  const ks=last?[['month','Закрыть месяц','1 числа в 06:00. Замер станет начальным остатком нового месяца'],['interval','Закрыть отчёт за прошедшие смены','Любой день в 06:00, кроме 1 числа. Все смены с прошлого замера']]:[['start','Начальный замер','Первая точка отсчёта. Расчёта нет, дальше закрываются периоды']];
-  if(!kindAllowed(kind,date,late)) kind=ks.map(x=>x[0]).find(k=>kindAllowed(k,date,late))||null;
-  $('#kd').innerHTML=ks.map(([k,t,s])=>`<button type="button" data-k="${k}" class="${kind===k?'on':''}" ${kindAllowed(k,date,late)?'':'disabled'}>${t}<small>${s}</small></button>`).join('');
-  const per=last&&date>last.boundary_date?`Период: смены ${dmy(last.boundary_date)} – ${dmy(addDaysISO(date,-1))} (замер ${dmy(last.boundary_date)} 06:00 → замер ${dmy(date)} 06:00)`:'';
-  let why='';
-  if(last&&date<=last.boundary_date) why=`Замер должен быть позже предыдущего (${dmy(last.boundary_date)}).`;
-  else if(last&&!kind) why='Для этой даты нельзя выбрать вид закрытия.';
-  else if(last&&!late&&last.boundary_date.slice(0,7)!==addDaysISO(date,-1).slice(0,7)) why='Период пересекает границу месяца: сначала закройте месяц на 1 число.'+(isSuper?' Если 1 число пропущено — отметьте «позднее закрытие».':'');
-  $('#per').innerHTML=esc(per)+(why?`<br><span class="bad">${esc(why)}</span>`:'');
-  invalidate();
+async function draw(){
+  const my=++seqD,v=$('#bd')?$('#bd').value:'',late=$('#late')?$('#late').checked:false;
+  at=toIso(v);invalidate();
+  const ks=KINDS();
+  if(!at){$('#kd').innerHTML='';$('#per').innerHTML='<span class="bad">Укажите дату и время замера.</span>';kind=null;return;}
+  $('#per').innerHTML='<span class="hint">Проверяю время…</span>';
+  const res2={};
+  await Promise.all(ks.map(async([k])=>{
+    let c=await askTime(k,false);
+    if(!c.ok&&k==='month'&&late&&isSuper){const c2=await askTime(k,true);if(c2.ok){c=c2;c.late=true;}}
+    res2[k]=c;
+  }));
+  if(my!==seqD)return;
+  chk=res2;
+  if(!chk[kind]||!chk[kind].ok) kind=ks.map(x=>x[0]).find(k=>chk[k].ok)||null;
+  $('#kd').innerHTML=ks.map(([k,t,s])=>`<button type="button" data-k="${k}" class="${kind===k?'on':''}" ${chk[k].ok?'':'disabled'}>${t}<small>${chk[k].ok?s:esc(chk[k].error||'Сейчас нельзя')}</small></button>`).join('');
+  const sel=kind&&chk[kind];
+  $('#per').innerHTML=last?`Период: <b>${fmtTs(last.at_ts)}</b> → <b>${fmtTs(at)}</b>`+(sel&&sel.ok&&kind==='month'?`<br>Замер станет началом нового месяца: ${esc(sel.opens_month||'')}.${sel.late?' <b>Позднее закрытие</b> (суперадмин).':''}`:''):`Замер: <b>${fmtTs(at)}</b>`;
+  if(!kind&&last)$('#per').innerHTML+='<br><span class="bad">Для этого времени закрыть нельзя: причины указаны на кнопках выше.</span>';
 }
-function invalidate(){res=null;$('#pv').innerHTML='';$('#go').hidden=true;}
+function invalidate(){res=null;if($('#pv'))$('#pv').innerHTML='';if($('#go'))$('#go').hidden=true;}
 
 function measuresForm(){
   return `<div class="ms">${chems.map(c=>`<div class="mc2"><h3>${esc(c.name)} <small>${c.kind==='extra'?'доп. средство':'основная'}${+c.bottle_kg>0&&+c.bottle_l>0?` · 1 шт = ${f(c.bottle_l)} л = ${f(c.bottle_kg)} кг`:''}</small></h3>
@@ -99,7 +109,7 @@ function rowCard(r){
   const parts=[['новые бутыли',fl.bottles],['остатки ушли в запас',-fl.leftovers],['подключено остатков',fl.connects],['вместо бутыли при подключении',fl.replacedByConnect],['залито из запаса',fl.pours],['добавлено суперадмином',fl.adds],['забрано',-fl.takes],['поправка по уровню',fl.levelAdj]].filter(x=>Math.abs(x[1])>1e-12);
   return `<div class="pr"><h3>${r.group==='all'?'Итого по обоим дозаторам':GL[r.group]}</h3>
    <div class="pg">
-    <div><span>На начало</span><b>${units(r,'start_kg')}</b></div>
+    <div><span>На начало (с нуля)</span><b>${units(r,'start_kg')}</b></div>
     <div><span>Приход</span><b>${units(r,'inflow_kg')}</b></div>
     <div><span>На конец</span><b>${units(r,'end_kg')}</b></div>
     <div><span>Расход факт</span><b>${units(r,'fact_kg')}</b></div>
@@ -110,6 +120,7 @@ function rowCard(r){
     ${r.group==='all'?`<div><span>${u} на жителя в сутки</span><b>${r.per_resident_day==null?'–':f(r.per_resident_day,2)}</b></div>`:''}
     <div><span>Факт / теория</span><b>${r.ratio==null?'–':f(r.ratio,3)}</b></div>
    </div>
+   ${r.to_reserve_in_kg>1e-12?`<p class="sm" style="margin:.4rem 0 0">Замер на начало: ${f(r.start_measured_kg)} кг. При прошлом закрытии ушло в запас: ${f(r.to_reserve_in_kg)} кг.</p>`:''}
    <p class="sm" style="margin:.4rem 0 0">Справочно, старый факт «по замене»: ${r.old_fact_kg==null?'–':f(r.old_fact_kg)+' кг'}</p>
    ${r.group!=='all'&&parts.length?`<details><summary>Из чего сложился приход</summary><p class="sm">${parts.map(([t,v])=>esc(t)+': '+sign(v)+f(v)+' кг').join('<br>')}<br><b>${f(r.start_kg)} + ${f(r.inflow_kg)} − ${f(r.end_kg)} = ${f(r.fact_kg)} кг</b></p></details>`:''}
   </div>`;
@@ -120,11 +131,18 @@ function renderPreview(){
   if(r.problems.length) h+=`<div class="msg er"><b>Закрытие не пройдёт, нужно исправить:</b><ul>${r.problems.map(p=>`<li>${esc(p.text)}${p.type==='density'?' — <a href="settings.html">Настройки</a>':''}</li>`).join('')}</ul></div>`;
   if(warnTypes.length) h+=`<div class="msg wr"><b>Проверьте перед подтверждением:</b><ul>${warnTypes.map(w=>`<li>${esc(w.text)}${w.type==='over'?` (${sign(w.value)}${f(w.value,2)}% при пороге ${f(w.limit)}%)`:w.type==='negative'?` (${f(w.value)} кг)`:''}</li>`).join('')}</ul></div>`;
   if(!r.problems.length&&!warnTypes.length) h+='<div class="msg ok"><b>Всё сходится, можно закрывать.</b></div>';
-  h+=`<h2>Итоги периода</h2><p class="hint">Смен: ${r.days} · ${dmy(r.from)} 06:00 → ${dmy(r.to)} 06:00</p>
+  h+=`<h2>Итоги периода</h2><p class="hint">${fmtTs(r.from_ts)} → ${fmtTs(r.to_ts)} · смен: ${r.days} (${f(r.days_exact,2)} сут.)</p>
    <div class="tot"><div><span>Стирок</span><b>${f(T.washes)}</b></div><div><span>Белья, кг</span><b>${f(T.laundry_kg)}</b></div>
    <div><span>Жителе-суток</span><b>${T.resident_days==null?'–':f(T.resident_days)}</b></div>
    <div><span>Факт / теория</span><b>${(()=>{const a=r.rows.filter(x=>x.group==='all'&&x.kind==='main'),fs=a.reduce((s,x)=>s+(x.fact_kg||0),0),ts=a.reduce((s,x)=>s+(x.theory_kg||0),0);return ts>0&&a.every(x=>x.fact_kg!=null)?f(fs/ts,3):'–';})()}</b></div></div>`;
   h+='<div class="tot" style="grid-template-columns:repeat(2,1fr)">'+CLOSE_GROUPS.map(g=>`<div><span>${GL[g]}</span><b>${f(T.byGroup[g].washes)} стирок · ${f(T.byGroup[g].laundry_kg)} кг</b></div>`).join('')+'</div>';
+  if((r.reserve||[]).length){   // общий запас: начало → поступило / залито / списано → конец, плюс остаток дозаторов, который уйдёт в запас
+    const k=v=>v==null?'–':f(v),sg=(v,m)=>!(Math.abs(v)>1e-12)?'–':(m<0?'−':'+')+f(Math.abs(v));
+    h+=`<h2>Запас химии, кг</h2><div class="box" style="overflow-x:auto;padding:.25rem .5rem"><table style="border-collapse:collapse;width:100%;font-size:.85rem;white-space:nowrap">
+      <tr style="text-align:right"><th style="text-align:left">Химикат</th><th>Запас на начало</th><th>Поступило</th><th>Залито в дозаторы</th><th>Списано</th><th>Запас на конец</th><th>Дозаторы (замер)</th><th>Всего после закрытия</th></tr>
+      ${r.reserve.map(z=>`<tr style="text-align:right"><td style="text-align:left">${esc(z.name)}</td><td>${k(z.start_kg)}</td><td>${sg(z.receipts_kg,1)}</td><td>${sg(z.pours_kg,-1)}</td><td>${sg((z.writeoff_moves_kg||0)+(z.writeoff_leftovers_kg||0),-1)}</td><td><b>${k(z.end_kg)}</b></td><td>${k(z.close_out_kg)}</td><td><b>${k(z.after_kg)}</b></td></tr>`).join('')}</table></div>
+      <p class="sm">Остаток дозаторов при закрытии уходит в запас, дозаторы дальше считаются с нуля.${r.reserve.some(z=>Math.abs(z.check_kg||0)>1e-6)?' <b>Баланс запаса не сходится с записями, проверьте поступления и списания.</b>':''}</p>`;
+  }
   h+='<h2>По химикатам</h2>';
   chems.forEach(c=>{const rs=r.rows.filter(x=>x.chemical_id===c.id);const all=rs.find(x=>x.group==='all');
     h+=`<details class="box" ${r.problems.some(p=>p.chemical_id===c.id)||r.warnings.some(w=>w.chemical_id===c.id)?'open':''}><summary><b>${esc(c.name)}</b> — факт ${all.fact_kg==null?'–':f(all.fact_kg)+' кг'}, теория ${all.theory_kg==null?'–':f(all.theory_kg)+' кг'}${all.dev_pct==null?'':` <span class="${cls(all.dev_pct)}">(${sign(all.dev_pct)}${f(all.dev_pct,2)}%)</span>`}</summary>
@@ -136,45 +154,45 @@ function renderPreview(){
 }
 
 async function preview(){
-  const my=++seq,date=$('#bd').value;
+  const my=++seq;
   const {end,arr,bad}=readMeasures();
   if(bad.length){toast('Проверьте замеры: только числа от 0 кг');bad[0].focus();return;}
-  if(!kind){toast('Выберите вид закрытия');return;}
+  if(!kind||!at){toast('Выберите вид закрытия');return;}
   if(kind==='start'){
     const miss=missingList(end);
-    $('#pv').innerHTML=miss.length?`<div class="msg er"><b>Не хватает замеров:</b><ul>${miss.map(m=>`<li>${esc(m)}</li>`).join('')}</ul></div>`:`<div class="msg ok"><b>Начальный замер ${dmy(date)} 06:00 готов: ${arr.length} значений.</b>Расчёта нет: это точка отсчёта для следующего закрытия.</div>`;
+    $('#pv').innerHTML=miss.length?`<div class="msg er"><b>Не хватает замеров:</b><ul>${miss.map(m=>`<li>${esc(m)}</li>`).join('')}</ul></div>`:`<div class="msg ok"><b>Начальный замер ${fmtTs(at)} готов: ${arr.length} значений.</b>Расчёта нет: это точка отсчёта для следующего закрытия.</div>`;
     res=miss.length?null:{start:true,arr};$('#go').hidden=!!miss.length;$('#go').textContent='Сохранить начальный замер';return;
   }
   $('#pv').innerHTML='<p class="hint">Считаю…</p>';$('#go').hidden=true;
   try{
-    const from=last.boundary_date,to=date,back=addDaysISO(from,-60),d2=addDaysISO(to,-1);
-    const [loads,changes,connects,moves,levels]=await Promise.all([page('report_loads',{d1:from,d2}),page('report_changes',{d1:back,d2:to}),page('report_connects',{d1:back,d2:to}),page('report_moves',{d1:back,d2:to}).catch(()=>[]),page('report_levels',{d1:back,d2:to}).catch(()=>[])]);
+    const fromTs=last.at_ts,toTs=at,from=shiftDateOf(fromTs,tz,st),to=shiftDateOf(toTs,tz,st),back=addDaysISO(from,-60);
+    const [loads,changes,connects,moves,levels]=await Promise.all([page('report_loads',{d1:from,d2:to}),page('report_changes',{d1:back,d2:to}),page('report_connects',{d1:back,d2:to}),page('report_moves',{d1:back,d2:to}).catch(()=>[]),page('report_levels',{d1:back,d2:to}).catch(()=>[])]);
     let residents=null;
-    try{const rr=await page('get_residents',{d1:from,d2});residents={};rr.forEach(x=>residents[x.day]=x.cnt);}catch(e){residents=null;}
+    try{const rr=await page('get_residents',{d1:from,d2:to});residents={};rr.forEach(x=>residents[x.day]=x.cnt);}catch(e){residents=null;}
     if(my!==seq)return;
-    res=calcClosing(refs,{from,to,tz,st,startKg:lastMeas,endKg:end,loads,changes,connects,moves,levels,residents,warnPct});
+    res=calcClosing(refs,{fromTs,toTs,tz,st,startKg:lastMeas,endKg:end,reserveStart:last.reserve||null,loads,changes,connects,moves,levels,residents,warnPct});
     res.arr=arr;
     renderPreview();
   }catch(e){if(my===seq)$('#pv').innerHTML=`<div class="msg er"><b>Не удалось посчитать</b>${esc(e.message)}</div>`;}
 }
 
 async function submit(){
-  if(!res)return;
-  const date=$('#bd').value,late=!!($('#late')&&$('#late').checked&&kind==='month'&&date.slice(8)!=='01');
+  if(!res||!at)return;
+  const late=!!(kind==='month'&&chk.month&&chk.month.late);
   if(!res.start&&res.warnings.length&&!($('#ack')&&$('#ack').checked)){toast('Отметьте, что предупреждения проверены');return;}
   const note=$('#note').value.trim()||null;
   let snap=null;
-  if(!res.start){const {arr,...rest}=res;snap={...rest,warn_pct:warnPct,version:1};}
+  if(!res.start){const {arr,...rest}=res;snap={...rest,warn_pct:warnPct,version:2};}
   const title=kind==='start'?'Сохранить начальный замер?':kind==='month'?'Закрыть месяц?':'Закрыть отчёт за прошедшие смены?';
-  const txt=kind==='start'?`Замер ${dmy(date)} 06:00`:`Смены ${dmy(last.boundary_date)} – ${dmy(addDaysISO(date,-1))}\nЗамер ${dmy(date)} 06:00${late?'\nПозднее закрытие':''}\nЗаписи внутри периода после закрытия менять нельзя.`;
-  const ok=await withPw(title,txt,pw=>rpcAsk('closing_create',{p_kind:kind,p_boundary:date,p_measures:res.arr,p_snapshot:snap,p_pw:pw,p_late:late,p_note:note}));
+  const txt=kind==='start'?`Замер ${fmtTs(at)}`:`Период: ${fmtTs(last.at_ts)} → ${fmtTs(at)}${late?'\nПозднее закрытие':''}\nПосле закрытия данные отчёта фиксируются и не пересчитываются. Записи внутри периода менять нельзя. Остаток дозаторов уйдёт в запас.`;
+  const ok=await withPw(title,txt,pw=>rpcAsk('closing_create',{p_kind:kind,p_at:at,p_measures:res.arr,p_snapshot:snap,p_pw:pw,p_late:late,p_note:note}));
   if(!ok)return;
   toast(kind==='start'?'Начальный замер сохранён':'Период закрыт');
   if(kind==='start')await init();else location.href='closings-report.html';
 }
 
 async function loadLast(){
-  const {data,error}=await sb.from('closings').select('id,kind,boundary_date,at_ts,is_etalon').order('at_ts',{ascending:false}).limit(1);
+  const {data,error}=await sb.from('closings').select('id,kind,boundary_date,at_ts,is_etalon,reserve').order('at_ts',{ascending:false}).limit(1);
   if(error) throw new Error(/closings/.test(error.message)?'Выполните stage15.sql в Supabase.':error.message);
   last=(data||[])[0]||null;lastMeas={};
   if(last){const {data:m}=await sb.from('closing_measures').select('chemical_id,machine_group,amount_kg').eq('closing_id',last.id);(m||[]).forEach(x=>lastMeas[x.chemical_id+':'+x.machine_group]=+x.amount_kg);}
@@ -183,24 +201,23 @@ async function loadLast(){
 async function init(){
   try{
     await loadLast();
-    const [s,c,w,r,td]=await Promise.all([sb.from('settings').select('*'),sb.from('chemicals').select('*').order('sort'),sb.from('wash_types').select('id,name').order('sort'),sb.from('recipes').select('*'),sb.rpc('closing_today')]);
+    const [s,c,w,r]=await Promise.all([sb.from('settings').select('*'),sb.from('chemicals').select('*').order('sort'),sb.from('wash_types').select('id,name').order('sort'),sb.from('recipes').select('*')]);
     const g=k=>{const x=(s.data||[]).find(y=>y.key===k);return x?+x.value:null};
     tz=g('tz_offset')??5;st=g('shift_start')??6;warnPct=g('close_warn_pct')??25;
     refs={water:g('water_l')??55,washTypes:w.data||[],chemicals:c.data||[],recipes:r.data||[]};
     chems=closingChems(refs.chemicals);
-    today=td.data||new Date(Date.now()+(tz-st)*3600e3).toISOString().slice(0,10);
   }catch(e){$('#out').innerHTML=`<div class="msg er"><b>Не удалось загрузить</b>${esc(e.message)}</div>`;return;}
-  const stHH=String(st).padStart(2,'0');
   $('#out').innerHTML=`
    <div class="box">
-    <p class="hint" style="margin-top:0">${last?`Последний замер: <b>${dmy(last.boundary_date)} ${stHH}:00</b> (${last.kind==='start'?'начальный':last.kind==='month'?'закрытие месяца':'закрытие внутри месяца'})`:'Замеров ещё нет. Сначала внесите начальный замер остатков во всех дозаторах.'}</p>
-    <label>Дата замера (в ${stHH}:00, начало смены)<input type="date" id="bd" value="${today}" max="${today}"></label>
-    ${isSuper&&last?'<label class="cf"><input type="checkbox" id="late"> Позднее закрытие месяца (1 число пропущено)</label>':''}
+    <p class="hint" style="margin-top:0">${last?`Последний замер: <b>${fmtTs(last.at_ts)}</b> (${last.kind==='start'?'начальный':last.kind==='month'?'закрытие месяца':'закрытие внутри месяца'})`:'Замеров ещё нет. Сначала внесите начальный замер остатков во всех дозаторах.'}</p>
+    <label>Дата и время замера<input type="datetime-local" id="bd" value="${nowLocal()}" max="${nowLocal()}" step="60"></label>
+    <p class="hint" style="margin:.2rem 0 0">Закрыть можно в любую минуту. Время — местное (UTC${tz>=0?'+':''}${tz}). Остатки взвешивайте именно в этот момент.</p>
+    ${isSuper&&last?'<label class="cf"><input type="checkbox" id="late"> Позднее закрытие месяца (первая стирка нового месяца уже была)</label>':''}
     <div class="kd" id="kd"></div>
     <p class="hint" id="per"></p>
    </div>
    <h2>Остатки в дозаторах, кг</h2>
-   <p class="hint">Взвесьте химию в ${stHH}:00, до заливок и замен бутылей. Можно с запятой: 12,5. Порог предупреждения «больше теории»: ${f(warnPct)}% (меняется в настройках).</p>
+   <p class="hint">Взвесьте химию в момент замера, до заливок и замен бутылей. Можно с запятой: 12,5. Порог предупреждения «больше теории»: ${f(warnPct)}% (меняется в настройках).</p>
    ${chems.length?measuresForm():'<div class="msg er">Нет химикатов для закрытия.</div>'}
    <label style="margin-top:.8rem">Комментарий (необязательно)<input id="note" maxlength="300" autocomplete="off"></label>
    <div id="pv"></div>
@@ -208,7 +225,6 @@ async function init(){
   $('#kd').onclick=e=>{const b=e.target.closest('button');if(!b||b.disabled)return;kind=b.dataset.k;draw();};
   $('#bd').onchange=draw;if($('#late'))$('#late').onchange=draw;
   document.querySelectorAll('[data-m]').forEach(i=>i.oninput=invalidate);
-  $('#note').oninput=()=>{};
   $('#pb').onclick=preview;$('#go').onclick=submit;
   kind=null;draw();
 }
