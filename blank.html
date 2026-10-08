@@ -323,8 +323,9 @@ async function download() {
     if (chErr) throw chErr;
     const { data: cnAll } = await sb.rpc('report_connects', { d1: back, d2 });              // нужен stage6.sql
     const { data: lvAll } = await sb.rpc('report_levels', { d1: back, d2 });                // нужен stage12.sql (если его нет — просто пусто)
+    const { data: mvAll } = await sb.rpc('report_moves', { d1: back, d2 }).then(r => r, () => ({ data: [] }));   // забрали / залили / добавил (stage10.sql); без них факт в Excel был завышен
     const changes = (chAll || []).filter(x => x.shift_date >= ymX + '-01'), connects = (cnAll || []).filter(x => x.shift_date >= ymX + '-01');
-    const used = chemUsed(refs, chAll || [], cnAll || [], null, lvAll || []).used;
+    const used = chemUsed(refs, chAll || [], cnAll || [], mvAll || [], lvAll || []).used;
     const byDay = {};
     data.forEach(l => (byDay[l.shift_date] = byDay[l.shift_date] || []).push(l));
     const days = {}, warn = new Set();

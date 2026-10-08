@@ -49,12 +49,17 @@ const dmy=d=>d.split('-').reverse().join('.');
 function two(o){return o?[o.pc!=null?f(o.pc,2)+' шт':'',o.l!=null?f(o.l)+' л':'',o.kg!=null?f(o.kg)+' кг':''].filter(Boolean).join('<br>')||'–':'–'}
 function dif(c){if(c.diff==null||!c.changes)return'–';const u=c.prim==='l'?'л':'кг',cls=c.pct!=null&&c.pct>10?' class="bad"':c.pct!=null&&c.pct<-10?' class="good"':'';return `<span${cls}>${c.diff>0?'+':''}${f(c.diff)} ${u}${c.size>0&&c.kind!=='extra'?'<br>'+(c.diff>0?'+':'')+f(c.diff/c.size,2)+' шт':''}${c.pct==null?'':'<br>'+(c.pct>0?'+':'')+Num.fmt(c.pct,2)+'%'}</span>`}
 function note(c){if(c.kind==='extra')return'по загрузкам, замены бутылей не отмечаются';return c.prim==null?'Задайте литры и кг в настройках':c.diff==null?'Задайте и литры, и кг в настройках':`замен: ${c.changes}${c.noLeft?`, без остатка: ${c.noLeft}`:''}`}
+function mvNote(c){   // что учтено в факте: забрали из дозатора, залили из запаса, добавил суперадмин
+  const u=o=>o?(o.l!=null?f(o.l)+' л':o.kg!=null?f(o.kg)+' кг':''):'',has=o=>o&&((o.l||0)>0||(o.kg||0)>0);
+  const p=[has(c.took)?'забрали '+u(c.took):'',has(c.put)?'залили '+u(c.put):'',has(c.added)?'добавил суперадмин '+u(c.added):''].filter(Boolean);
+  return p.length?`<small>учтено: ${p.join(', ')}</small>`:'';
+}
 function chemTable(g){
   const body=g.chem.map(c=>{
     const ex=c.kind==='extra',has=c.stock&&(c.stock.l>0||c.stock.kg>0),con=c.connected&&(c.connected.l>0||c.connected.kg>0);
     return `<div class="cm"><div class="cmh"><b>${esc(c.name)}</b><small>${note(c)}</small></div><div class="cmg">
       <div><span>Теория</span><b>${two(c.theory)}</b></div>
-      <div><span>Факт</span><b>${c.changes?two(c.actual):'–'}</b>${c.connected&&((c.connected.l||0)>0||(c.connected.kg||0)>0)?`<small>с учётом подключённого остатка</small>`:''}</div>
+      <div><span>Факт</span><b>${c.changes?two(c.actual):'–'}</b>${mvNote(c)}${c.connected&&((c.connected.l||0)>0||(c.connected.kg||0)>0)?`<small>с учётом подключённого остатка</small>`:''}</div>
       <div><span>Разница</span><b>${dif(c)}</b></div>
       <div class="st"><span>Остаток</span>${ex?'<b>–</b>':`<b>${has?'в запасе: '+two(c.stock).replace('<br>',' · '):'в запасе: нет'}</b>${con?`<small>подключено: ${two(c.connected).replace('<br>',' · ')}</small>`:''}`}</div>
     </div></div>`;}).join('');
@@ -108,7 +113,7 @@ async function show(){
   if(my!==seq)return;
   if(error||e2||e3){$('#out').innerHTML='<p class="err">Не удалось загрузить данные. Выполните supabase.sql, затем stage3.sql … stage12.sql.</p>';return;}
   nm=Object.fromEntries(((sn&&sn.data)||[]).map(x=>[x.id,x.name]));
-  const loads=data||[],chgAll=chg||[],cnAll=cn||[],changes=chgAll.filter(x=>x.shift_date>=d1),conns=cnAll.filter(x=>x.shift_date>=d1),r=calcReport(loads,changes,refs,conns,{changes:chgAll,connects:cnAll,levels:lv||[]});
+  const loads=data||[],chgAll=chg||[],cnAll=cn||[],changes=chgAll.filter(x=>x.shift_date>=d1),conns=cnAll.filter(x=>x.shift_date>=d1),mvAll=(mvr&&mvr.data)||[],moves=mvAll.filter(x=>x.shift_date>=d1),r=calcReport(loads,changes,refs,conns,{changes:chgAll,connects:cnAll,moves:mvAll,levels:lv||[]},moves);   // забрали / залили / добавил учитываются в факте и в запасе
   cache={loads,changes,conns};R=r;LOADS=loads;PER={d1,d2};EVT={changes:chgAll,connects:cnAll,moves:(mvr&&mvr.data)||[],levels:lv||[]};draw();
 }
 function renderOps(){

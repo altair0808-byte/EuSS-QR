@@ -83,6 +83,21 @@ console.log('\n5. Экран: список и окно «кто, где, во с
     const h = doc.last.innerHTML; assert.ok(h.includes('Щёлочь') && h.includes('Петров') && h.includes('Машина 11') && h.includes('Смена 07.10.2026'), h.slice(0, 300)); });
 }
 
+console.log('\n7. Отчёт и Excel учитывают «забрали / залили / добавил»');
+{
+  const L = [], chg = [{ id: 'z1', ts: at(6), shift_date: from, machine_group: '1_10', chemical_id: 1, leftover_kg: 2, leftover_l: null, created_by: 'u3', connect_id: null, written_off_at: null }];
+  const take = [{ id: 'z2', ts: at(4), shift_date: from, chemical_id: 1, machine_group: '1_10', kind: 'take', amount_kg: 1, amount_l: null, created_by: 'u3' }];
+  const one1 = r => r.groups['1_10'].chem.find(x => x.id === 1);
+  const base = RC.calcReport(L, chg, refs, [], { changes: chg, connects: [], levels: [] }, [], []);
+  const withMv = RC.calcReport(L, chg, refs, [], { changes: chg, connects: [], moves: take, levels: [] }, take, []);
+  t('без перемещений: бутыль 22 − остаток 2 = 20 кг', () => near(one1(base).actual.kg, 20));
+  t('забрали 1 кг до замены: расход 19 кг (забранное не расход)', () => near(one1(withMv).actual.kg, 19));
+  t('отчёт показывает, сколько забрали', () => near(one1(withMv).took.kg, 1));
+  t('остаток в запасе вырос на забранное: 2 + 1 = 3 кг', () => near(one1(withMv).stock.kg, 3));
+  const used = RC2 => RC2;
+  t('chemUsed (Excel) тоже вычитает забранное', () => { const U = vm.runInContext('chemUsed', ctxVm)(refs, chg, [], take, []).used; near(U['z1'] * 1.1, 19); });
+}
+
 console.log('\n6. Главная: статистика за месяц');
 t('границы месяца и надпись обнуления', () => { const i = CS.monthInfo('2026-12-15', 6); assert.strictEqual(i.from, '2026-12-01'); assert.strictEqual(i.name, 'декабрь'); assert.strictEqual(i.nextName, 'января'); assert.strictEqual(i.nextYear, 2027); assert.strictEqual(i.hh, '06'); });
 {
