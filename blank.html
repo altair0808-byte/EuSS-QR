@@ -63,7 +63,7 @@ details.det{margin-top:.75rem}
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="config.js"></script><script src="num.js"></script><script src="app.js"></script><script src="report-calc.js"></script><script src="blanc.js"></script><script src="storage-anim.js"></script><script src="residents.js"></script>
+<script src="config.js"></script><script src="num.js"></script><script src="app.js"></script><script src="report-calc.js"></script><script src="chem-stats.js"></script><script src="blanc.js"></script><script src="storage-anim.js"></script><script src="residents.js"></script>
 <script>
 let refs = null, tz = 5, st = 6, seq = 0, isAdm = false, isSuper = false;   // isAdm: админ или суперадмин (видят проживающих), isSuper: может добавлять химию
 const shiftToday = () => new Date(Date.now() + (tz - st) * 3600e3).toISOString().slice(0, 10);
@@ -192,7 +192,7 @@ function view(m, data) {
     <section class="pn2" data-p="day:type">${typesTable(data)}</section>
     <section class="pn2" data-p="day:chem">${tabBar('chem', [['stor', 'Хранилище и остатки'], ['use', 'Расход по рецептам']])}
       <div data-p="chem:stor"><p class="hint">Сколько химии сейчас в каждом дозаторе и в запасе. Если в дозаторе было другое количество, нажмите «Указать реальный уровень».</p><div id="stg"></div></div>
-      <div data-p="chem:use">${chemBlock([m])}${chemByType([m])}</div></section>
+      <div data-p="chem:use"><h3 style="margin:.5rem 0 0">Залито и израсходовано</h3><div id="cst"><p class="hint">Загрузка…</p></div>${chemBlock([m])}${chemByType([m])}</div></section>
     <section class="pn2" data-p="day:blk"><p class="hint">Вес каждой стирки по машинам: так же, как в листе дня Excel.</p><div class="blkwrap box" style="margin-top:0">${Blank.html(m)}</div></section>`;
 }
 
@@ -255,7 +255,23 @@ function viewMonth(ym, data, days, res) {   // res: { дата: число } —
     <section class="pn2" data-p="mon:cal">${cal}</section>
     <section class="pn2" data-p="mon:days">${dayTbl}</section>
     <section class="pn2" data-p="mon:mach">${machTable(agg, new Set())}</section>
-    <section class="pn2" data-p="mon:type">${typesTable(data)}<div style="height:.75rem"></div>${chemBlock(live.map(x => x.m))}${chemByType(live.map(x => x.m))}</section>`;
+    <section class="pn2" data-p="mon:type">${typesTable(data)}<div style="height:.75rem"></div><h3 style="margin:.5rem 0 0">Залито и израсходовано</h3><div id="cst"><p class="hint">Загрузка…</p></div>${chemBlock(live.map(x => x.m))}${chemByType(live.map(x => x.m))}</section>`;
+}
+
+// статистика химии: залито и израсходовано (теория), по нажатию на химикат — кто, где и во сколько
+async function mountStats(d1, d2, data, my) {
+  const el = $('#cst'); if (!el) return;
+  try {
+    const back = addDaysISO(d1, -60);
+    const [ch, cn, mv, lv, sn] = await Promise.all([sb.rpc('report_changes', { d1: back, d2 }), sb.rpc('report_connects', { d1: back, d2 }),
+      sb.rpc('report_moves', { d1: back, d2 }).then(r => r, () => ({ data: [] })), sb.rpc('report_levels', { d1: back, d2 }).then(r => r, () => ({ data: [] })), sb.rpc('staff_names').then(r => r, () => ({ data: [] }))]);
+    if (my !== seq || !$('#cst')) return;
+    if (ch.error || cn.error) throw (ch.error || cn.error);
+    const nm = Object.fromEntries(((sn && sn.data) || []).map(x => [x.id, x.name]));
+    const ev = { changes: ch.data || [], connects: cn.data || [], moves: (mv && mv.data) || [], levels: (lv && lv.data) || [] };
+    const rep = calcReport(data, [], refs, [], null, [], []);          // для теории достаточно загрузок
+    ChemStats.mount($('#cst'), { refs, rep, ev, loads: data, from: d1, to: d2, tz, st, nm, key: 'all', picker: true });
+  } catch (e) { if ($('#cst')) $('#cst').innerHTML = '<p class="hint">Статистика химии недоступна: выполните stage3.sql … stage12.sql.</p>'; }
 }
 
 async function showMonth() {
@@ -269,6 +285,7 @@ async function showMonth() {
     const [data, res] = await Promise.all([loads(ym + '-01', d2), isAdm ? Residents.range(ym + '-01', d2) : null]);
     if (my !== seq) return;
     $('#out').innerHTML = viewMonth(ym, data, monthDays(ym, data), res); applyTabs();
+    mountStats(ym + '-01', d2, data, my);
   } catch (e) {
     $('#out').innerHTML = '<p class="err">Не удалось загрузить данные. Проверьте, что выполнены report.sql, stage2.sql и stage5.sql.</p>';
   }
@@ -284,6 +301,7 @@ async function showDay() {
     const data = await loads(date, date);
     if (my !== seq) return;
     $('#out').innerHTML = (isAdm ? '<div id="rsd"></div>' : '') + view(Blank.build(data, refs, date), data); applyTabs();
+    mountStats(date, date, data, my);
     if (isAdm) Residents.mount($('#rsd'), date, { today: shiftToday(), toast });          // проживающие: только админы
     if ($('#stg')) StorageAnim.mount($('#stg'), { refs, date, st, tz, toast, can: true, isSuper }).catch(() => { $('#stg').innerHTML = '<p class="hint">Хранилище появится после выполнения stage10.sql.</p>'; });
   } catch (e) {

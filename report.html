@@ -34,10 +34,11 @@
 <div id="ovl"></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="config.js"></script><script src="num.js"></script><script src="app.js"></script><script src="report-calc.js"></script>
+<script src="config.js"></script><script src="num.js"></script><script src="app.js"></script><script src="report-calc.js"></script><script src="chem-stats.js"></script>
 <script>
 const esc=t=>String(t??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const f=n=>Num.fmt(n);   // без округления: 0,175 → «0,175», 0,350 → «0,35»
+let EVT={changes:[],connects:[],moves:[],levels:[]},LOADS=[],PER=null;
 let tabR='all',R=null,refs=null,tz=5,st=6,seq=0,canEdit=false,byId={},byCh={},nm={},cache={loads:[],changes:[],conns:[]},kindF='all';
 const who=id=>(id&&nm[id])||'';
 const shiftToday=()=>new Date(Date.now()+(tz-st)*3600e3).toISOString().slice(0,10);
@@ -75,6 +76,7 @@ function groupBlock(title,g){
   return `<section><div class="gh"><h2>${title}</h2></div>
   <div class="kpi"><div><b>${g.total}</b><span>стирок</span></div><div><b>${f(g.kg,0)}</b><span>кг белья</span></div><div><b>${g.total?Num.fmt(g.kg/g.total,1):'–'}</b><span>средний вес загрузки, кг</span></div></div>
   <div class="gh"><h2>Стирки по видам</h2></div>${washTable(g)}
+  <div class="gh"><h2>Химия: залито и израсходовано</h2></div><div id="cst"></div>
   <div class="gh"><h2>Химия: теория и факт</h2></div>${chemSum(g)}${chemTable(g)}</section>`;
 }
 const split=(t,a,b,la,lb,fa,fb)=>{const sum=a+b,pa=sum>0?a/sum*100:50;return `<div class="sbx"><p>${t}</p><div class="sb2"><i style="width:${pa.toFixed(0)}%"></i><i style="width:${(100-pa).toFixed(0)}%"></i></div><div class="sl"><span>${la}: <b>${fa}</b></span><span>${lb}: <b>${fb}</b></span></div></div>`;};
@@ -90,19 +92,24 @@ function draw(){
   $('#out').innerHTML=`<div class="rv"><div class="kpi"><div><b>${r.total}</b><span>стирок всего</span></div><div><b>${f(r.kg,0)}</b><span>кг всего</span></div><div><b>${r.total?Num.fmt(r.kg/r.total,1):'–'}</b><span>средний вес, кг</span></div><div><b>${f(chL(A))} л</b><span>химия, теория</span></div></div>
     <div class="sgrid">${split('День / ночь',r.byPart.day,r.byPart.night,'день',' ночь',r.byPart.day+' стирок',r.byPart.night+' стирок')}${split('Дозатор 1 / Дозатор 2 · вес',g1.kg,g2.kg,'Д1 (1–10)','Д2 (11–12)',f(g1.kg,0)+' кг · '+g1.total+' ст.',f(g2.kg,0)+' кг · '+g2.total+' ст.')}</div></div>
     <div class="seg rtabs" role="tablist">${RT.map(([id,l])=>`<button role="tab" aria-selected="${tabR===id}" class="${tabR===id?'on':''}" data-rt="${id}">${l}</button>`).join('')}</div>${body}`;
-  if(tabR==='ops')renderOps();
+  if(tabR==='ops')renderOps();else mountStats();
+}
+function mountStats(){
+  if(!R||!PER||!$('#cst'))return;
+  try{ChemStats.mount($('#cst'),{refs,rep:R,ev:EVT,loads:LOADS,from:PER.d1,to:PER.d2,tz,st,nm,key:tabR});}
+  catch(e){$('#cst').innerHTML='<p class="hint">Не удалось показать статистику химии.</p>';}
 }
 
 async function show(){
   const d1=$('#d1').value,d2=$('#d2').value,my=++seq;
   if(!d1||!d2||d1>d2){$('#out').innerHTML='<p class="hint">Укажите период: дата «с» не позже даты «по».</p>';return;}
   $('#rng').textContent=`Смена начинается в ${String(st).padStart(2,'0')}:00 и длится сутки. Расход считается отдельно по двум дозаторам.`;
-  const [{data,error},{data:chg,error:e2},{data:cn,error:e3},sn,{data:lv}]=await Promise.all([sb.rpc('report_loads',{d1,d2}),sb.rpc('report_changes',{d1:addDaysISO(d1,-60),d2}),sb.rpc('report_connects',{d1:addDaysISO(d1,-60),d2}),sb.rpc('staff_names'),sb.rpc('report_levels',{d1:addDaysISO(d1,-60),d2})]);   // report_levels появится после stage12.sql; без него просто пусто
+  const [{data,error},{data:chg,error:e2},{data:cn,error:e3},sn,{data:lv},mvr]=await Promise.all([sb.rpc('report_loads',{d1,d2}),sb.rpc('report_changes',{d1:addDaysISO(d1,-60),d2}),sb.rpc('report_connects',{d1:addDaysISO(d1,-60),d2}),sb.rpc('staff_names'),sb.rpc('report_levels',{d1:addDaysISO(d1,-60),d2}),sb.rpc('report_moves',{d1:addDaysISO(d1,-60),d2}).then(r=>r,()=>({data:[]}))]);   // report_levels появится после stage12.sql; без него просто пусто
   if(my!==seq)return;
   if(error||e2||e3){$('#out').innerHTML='<p class="err">Не удалось загрузить данные. Выполните supabase.sql, затем stage3.sql … stage12.sql.</p>';return;}
   nm=Object.fromEntries(((sn&&sn.data)||[]).map(x=>[x.id,x.name]));
   const loads=data||[],chgAll=chg||[],cnAll=cn||[],changes=chgAll.filter(x=>x.shift_date>=d1),conns=cnAll.filter(x=>x.shift_date>=d1),r=calcReport(loads,changes,refs,conns,{changes:chgAll,connects:cnAll,levels:lv||[]});
-  cache={loads,changes,conns};R=r;draw();
+  cache={loads,changes,conns};R=r;LOADS=loads;PER={d1,d2};EVT={changes:chgAll,connects:cnAll,moves:(mvr&&mvr.data)||[],levels:lv||[]};draw();
 }
 function renderOps(){
   const wn={},cn2={};refs.washTypes.forEach(w=>wn[w.id]=w.name);refs.chemicals.forEach(c=>cn2[c.id]=c.name);
