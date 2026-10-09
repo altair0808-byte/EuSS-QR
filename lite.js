@@ -13,9 +13,9 @@
   if (!window.LITE) return;
   document.documentElement.className += ' lite';
   var st = document.createElement('style');
-  // Статусы машин остаются видны по цвету и рамке, пропадает только движение. Окна подтверждения и загрузки не трогаем.
+  // Анимация стиральных машин (барабан, вода, пена) остаётся и в облегчённом режиме, отключена только тряска корпуса. Окна подтверждения и загрузки не трогаем.
   st.textContent = 'html.lite *{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;transition-duration:0s!important}' +
-    'html.lite .wm *,html.lite .wm *::before,html.lite .wm *::after,html.lite .on .dr,html.lite .on .dr::after,' +
+    'html.lite .wm.on .wm-d,html.lite .on .dr,html.lite .on .dr::after,' +
     'html.lite .t1.on .dm,html.lite .t1.on .dm::after,html.lite .t1.on i,html.lite .cn-liq,html.lite .cn-liq::before,html.lite .cn-liq::after{animation:none!important}';
   (document.head || document.documentElement).appendChild(st);
 })();
