@@ -14,7 +14,7 @@
 <header class="hd"><div><a class="lg" href="index.html" aria-label="На панель смены"><img src="euss-logo.png" alt="EuSS"><span class="sep"></span><span class="sub">Бланки</span></a><nav class="nav"><a class="btn s" href="index.html">← Панель</a></nav></div></header>
 <main id="app"><p class="hint">Загрузка…</p></main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="config.js"></script><script src="num.js"></script><script src="app.js"></script><script src="leftover.js"></script><script src="wm.js"></script>
+<script src="config.js"></script><script src="num.js"></script><script src="app.js"></script><script src="feedback.js"></script><script src="leftover.js"></script><script src="wm.js"></script>
 <script>
 (async () => {
   const ses = await need(); if (!ses) return;
@@ -167,9 +167,10 @@
         const w = startedAt(); if (w.err) { toast(w.err); return; }
         const payload = rows.map(([m, v]) => ({ form_id: f.id, machine: m, wash_type_id: +v.wash_type_id, weight_kg: +v.weight_kg, extras: v.extras, ...(w.ts ? { ts: w.ts } : {}) }));
         $('#confirm').disabled = true;
-        const { data, error } = await sb.from('loads').insert(payload).select('id,machine');
-        if (error) { toast('Не сохранено: ' + error.message); $('#confirm').disabled = false; return; }
-        toast(`Отправлено: ${data.length} ${mw(data.length)}`);
+        let data, error; try { ({ data, error } = await sb.from('loads').insert(payload).select('id,machine')); } catch (x) { error = x; }
+        if (!error && (!data || !data.length)) error = { code: '42501', message: 'row-level security' };   // база не вернула записи: прав нет
+        if (error) { Fb.err(error); $('#confirm').disabled = false; return; }
+        Fb.ok(`Отправлено: ${data.length} ${mw(data.length)}`);
         lastIds = data.map(x => x.id); state.clear(); await loadBusy(); render(); toTop();
       };
     }
@@ -317,9 +318,9 @@
       $('#back').onclick = () => laundryChem(undefined, c, g);
       $('#confirm').onclick = async () => {
         $('#confirm').disabled = true;
-        const { data, error } = await sb.from('chem_changes').insert({ form_id: f.id, chemical_id: +c, ...(lf === '' ? { leftover_kg: 0, leftover_l: 0 } : unit === 'kg' ? { leftover_kg: +lf } : { leftover_l: +lf }), machine_group: g }).select('id').single();
-        if (error) { toast('Не сохранено: ' + error.message); $('#confirm').disabled = false; return; }
-        toast('Замена записана'); laundryChem(data.id); toTop();
+        let data, error; try { ({ data, error } = await sb.from('chem_changes').insert({ form_id: f.id, chemical_id: +c, ...(lf === '' ? { leftover_kg: 0, leftover_l: 0 } : unit === 'kg' ? { leftover_kg: +lf } : { leftover_l: +lf }), machine_group: g }).select('id').single()); } catch (x) { error = x; }
+        if (error || !data) { Fb.err(error || { code: '42501', message: 'row-level security' }); $('#confirm').disabled = false; return; }
+        Fb.ok('Замена записана'); laundryChem(data.id); toTop();
       };
     };
   }

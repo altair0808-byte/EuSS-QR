@@ -29,7 +29,7 @@ const QrScan = (() => {
         <button type="button" data-no style="flex:1;min-height:3rem;border:0;border-radius:.6rem;background:#fff;color:#123;font:inherit">Отмена</button></div>`;
     document.body.appendChild(ov);
     const video = ov.querySelector('video'), msg = ov.querySelector('[data-msg]');
-    let stream = null, facing = 'environment', alive = true, done = false, raf = 0, last = 0, detector = null, canvas = null, ctx2 = null;
+    let stream = null, facing = 'user', alive = true, done = false, raf = 0, last = 0, detector = null, canvas = null, ctx2 = null;
 
     const stop = () => { if (stream) stream.getTracks().forEach(t => t.stop()); stream = null; };
     const close = () => { alive = false; cancelAnimationFrame(raf); stop(); ov.remove(); };
