@@ -1,44 +1,38 @@
-// Supabase -> Edge Functions -> Create function, имя: admin-users. Вставить этот код и нажать Deploy.
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+// Supabase -> Edge Functions -> Create function, имя: badge-login. Вставить этот код и нажать Deploy.
+// Вход по QR: принимает код с бейджа и возвращает одноразовый токен, по которому сайт получает сессию (sb.auth.verifyOtp).
+// Админам и суперадмину вход по QR запрещён.
+import { createClient } from 'npm:@supabase/supabase-js@2';   // npm: надёжнее, чем esm.sh (тот иногда не грузится и функция не стартует)
 
-// Должно совпадать с LOGIN_DOMAIN в config.js
-const LOGIN_DOMAIN = 'euss.local';
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type' };
 const out = (o: unknown, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { ...cors, 'Content-Type': 'application/json' } });
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
+  try {
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
-  const token = (req.headers.get('Authorization') || '').replace('Bearer ', '');
-  const { data: { user } } = await admin.auth.getUser(token);
-  if (!user) return out({ error: 'Нужно войти' }, 401);
-  const { data: p } = await admin.from('profiles').select('role').eq('id', user.id).maybeSingle();
-  if (p?.role !== 'superadmin') return out({ error: 'Только суперадмин' }, 403);
+  const b = await req.json().catch(() => ({}));
+  const code = String(b.code || '');
+  if (!/^[A-Za-z0-9_-]{20,64}$/.test(code)) return out({ error: 'Это не бейдж EuSS' }, 400);
 
-  const b = await req.json();
-  if (b.action === 'create') {
-    const login = String(b.login || '').trim().toLowerCase();
-    if (login.length < 4 || login.length > 32 || !/^[a-z0-9._-]+$/.test(login)) return out({ error: 'Логин: от 4 до 32 символов, латинские буквы, цифры и . _ -' }, 400);
-    if ((b.password || '').length < 4) return out({ error: 'Пароль: не меньше 4 символов' }, 400);
-    const email = login + '@' + LOGIN_DOMAIN;
-    const { data, error } = await admin.auth.admin.createUser({ email, password: b.password, email_confirm: true });
-    if (error) return out({ error: /already|registered|exists/i.test(error.message) ? 'Такой логин уже занят' : error.message }, 400);
-    const id = data.user.id;
-    const r1 = await admin.from('people').insert({ id, email, full_name: b.full_name || null });
-    const r2 = b.access?.length ? await admin.from('form_access').insert(b.access.map((a: any) => ({ user_id: id, form_id: a.form_id, role: a.role }))) : { error: null };
-    if (r1.error || r2.error) { await admin.auth.admin.deleteUser(id); return out({ error: (r1.error || r2.error)!.message }, 400); }
-    return out({ id });
+  const { data: bd } = await admin.from('badges').select('user_id').eq('code', code).maybeSingle();
+  if (!bd) return out({ error: 'QR-код не найден или отозван. Обратитесь к суперадмину' }, 401);
+
+  const { data: p } = await admin.from('profiles').select('role').eq('id', bd.user_id).maybeSingle();
+  const { data: fa } = await admin.from('form_access').select('role').eq('user_id', bd.user_id).eq('role', 'admin').limit(1);
+  if (p?.role === 'superadmin' || (fa && fa.length)) return out({ error: 'Админам вход по QR недоступен. Войдите по логину и паролю' }, 403);
+
+  const { data: tu } = await admin.auth.admin.getUserById(bd.user_id);
+  const email = tu?.user?.email;
+  if (!email) return out({ error: 'Аккаунт не найден' }, 404);
+
+  // письмо не отправляется, нужен только токен
+  const { data: lk, error } = await admin.auth.admin.generateLink({ type: 'magiclink', email });
+  if (error || !lk?.properties?.hashed_token) return out({ error: 'Не удалось войти, попробуйте ещё раз' }, 500);
+
+  await admin.from('badges').update({ last_used_at: new Date().toISOString() }).eq('user_id', bd.user_id);
+  return out({ token_hash: lk.properties.hashed_token });
+  } catch (e) {   // любая неожиданная ошибка уходит ответом с CORS, а не обрывом связи
+    return out({ error: 'Ошибка функции: ' + (e instanceof Error ? e.message : String(e)) }, 500);
   }
-  if (b.action === 'password') {
-    if ((b.password || '').length < 4) return out({ error: 'Пароль: не меньше 4 символов' }, 400);
-    const { error } = await admin.auth.admin.updateUserById(b.id, { password: b.password });
-    return error ? out({ error: error.message }, 400) : out({ ok: true });
-  }
-  if (b.action === 'remove') {
-    if (b.id === user.id) return out({ error: 'Суперадмина удалить нельзя' }, 400);
-    const { error } = await admin.auth.admin.deleteUser(b.id);
-    return error ? out({ error: error.message }, 400) : out({ ok: true });
-  }
-  return out({ error: 'Неизвестное действие' }, 400);
 });
