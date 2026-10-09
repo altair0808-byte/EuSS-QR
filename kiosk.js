@@ -26,10 +26,10 @@
     document.addEventListener('dragstart', function (e) { e.preventDefault(); });
   }
   if (showBar) {
-    css += ':root{--sbh:1.7rem}html.sb body{padding-top:var(--sbh)}html.sb .hd{top:var(--sbh)}' +
+    css += ':root{--sbh:1.7rem}html.kbar body{padding-top:var(--sbh)}html.kbar .hd{top:var(--sbh)}' +
       '#sbar{position:fixed;top:0;left:0;right:0;z-index:300;height:var(--sbh);padding:0 .9rem;display:flex;align-items:center;justify-content:space-between;' +
       'background:#123;color:#fff;font:700 .85rem/1 Manrope,system-ui,sans-serif;font-variant-numeric:tabular-nums;pointer-events:none}' +
-      '#sbar .lo{color:#ff8a80}@media print{#sbar{display:none}html.sb body{padding-top:0}}';
+      '#sbar .lo{color:#ff8a80}@media print{#sbar{display:none}html.kbar body{padding-top:0}}';
   }
   var st = document.createElement('style'); st.textContent = css;
   (document.head || document.documentElement).appendChild(st);
@@ -37,7 +37,7 @@
 
   function build() {
     if (document.getElementById('sbar')) return;
-    document.documentElement.className += ' sb';
+    document.documentElement.className += ' kbar';
     var bar = document.createElement('div'); bar.id = 'sbar'; bar.setAttribute('aria-hidden', 'true');
     bar.innerHTML = '<span id="sb-t"></span><span id="sb-b"></span>';
     document.body.appendChild(bar);
