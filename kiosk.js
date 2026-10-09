@@ -1,12 +1,16 @@
 // Режим приложения (установлено на главный экран / полный экран): строка со временем (24 ч) и зарядом сверху,
 // запрет масштабирования, выделения текста, контекстного меню и «потяни, чтобы обновить».
 // Пароли вводятся в обычное поле со скрытыми символами (класс pwm), поэтому браузер не предлагает «Сохранить пароль».
-// Вручную: ?status=1 - показать строку со временем и зарядом в обычном браузере, ?status=0 - скрыть везде.
+// Включено везде. Выключить: открыть сайт с ?status=0, снова включить: ?status=1.
 (function () {
   var dm = false, ov = null;
   try { ['standalone', 'fullscreen', 'minimal-ui'].forEach(function (m) { if (matchMedia('(display-mode: ' + m + ')').matches) dm = true; }); if (navigator.standalone === true) dm = true; } catch (e) {}
   try { var q = location.search.match(/[?&]status=([01])/); if (q) localStorage.setItem('euss_status', q[1]); ov = localStorage.getItem('euss_status'); } catch (e) {}
-  var showBar = ov === '1' || (ov !== '0' && dm);
+  // Ярлык из Samsung Internet открывается как обычная вкладка (display-mode: browser), поэтому режим определять по нему нельзя:
+  // строка со временем и зарядом и ограничения включены везде, пока не выключено через ?status=0
+  var on = ov !== '0';
+  var showBar = on;
+  dm = on;
 
   var css = 'input.pwm{-webkit-text-security:disc;text-security:disc}';
   if (dm) {

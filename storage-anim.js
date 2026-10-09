@@ -191,7 +191,7 @@ const StorageAnim = (() => {
         <label style="display:block;font-weight:600;margin:.8rem 0 .2rem">Причина</label>
         <input id="wo-n" type="text" maxlength="300" style="width:100%" placeholder="например: просрочено, разлито">
         <label style="display:block;font-weight:600;margin:.8rem 0 .2rem">Ваш пароль</label>
-        <input id="wo-p" type="password" autocomplete="current-password" style="width:100%">
+        <input id="wo-p" type="text" class="pwm" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore style="width:100%">
         <p id="wo-h" class="hint" style="margin:.6rem 0 0"></p>
         <div style="display:flex;gap:.5rem;margin-top:.9rem"><button type="button" class="btn" id="wo-ok" style="font-weight:700" disabled>Списать</button><button type="button" class="btn" id="wo-no">Отмена</button></div>`);
       $('#wo-no').onclick = close;

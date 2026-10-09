@@ -190,6 +190,8 @@ body{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-ri
 .ci.sm{height:2.5rem}
 </style></head>
 <body><div id="app"><p class="hint" style="padding:1rem">Загрузка…</p></div>
+<script src="lite.js"></script>
+<script src="kiosk.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script><script src="num.js"></script><script src="app.js"></script><script src="scanner.js"></script><script src="report-calc.js"></script><script src="leftover.js"></script><script src="residents.js"></script><script src="wm.js"></script><script src="closing-dash.js"></script><script src="chem-stats.js"></script>
 <script>
@@ -204,8 +206,8 @@ const nextUrl=()=>{const n=q.get('next')||'';return /^[a-z0-9_-]+\.html(\?[^#]*)
 function loginView(){
   clearInterval(timer);if(location.hash)history.replaceState(null,'',location.pathname+location.search);
   app.innerHTML=`<div class="lw"><div class="box"><img src="euss-logo.png" alt="EuSS"><h1>Вход</h1>
-  <form id="lf"><label>Логин<input id="em" type="text" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required></label>
-  <label>Пароль<input id="pw" type="password" autocomplete="current-password" required></label>
+  <form id="lf" autocomplete="off"><label>Логин<input id="em" type="text" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" required></label>
+  <label>Пароль<input id="pw" type="text" class="pwm" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore required></label>
   <p class="err" id="er" role="alert"></p><div class="lrow"><button class="btn p" id="go" type="submit">Войти</button><button class="btn qrb" id="qrb" type="button" aria-label="Войти по QR-коду" title="Войти по QR-коду"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v0M14 20h3M20 17v4M17 20h0"/></svg><span>По QR</span></button></div></form></div></div>`;
   $('#lf').onsubmit=async e=>{e.preventDefault();const b=$('#go');b.disabled=true;$('#er').textContent='';
     const{error}=await sb.auth.signInWithPassword({email:loginToEmail($('#em').value),password:pwFix($('#em').value,$('#pw').value)});
@@ -446,7 +448,7 @@ async function start(){
   try{await loadAll(session);}catch(e){app.innerHTML='<p class="err" style="padding:1rem">Не удалось загрузить данные: '+esc(e.message)+'</p>';return;}
   route();
   clearInterval(timer);
-  let k=0;timer=setInterval(async()=>{if(isStaffHome()&&!inLaundry())return;if(++k%2===0)await loadLoads();if(!sel&&!Residents.busy())dashView();},30000);
+  let k=0;timer=setInterval(async()=>{if(document.hidden)return;if(isStaffHome()&&!inLaundry())return;if(++k%2===0)await loadLoads();if(!sel&&!Residents.busy())dashView();},window.pollMs?pollMs(30000):30000);
 }
 start();
 </script><script src="compat.js"></script>

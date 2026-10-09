@@ -13,6 +13,8 @@
 <body>
 <header class="hd"><div><a class="lg" href="index.html" aria-label="На панель смены"><img src="euss-logo.png" alt="EuSS"><span class="sep"></span><span class="sub">Бланки</span></a><nav class="nav"><a class="btn s" href="index.html">← Панель</a></nav></div></header>
 <main id="app"><p class="hint">Загрузка…</p></main>
+<script src="lite.js"></script>
+<script src="kiosk.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script><script src="num.js"></script><script src="app.js"></script><script src="feedback.js"></script><script src="leftover.js"></script><script src="wm.js"></script>
 <script>
@@ -73,7 +75,7 @@
       document.head.appendChild(st); }
     { const st2 = document.createElement('style'); st2.textContent = '.mv .wm{max-width:min(82%,8.5rem)}'; document.head.appendChild(st2); }
     await loadBusy();
-    setInterval(async () => { if (document.querySelector('.mgr') && !document.querySelector('#ovl .ov')) { await loadBusy(); render(); } }, 30000);
+    setInterval(async () => { if (!document.hidden && document.querySelector('.mgr') && !document.querySelector('#ovl .ov')) { await loadBusy(); render(); } }, window.pollMs ? pollMs(30000) : 30000);
     const hh = n => String(n).padStart(2, '0');
     const fmt = n => Num.fmt(n);
     const dos = m => m <= 10 ? 'Основной дозатор · 1–10' : 'Отдельный дозатор · 11–12';

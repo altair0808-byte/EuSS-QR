@@ -64,11 +64,11 @@ function withPw(title, text, run) {
     const E = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
     const d = document.createElement('div');
     d.style.cssText = 'position:fixed;top:0;right:0;bottom:0;left:0;z-index:120;display:flex;align-items:center;justify-content:center;padding:1rem;background:rgb(10 40 55/.45)';
-    d.innerHTML = `<form role="dialog" aria-modal="true" style="width:100%;max-width:22rem;padding:1.25rem;border-radius:.75rem;background:#fff;color:#123;box-shadow:0 20px 50px rgb(0 0 0/.3);font:inherit">
+    d.innerHTML = `<form autocomplete="off" role="dialog" aria-modal="true" style="width:100%;max-width:22rem;padding:1.25rem;border-radius:.75rem;background:#fff;color:#123;box-shadow:0 20px 50px rgb(0 0 0/.3);font:inherit">
       <p style="margin:0;font-size:.72rem;font-weight:800;text-transform:uppercase;color:#566">Подтверждение паролем</p>
       <h2 style="margin:.25rem 0 0;font-size:1.2rem">${E(title)}</h2>
       ${text ? `<p style="margin:.5rem 0 0;font-size:.88rem;color:#566;white-space:pre-line">${E(text)}</p>` : ''}
-      <input type="password" autocomplete="current-password" placeholder="Ваш пароль" required style="display:block;width:100%;height:3rem;margin-top:.9rem;padding:0 .75rem;border:1px solid #c5d3d7;border-radius:.5rem;font:inherit;font-size:1rem;box-sizing:border-box">
+      <input type="text" class="pwm" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore placeholder="Ваш пароль" required style="display:block;width:100%;height:3rem;margin-top:.9rem;padding:0 .75rem;border:1px solid #c5d3d7;border-radius:.5rem;font:inherit;font-size:1rem;box-sizing:border-box">
       <p role="alert" style="margin:.5rem 0 0;min-height:1.2em;font-size:.85rem;color:#b42318"></p>
       <button type="submit" style="display:block;width:100%;min-height:3rem;margin-top:.5rem;border:0;border-radius:.5rem;background:#2aa3b5;color:#fff;font:inherit;font-weight:700;cursor:pointer">Подтвердить</button>
       <button type="button" data-no style="display:block;width:100%;min-height:2.75rem;margin-top:.25rem;border:0;background:none;font:inherit;font-weight:600;color:#566;cursor:pointer">Отмена</button></form>`;
