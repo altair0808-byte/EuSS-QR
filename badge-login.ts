@@ -1,13 +1,14 @@
 // Supabase -> Edge Functions -> Create function, имя: badge-login. Вставить этот код и нажать Deploy.
 // Вход по QR: принимает код с бейджа и возвращает одноразовый токен, по которому сайт получает сессию (sb.auth.verifyOtp).
 // Админам и суперадмину вход по QR запрещён.
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'npm:@supabase/supabase-js@2';   // npm: надёжнее, чем esm.sh (тот иногда не грузится и функция не стартует)
 
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type' };
 const out = (o: unknown, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { ...cors, 'Content-Type': 'application/json' } });
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
+  try {
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
   const b = await req.json().catch(() => ({}));
@@ -31,4 +32,7 @@ Deno.serve(async (req) => {
 
   await admin.from('badges').update({ last_used_at: new Date().toISOString() }).eq('user_id', bd.user_id);
   return out({ token_hash: lk.properties.hashed_token });
+  } catch (e) {   // любая неожиданная ошибка уходит ответом с CORS, а не обрывом связи
+    return out({ error: 'Ошибка функции: ' + (e instanceof Error ? e.message : String(e)) }, 500);
+  }
 });

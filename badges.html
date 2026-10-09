@@ -21,16 +21,27 @@
 .rw .mini{width:auto;min-height:2.5rem;margin:0;padding:0 .8rem;white-space:nowrap}
 #sheet{display:none}
 @media print{
-  @page{size:A4;margin:10mm}
+  @page{size:A4 portrait;margin:10mm}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  html,body{margin:0!important;padding:0!important;background:#fff!important;width:auto!important;min-height:0!important}
   body>*:not(#sheet){display:none!important}
-  #sheet{display:grid!important;grid-template-columns:repeat(3,60mm);justify-content:center}
-  .card{width:60mm;height:90mm;box-sizing:border-box;padding:4mm;border:.3mm dashed #999;display:flex;flex-direction:column;align-items:center;justify-content:space-between;break-inside:avoid;page-break-inside:avoid;background:#fff;color:#000}
-  .card img.lg{height:9mm;width:auto}
-  .card .qr{width:46mm;height:46mm}
-  .card .qr canvas{display:none!important}
-  .card .qr img{display:block!important;width:46mm!important;height:46mm!important;image-rendering:pixelated}
-  .card .pn{font:700 5mm/1.15 Manrope,Arial,sans-serif;text-align:center;overflow-wrap:anywhere;max-height:18mm;overflow:hidden}
-  .card .pl{font:400 3mm Arial,sans-serif;color:#444}
+  #sheet{display:block!important}
+  /* 9 бейджей на лист: каждая страница отдельный блок 180x270 мм, сдвигов между страницами нет */
+  .bpg{display:grid;grid-template-columns:repeat(3,60mm);grid-auto-rows:90mm;width:180mm;height:270mm;margin:0 auto;break-after:page;page-break-after:always;overflow:hidden}
+  .bpg:last-child{break-after:auto;page-break-after:auto}
+  .bcell{width:60mm;height:90mm;padding:1mm;box-sizing:border-box}
+  .bdg{width:100%;height:100%;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;overflow:hidden;position:relative;
+    background:#fff;border:.25mm solid #9fc3ca;border-radius:3.5mm;color:#002f3e;font-family:Manrope,Arial,sans-serif}
+  .bdg>*{flex:none}
+  .bdg .b-top{margin-top:4mm;height:9mm;display:flex;align-items:center;justify-content:center}
+  .bdg .b-top img{height:9mm;width:auto;display:block}
+  .bdg .b-tag{margin-top:2.2mm;display:flex;align-items:center;gap:1.6mm;font:800 2.2mm/1 Manrope,Arial,sans-serif;letter-spacing:.3mm;text-transform:uppercase;color:#0097a8}
+  .bdg .b-tag::before,.bdg .b-tag::after{content:"";width:6mm;height:.3mm;background:#9fd3da}
+  .bdg .b-qf{margin-top:2.4mm;width:40mm;height:40mm;box-sizing:border-box;padding:3mm;background:#fff;border:.35mm solid #0097a8;border-radius:3mm}
+  .bdg .b-qf img{display:block;width:100%;height:100%}
+  .bdg .b-nm{margin-top:3mm;padding:0 3mm;max-height:12.5mm;overflow:hidden;text-align:center;font-weight:800;line-height:1.12;overflow-wrap:anywhere;text-wrap:balance}
+  .bdg .b-lg{margin-top:1.3mm;padding:.7mm 2.4mm;border-radius:99mm;background:#e8f3f3;font:700 2.6mm/1.1 Manrope,Arial,sans-serif;color:#4f6f79;max-width:52mm;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  .bdg .b-ft{margin-top:auto;width:100%;height:6.5mm;display:flex;align-items:center;justify-content:center;background:linear-gradient(90deg,#00808e,#0097a8);color:#fff;font:700 2.2mm/1 Manrope,Arial,sans-serif;letter-spacing:.15mm}
 }
 </style></head>
 <body>
@@ -116,19 +127,37 @@ $('#mkAll').onclick = async () => {
 };
 $('#selAll').onclick = () => { people.forEach(p => { if (badges[p.id]) picked.add(p.id); }); draw(); };
 
-$('#prSel').onclick = () => {
+// QR -> векторная картинка (SVG): резкая при печати. Библиотека рисует в canvas с неравным полем справа и снизу,
+// поэтому берём только сам код и кладём его в рамку ровно по центру.
+function qrSvg(text) {
+  const h = document.createElement('div');
+  new QRCode(h, { text, width: 512, height: 512, correctLevel: QRCode.CorrectLevel.Q });
+  const cv = h.querySelector('canvas'); if (!cv) return '';
+  const W = cv.width, H = cv.height, d = cv.getContext('2d').getImageData(0, 0, W, H).data;
+  const dark = (x, y) => { const i = (y * W + x) * 4; return d[i + 3] > 128 && d[i] < 128; };
+  let x0 = W, y0 = H, x1 = -1, y1 = -1;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (dark(x, y)) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  if (x1 < 0) return '';
+  let run = 0; while (x0 + run < W && dark(x0 + run, y0)) run++;       // верхняя кромка угловой метки = 7 модулей
+  const m = run / 7, n = Math.round((x1 - x0 + 1) / m);
+  let path = '';
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (dark(Math.min(W - 1, Math.round(x0 + (c + .5) * m)), Math.min(H - 1, Math.round(y0 + (r + .5) * m)))) path += `M${c} ${r}h1v1h-1z`;
+  return 'data:image/svg+xml,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${n} ${n}" shape-rendering="crispEdges"><path d="${path}" fill="#000"/></svg>`);
+}
+const nameMm = t => t.length <= 14 ? 5.4 : t.length <= 22 ? 4.6 : t.length <= 30 ? 4 : 3.5;
+const badgeHtml = (p, qr) => { const nm = p.full_name || showLogin(p.email);
+  return `<div class="bcell"><div class="bdg"><div class="b-top"><img src="euss-logo.png" alt=""></div><div class="b-tag">Пропуск · вход по QR</div>
+    <div class="b-qf"><img src="${qr}" alt=""></div><div class="b-nm" style="font-size:${nameMm(nm)}mm">${esc(nm)}</div><div class="b-lg">${esc(showLogin(p.email))}</div>
+    <div class="b-ft">Поднесите к камере на экране входа</div></div></div>`; };
+
+$('#prSel').onclick = async () => {
   const sel = people.filter(p => picked.has(p.id) && badges[p.id]);
   if (!sel.length) { toast('Отметьте сотрудников галочкой'); return; }
-  const sh = $('#sheet'); sh.innerHTML = '';
-  sel.forEach(p => {
-    const c = document.createElement('div'); c.className = 'card';
-    c.innerHTML = '<img class="lg" src="euss-logo.png" alt=""><div class="qr"></div><div class="pn"></div><div class="pl"></div>';
-    c.querySelector('.pn').textContent = p.full_name || showLogin(p.email);
-    c.querySelector('.pl').textContent = showLogin(p.email);
-    sh.appendChild(c);
-    new QRCode(c.querySelector('.qr'), { text: 'euss-badge:' + badges[p.id].code, width: 360, height: 360, correctLevel: QRCode.CorrectLevel.Q });
-  });
-  setTimeout(() => window.print(), 300);
+  const cards = sel.map(p => badgeHtml(p, qrSvg('euss-badge:' + badges[p.id].code))), pages = [];
+  for (let i = 0; i < cards.length; i += 9) pages.push(`<div class="bpg">${cards.slice(i, i + 9).join('')}</div>`);
+  const sh = $('#sheet'); sh.innerHTML = pages.join('');
+  try { if (document.fonts) await document.fonts.ready; await Promise.all([...sh.querySelectorAll('img')].map(i => i.decode ? i.decode().catch(() => {}) : 0)); } catch (e) {}
+  window.print();   // печать только после того, как картинки и шрифт готовы: раньше лист мог уехать
 };
 
 (async () => {
