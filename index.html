@@ -215,7 +215,15 @@ function loginView(){
     const er=$('#er');er.style.color='var(--mf)';er.textContent='Входим…';
     const{data,error}=await sb.functions.invoke('badge-login',{body:{code}});
     const fail=m=>{er.style.color='';er.textContent=m;};
-    if(error||!data||!data.token_hash){let m='Не удалось войти по QR';try{const j=await error.context.json();if(j&&j.error)m=j.error;}catch(e){}fail(m);return;}
+    if(error||!data||!data.token_hash){let m='Не удалось войти по QR';
+      try{const c=error&&error.context;
+        if(c&&typeof c.json==='function'){let j={};try{j=await c.json();}catch(e){}const st=c.status;
+          if(j&&j.error)m=j.error;
+          else if(st===404)m='Функция badge-login не найдена в Supabase: создайте её (Edge Functions) и нажмите Deploy';
+          else if(st===401||st===403)m='Функция не пропустила запрос: у badge-login отключите «Verify JWT» и повторите';
+          else m='Ошибка функции badge-login ('+(st||'?')+')'+(j&&(j.message||j.msg)?': '+(j.message||j.msg):'');}
+        else if(error)m='Нет связи с функцией badge-login: проверьте интернет и что функция создана и задеплоена';
+      }catch(e){}fail(m);return;}
     const r=await sb.auth.verifyOtp({token_hash:data.token_hash,type:'magiclink'});
     if(r.error){fail('Не удалось войти по QR: '+r.error.message);return;}
     const n=nextUrl();if(n){location.href=n;return;}start();
