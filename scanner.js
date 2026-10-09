@@ -29,7 +29,7 @@ const QrScan = (() => {
         <button type="button" data-no style="flex:1;min-height:3rem;border:0;border-radius:.6rem;background:#fff;color:#123;font:inherit">Отмена</button></div>`;
     document.body.appendChild(ov);
     const video = ov.querySelector('video'), msg = ov.querySelector('[data-msg]');
-    let stream = null, facing = 'user', alive = true, done = false, raf = 0, last = 0, detector = null, canvas = null, ctx2 = null;
+    let stream = null, facing = 'environment', alive = true, done = false, raf = 0, last = 0, detector = null, canvas = null, ctx2 = null;
 
     const stop = () => { if (stream) stream.getTracks().forEach(t => t.stop()); stream = null; };
     const close = () => { alive = false; cancelAnimationFrame(raf); stop(); ov.remove(); };
@@ -57,12 +57,22 @@ const QrScan = (() => {
     }
 
     async function read() {
-      if (detector) { const r = await detector.detect(video); return r.length ? r[0].rawValue : ''; }
+      if (detector) { const r = await detector.detect(video); if (r.length) return r[0].rawValue;
+        // зеркальный кадр (фронтальная камера): отражаем и пробуем ещё раз
+        const w = video.videoWidth, h = video.videoHeight; if (!w || !h) return '';
+        if (!canvas) { canvas = document.createElement('canvas'); ctx2 = canvas.getContext('2d'); }
+        canvas.width = w; canvas.height = h; ctx2.save(); ctx2.translate(w, 0); ctx2.scale(-1, 1); ctx2.drawImage(video, 0, 0, w, h); ctx2.restore();
+        const r2 = await detector.detect(canvas); return r2.length ? r2[0].rawValue : ''; }
       const w = video.videoWidth, h = video.videoHeight; if (!w || !h) return '';
       const k = Math.min(1, 640 / w); canvas.width = Math.round(w * k); canvas.height = Math.round(h * k);
       ctx2.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const d = ctx2.getImageData(0, 0, canvas.width, canvas.height);
-      const r = window.jsQR(d.data, d.width, d.height, { inversionAttempts: 'dontInvert' });
+      let d = ctx2.getImageData(0, 0, canvas.width, canvas.height);
+      let r = window.jsQR(d.data, d.width, d.height, { inversionAttempts: 'dontInvert' });
+      if (r) return r.data;
+      // фронтальная камера на части телефонов отдаёт зеркальную картинку — пробуем и перевёрнутый кадр
+      ctx2.save(); ctx2.translate(canvas.width, 0); ctx2.scale(-1, 1); ctx2.drawImage(video, 0, 0, canvas.width, canvas.height); ctx2.restore();
+      d = ctx2.getImageData(0, 0, canvas.width, canvas.height);
+      r = window.jsQR(d.data, d.width, d.height, { inversionAttempts: 'dontInvert' });
       return r ? r.data : '';
     }
 

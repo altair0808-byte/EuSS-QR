@@ -359,11 +359,12 @@ const Blank = (() => {
       Object.values(days).forEach(m => { models[m.date] = m; });
       (changes || []).concat(connects || []).forEach(x => { if (x.shift_date && !models[x.shift_date]) models[x.shift_date] = build([], refs, x.shift_date); });
       const dateList = Object.keys(models).sort();
-      xml = setCell(xml, 'E1', 'Теория'); xml = setCell(xml, 'F1', 'Факт'); xml = setCell(xml, 'G1', 'Разница'); xml = setCell(xml, 'K1', 'Ед.'); ['Теория, шт','Факт, шт','Теория, л','Факт, л','Теория, кг','Факт, кг'].forEach((t, i) => { xml = setCell(xml, LET(12 + i) + '1', t); });
+      xml = setCell(xml, 'E1', 'Теория'); xml = setCell(xml, 'F1', 'Факт'); xml = setCell(xml, 'G1', 'Разница'); xml = setCell(xml, 'R1', 'Теория с прошлой замены'); xml = setCell(xml, 'K1', 'Ед.'); ['Теория, шт','Факт, шт','Теория, л','Факт, л','Теория, кг','Факт, кг'].forEach((t, i) => { xml = setCell(xml, LET(12 + i) + '1', t); });
       let row = 2;
       const density = c => (+c.bottle_l > 0 && +c.bottle_kg > 0) ? (+c.bottle_kg / +c.bottle_l) : null;
       const toL = (c, v, unit) => unit === 'l' ? v : (density(c) ? v / density(c) : null);
       const toKg = (c, v, unit) => unit === 'kg' ? v : (density(c) ? v * density(c) : null);
+      const accTh = {};   // теория с прошлой замены бутыли: факт появляется только в день замены, сравнивать надо с накопленной теорией
       for (const date of dateList) {
         const m = models[date];
         for (const group of groups) {
@@ -386,10 +387,14 @@ const Blank = (() => {
             let theoryPrim = theory;
             if (prim && theoryUnit !== prim) { const d = density(c); theoryPrim = d ? (theoryUnit === 'l' ? theory * d : theory / d) : null; }
             const theoryOut = theoryPrim == null ? '' : r6(theoryPrim);
-            const diff = prim && theoryOut ? r6(actualOut-theoryOut) : '';
-            const pct = prim && theoryOut ? r6((actualOut-theoryOut)/theoryOut*100) : '';
+            const ak = group + ':' + c.id; accTh[ak] = (accTh[ak] || 0) + (+theoryOut || 0);
+            const isRep = !!(prim && mine.length);   // день замены — факт измерен
+            const accOut = isRep ? r6(accTh[ak]) : '';
+            const diff = isRep && accTh[ak] ? r6(actualOut - accTh[ak]) : '';
+            const pct = isRep && accTh[ak] ? r6((actualOut - accTh[ak]) / accTh[ak] * 100) : '';
+            if (isRep) accTh[ak] = 0;
             xml=setCell(xml,'A'+row,serial(date)); xml=setCell(xml,'B'+row,group); xml=setCell(xml,'C'+row,c.name); xml=setCell(xml,'D'+row,c.kind==='main'?'основная':'дополнительная');
-            xml=setCell(xml,'E'+row,theoryOut); xml=setCell(xml,'F'+row,actualOut); xml=setCell(xml,'G'+row,diff); xml=setCell(xml,'H'+row,pct); xml=setCell(xml,'I'+row,mine.length||''); xml=setCell(xml,'J'+row,noLeft||''); xml=setCell(xml,'K'+row,(prim||theoryUnit)==='l'?'л':'кг');
+            xml=setCell(xml,'E'+row,theoryOut); xml=setCell(xml,'F'+row,isRep?actualOut:'');xml=setCell(xml,'R'+row,accOut); xml=setCell(xml,'G'+row,diff); xml=setCell(xml,'H'+row,pct); xml=setCell(xml,'I'+row,mine.length||''); xml=setCell(xml,'J'+row,noLeft||''); xml=setCell(xml,'K'+row,(prim||theoryUnit)==='l'?'л':'кг');
             // те же значения сразу в штуках, литрах и кг (пересчёт по размеру бутыли из настроек)
             const trio = (v, u) => {
               if (v === '' || v == null) return ['', '', ''];
@@ -397,7 +402,7 @@ const Blank = (() => {
               const l = u === 'l' ? v : (d ? v / d : ''), kg = u === 'kg' ? v : (d ? v * d : '');
               return [prim && size1 > 0 ? r6(v / size1) : '', l === '' ? '' : r6(l), kg === '' ? '' : r6(kg)];
             };
-            const tu = prim || theoryUnit, tt = trio(theoryOut, tu), aa = prim ? trio(actualOut, tu) : ['', '', ''];
+            const tu = prim || theoryUnit, tt = trio(theoryOut, tu), aa = isRep ? trio(actualOut, tu) : ['', '', ''];
             [tt[0], aa[0], tt[1], aa[1], tt[2], aa[2]].forEach((v, i) => { xml = setCell(xml, LET(12 + i) + row, v); });
             row++;
           }
