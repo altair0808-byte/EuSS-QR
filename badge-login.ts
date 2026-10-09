@@ -1,6 +1,6 @@
 // Supabase -> Edge Functions -> Create function, имя: badge-login. Вставить этот код и нажать Deploy.
 // Вход по QR: принимает код с бейджа и возвращает одноразовый токен, по которому сайт получает сессию (sb.auth.verifyOtp).
-// Админам и суперадмину вход по QR запрещён.
+// Вход по QR доступен всем, включая админов и суперадмина. QR создаёт и показывает только суперадмин (таблица badges закрыта правилами).
 import { createClient } from 'npm:@supabase/supabase-js@2';   // npm: надёжнее, чем esm.sh (тот иногда не грузится и функция не стартует)
 
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type' };
@@ -17,10 +17,6 @@ Deno.serve(async (req) => {
 
   const { data: bd } = await admin.from('badges').select('user_id').eq('code', code).maybeSingle();
   if (!bd) return out({ error: 'QR-код не найден или отозван. Обратитесь к суперадмину' }, 401);
-
-  const { data: p } = await admin.from('profiles').select('role').eq('id', bd.user_id).maybeSingle();
-  const { data: fa } = await admin.from('form_access').select('role').eq('user_id', bd.user_id).eq('role', 'admin').limit(1);
-  if (p?.role === 'superadmin' || (fa && fa.length)) return out({ error: 'Админам вход по QR недоступен. Войдите по логину и паролю' }, 403);
 
   const { data: tu } = await admin.auth.admin.getUserById(bd.user_id);
   const email = tu?.user?.email;
