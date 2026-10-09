@@ -26,18 +26,24 @@ const QrScan = (() => {
         <p style="margin:0">Поднесите бейдж к камере</p><p data-msg style="margin:.4rem 0 0;font-size:.9rem;min-height:1.3em;color:#ffd8d8"></p></div>
       <div style="position:relative;margin-top:auto;display:flex;gap:.6rem;padding:1rem 1rem calc(1rem + env(safe-area-inset-bottom))">
         <button type="button" data-flip style="flex:1;min-height:3rem;border:1px solid #fff8;border-radius:.6rem;background:#0008;color:#fff;font:inherit">Сменить камеру</button>
+        <button type="button" data-mir style="flex:1;min-height:3rem;border:1px solid #fff8;border-radius:.6rem;background:#0008;color:#fff;font:inherit">Отразить</button>
         <button type="button" data-no style="flex:1;min-height:3rem;border:0;border-radius:.6rem;background:#fff;color:#123;font:inherit">Отмена</button></div>`;
     document.body.appendChild(ov);
     const video = ov.querySelector('video'), msg = ov.querySelector('[data-msg]');
-    let stream = null, facing = 'environment', alive = true, done = false, raf = 0, last = 0, detector = null, canvas = null, ctx2 = null;
+    let stream = null, facing = 'user', alive = true, done = false, raf = 0, last = 0, detector = null, canvas = null, ctx2 = null;
 
     const stop = () => { if (stream) stream.getTracks().forEach(t => t.stop()); stream = null; };
     const close = () => { alive = false; cancelAnimationFrame(raf); stop(); ov.remove(); };
     ov.querySelector('[data-no]').onclick = close;
     ov.querySelector('[data-flip]').onclick = () => { facing = facing === 'environment' ? 'user' : 'environment'; startCam(); };
+    // Картинка фронтальной камеры: на части устройств приходит зеркальной. Кнопка «Отразить» запоминается на устройстве.
+    const mir = ov.querySelector('[data-mir]');
+    let unmirror = true; try { unmirror = localStorage.getItem('euss_scan_unmirror') !== '0'; } catch (e) {}
+    const paint = () => { video.style.transform = facing === 'user' && unmirror ? 'scaleX(-1)' : ''; mir.style.display = facing === 'user' ? '' : 'none'; };
+    mir.onclick = () => { unmirror = !unmirror; try { localStorage.setItem('euss_scan_unmirror', unmirror ? '1' : '0'); } catch (e) {} paint(); };
 
     async function startCam() {
-      stop(); msg.textContent = '';
+      stop(); msg.textContent = ''; paint();
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { msg.textContent = 'Камера недоступна (нужен безопасный адрес https)'; return; }
       try {
         stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: facing }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });

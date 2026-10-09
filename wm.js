@@ -13,10 +13,9 @@ const WM = (() => {
 .wm-d svg{position:absolute;top:0;left:0;width:100%;height:100%;display:block}
 .wm-d b{position:relative;z-index:2;font-family:Sora,sans-serif;font-size:1.25rem;line-height:1;color:#1d3f49;text-shadow:0 1px 0 #fff,0 0 4px #fff}
 .wm-d .wm-sh{fill:none;stroke:#fff;stroke-width:3;stroke-linecap:round;opacity:.7}
-.wm-d .wm-hl{fill:none;stroke:#b8dae0;stroke:color-mix(in oklab,${A} 35%,#fff);stroke-width:2.2;stroke-dasharray:1.5 7;stroke-linecap:round}
+.wm-d .wm-hl{fill:none;stroke:#b8dae0;stroke-width:2.2;stroke-dasharray:1.5 7;stroke-linecap:round}
 .wm-d .wm-wa{fill:${A};opacity:.28}.wm-d .wm-wb{fill:${A};opacity:.42}
-.wm-d .wm-wa,.wm-d .wm-wb{fill:color-mix(in oklab,${A} 55%,#fff)}
-.wm-d .wm-wa{opacity:.55}.wm-d .wm-wb{opacity:.8}
+.wm-d .wm-wa{opacity:.4}.wm-d .wm-wb{opacity:.6}
 .wm-d .wm-c1{fill:#a3d0d8}.wm-d .wm-c2{fill:#f4b581}.wm-d .wm-c3{fill:#fff;stroke:#b0bec5;stroke-width:1}
 .wm-d .wm-fo{fill:#fff;stroke:#cfe6ec;stroke-width:.8;opacity:0}
 .wm-d .wm-bu{fill:#fff;fill-opacity:.55;stroke:#fff;stroke-width:.9;opacity:0}
@@ -24,11 +23,11 @@ const WM = (() => {
 .wm-d .wm-dr.b{fill:#4fc3e8}
 .wm-d .wm-dw,.wm-d .wm-dm,.wm-d .wm-fz{display:none}
 .wm.on .wm-dw,.wm.on .wm-dm,.wm.on .wm-fz{display:inline}
-.wm.on{border-color:${A};box-shadow:inset 0 -3px 0 rgb(0 0 0/.06),0 3px 10px ${A};box-shadow:inset 0 -3px 0 rgb(0 0 0/.06),0 3px 10px color-mix(in oklab,${A} 35%,transparent)}
+.wm.on{border-color:${A};box-shadow:inset 0 -3px 0 rgb(0 0 0/.06),0 3px 10px rgb(42 163 181/.35)}
 .wm.on .wm-s{color:#5ef2d6;text-shadow:0 0 6px rgb(94 242 214/.55)}
 .wm.on .wm-t svg:first-of-type{color:${A}}
 .wm.on .wm-d{animation:wmsh .35s linear infinite}
-.wm.on .wm-r{border-color:${A};border-color:color-mix(in oklab,${A} 70%,transparent);animation:wmsp 3.2s linear infinite}
+.wm.on .wm-r{border-color:${A};opacity:1;animation:wmsp 3.2s linear infinite}
 .wm.on .wm-dm{transform-box:view-box;transform-origin:50% 50%;animation:wmsp 3.4s linear infinite}
 .wm.on .wm-wa{animation:wmwa 1.9s linear infinite}
 .wm.on .wm-wb{animation:wmwb 1.3s linear infinite}
@@ -43,7 +42,8 @@ const WM = (() => {
 @keyframes wmfo{0%,100%{opacity:.95;transform:scale(1)}50%{opacity:1;transform:scale(1.18,1.3)}}
 @keyframes wmup{0%{transform:translateY(0) scale(.6);opacity:0}15%{opacity:.95}70%{opacity:.8}100%{transform:translateY(-46px) scale(1.15);opacity:0}}
 @keyframes wmdr{0%{transform:translateY(-8px);opacity:0}6%{opacity:1}22%{transform:translateY(34px);opacity:1}26%,100%{transform:translateY(34px);opacity:0}}
-@media(prefers-reduced-motion:reduce){.wm.on .wm-d,.wm.on .wm-r,.wm.on .wm-dm,.wm.on .wm-wa,.wm.on .wm-wb,.wm.on .wm-fo,.wm.on .wm-bu,.wm.on .wm-dr{animation:none}.wm.on .wm-fo{opacity:.9}}`;
+@supports(color:color-mix(in oklab,red,blue)){.wm-d .wm-hl{stroke:color-mix(in oklab,${A} 35%,#fff)}.wm.on{box-shadow:inset 0 -3px 0 rgb(0 0 0/.06),0 3px 10px color-mix(in oklab,${A} 35%,transparent)}.wm.on .wm-r{border-color:color-mix(in oklab,${A} 70%,transparent)}}
+@media(prefers-reduced-motion:reduce){.wm.on .wm-d{animation:none}}`;
   function mount() { if (document.getElementById('wm-css')) return; const s = document.createElement('style'); s.id = 'wm-css'; s.textContent = css; document.head.appendChild(s); }
   const time = m => m == null ? '--' : m >= 60 ? Math.floor(m / 60) + ':' + String(m % 60).padStart(2, '0') : String(m);
   const drop = '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1S2.2 5 2.2 7.4a3.8 3.8 0 0 0 7.6 0C9.8 5 6 1 6 1Z" fill="currentColor"/></svg>';
