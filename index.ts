@@ -18,19 +18,22 @@ Deno.serve(async (req) => {
   const { data: bd } = await admin.from('badges').select('user_id').eq('code', code).maybeSingle();
   if (!bd) return out({ error: 'QR-код не найден или отозван. Обратитесь к суперадмину' }, 401);
 
-  const { data: p } = await admin.from('profiles').select('role').eq('id', bd.user_id).maybeSingle();
-  const { data: fa } = await admin.from('form_access').select('role').eq('user_id', bd.user_id).eq('role', 'admin').limit(1);
+  // три проверки одновременно: функция отвечает быстрее
+  const [{ data: p }, { data: fa }, { data: tu }] = await Promise.all([
+    admin.from('profiles').select('role').eq('id', bd.user_id).maybeSingle(),
+    admin.from('form_access').select('role').eq('user_id', bd.user_id).eq('role', 'admin').limit(1),
+    admin.auth.admin.getUserById(bd.user_id)]);
   if (p?.role === 'superadmin' || (fa && fa.length)) return out({ error: 'Админам вход по QR недоступен. Войдите по логину и паролю' }, 403);
 
-  const { data: tu } = await admin.auth.admin.getUserById(bd.user_id);
   const email = tu?.user?.email;
   if (!email) return out({ error: 'Аккаунт не найден' }, 404);
 
   // письмо не отправляется, нужен только токен
-  const { data: lk, error } = await admin.auth.admin.generateLink({ type: 'magiclink', email });
+  // токен и отметка «последний вход» одновременно
+  const [{ data: lk, error }] = await Promise.all([
+    admin.auth.admin.generateLink({ type: 'magiclink', email }),
+    admin.from('badges').update({ last_used_at: new Date().toISOString() }).eq('user_id', bd.user_id)]);
   if (error || !lk?.properties?.hashed_token) return out({ error: 'Не удалось войти, попробуйте ещё раз' }, 500);
-
-  await admin.from('badges').update({ last_used_at: new Date().toISOString() }).eq('user_id', bd.user_id);
   return out({ token_hash: lk.properties.hashed_token });
   } catch (e) {   // любая неожиданная ошибка уходит ответом с CORS, а не обрывом связи
     return out({ error: 'Ошибка функции: ' + (e instanceof Error ? e.message : String(e)) }, 500);

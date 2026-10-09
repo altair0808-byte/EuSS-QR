@@ -211,10 +211,13 @@ function loginView(){
     const{error}=await sb.auth.signInWithPassword({email:loginToEmail($('#em').value),password:pwFix($('#em').value,$('#pw').value)});
     if(error){$('#er').textContent=/invalid/i.test(error.message)?'Неверный логин или пароль':error.message;b.disabled=false;return;}
     const n=nextUrl();if(n){location.href=n;return;}start();};
-  $('#qrb').onclick=()=>QrScan.open(async code=>{
-    const er=$('#er');er.style.color='var(--mf)';er.textContent='Входим…';
+  const busy=t=>{let o=document.getElementById('qbusy');if(!o){document.head.insertAdjacentHTML('beforeend','<style>@keyframes qsp{to{transform:rotate(360deg)}}</style>');o=document.createElement('div');o.id='qbusy';o.setAttribute('role','status');o.style.cssText='position:fixed;top:0;right:0;bottom:0;left:0;z-index:350;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;background:rgb(255 255 255/.92);color:#002f3e;font:700 1.1rem Manrope,system-ui,sans-serif';o.innerHTML='<i style="width:3rem;height:3rem;border:.3rem solid #cfe3e6;border-top-color:#0097a8;border-radius:50%;animation:qsp .8s linear infinite"></i><span></span>';document.body.appendChild(o);}o.lastChild.textContent=t;return{set:x=>{o.lastChild.textContent=x;},end:()=>o.remove()};};
+  $('#qrb').onclick=()=>{
+    try{sb.functions.invoke('badge-login',{body:{code:'warmup'}}).then(()=>{},()=>{});}catch(e){}   // пока наводят камеру, функция на сервере уже просыпается
+    QrScan.open(async code=>{
+    const er=$('#er');er.style.color='var(--mf)';er.textContent='Входим…';const bz=busy('Входим…');
     const{data,error}=await sb.functions.invoke('badge-login',{body:{code}});
-    const fail=m=>{er.style.color='';er.textContent=m;};
+    const fail=m=>{bz.end();er.style.color='';er.textContent=m;};
     if(error||!data||!data.token_hash){let m='Не удалось войти по QR';
       try{const c=error&&error.context;
         if(c&&typeof c.json==='function'){let j={};try{j=await c.json();}catch(e){}const st=c.status;
@@ -226,8 +229,9 @@ function loginView(){
       }catch(e){}fail(m);return;}
     const r=await sb.auth.verifyOtp({token_hash:data.token_hash,type:'magiclink'});
     if(r.error){fail('Не удалось войти по QR: '+r.error.message);return;}
-    const n=nextUrl();if(n){location.href=n;return;}start();
-  });
+    bz.set('Загружаем данные…');
+    const n=nextUrl();if(n){location.href=n;return;}await start();bz.end();
+  });};
 }
 
 async function loadAll(session){
@@ -242,20 +246,21 @@ async function loadAll(session){
     sb.from('chemicals').select('*').order('sort'),
     sb.from('recipes').select('*')]);
   const g=k=>{const x=(set||[]).find(y=>y.key===k);return x?+x.value:null};
-  S={session,isSuper:pr?.role==='superadmin',forms:forms||[],acc:acc||[],can:!!can,tz:g('tz_offset')??5,st:g('shift_start')??6,me:'',
+  S={session,isSuper:pr?.role==='superadmin',forms:forms||[],acc:acc||[],can:!!can,tz:g('tz_offset')??5,st:g('shift_start')??6,
      refs:{water:g('water_l')??55,washTypes:wt||[],chemicals:ch||[],recipes:rc||[]},loads:[],mach:[],changes:[],pool:null,names:{}};
-  try{const n=await sb.rpc('staff_names');const r=((n&&n.data)||[]).find(x=>x.id===uid);if(r&&r.name)S.me=String(r.name).trim();}catch(e){}   // имя из «Пользователи», иначе логин
-  isAdm=await Residents.isAdmin();
-  await loadLoads();
+  const[adm]=await Promise.all([Residents.isAdmin(),loadLoads()]);isAdm=adm;   // всё параллельно: вход раньше ждал 6 запросов подряд
 }
 const shiftDate=()=>new Date(Date.now()+(S.tz-S.st)*3600e3).toISOString().slice(0,10);
 async function loadLoads(){
   const d=shiftDate();
-  const r=S.can?await sb.rpc('report_loads',{d1:d,d2:d}):await sb.from('loads').select('id,ts,shift_date,part,machine,wash_type_id,weight_kg,extras,finished_at,created_by').eq('shift_date',d).order('ts');
-  S.loads=r.data||[];
-  { const ms=await sb.rpc('machine_status',{d}); S.mach=ms.error?S.loads:(ms.data||[]); }   // статус машин виден всем; до stage14.sql берём свои загрузки
-  if(S.can){const c=await sb.rpc('report_changes',{d1:d,d2:d});S.changes=c.data||[];}
-  const lo=await Leftover.fetch();S.pool=lo.rows;S.names=lo.names;S.poolErr=lo.error;
+  const[r,ms,c,lo]=await Promise.all([
+    S.can?sb.rpc('report_loads',{d1:d,d2:d}):sb.from('loads').select('id,ts,shift_date,part,machine,wash_type_id,weight_kg,extras,finished_at,created_by').eq('shift_date',d).order('ts'),
+    sb.rpc('machine_status',{d}),                       // статус машин виден всем; до stage14.sql берём свои загрузки
+    S.can?sb.rpc('report_changes',{d1:d,d2:d}):Promise.resolve(null),
+    Leftover.fetch()]);
+  S.loads=r.data||[];S.mach=ms.error?S.loads:(ms.data||[]);
+  if(c)S.changes=c.data||[];
+  S.pool=lo.rows;S.names=lo.names;S.poolErr=lo.error;
 }
 const roleOf=id=>S.isSuper?'admin':S.acc.find(a=>a.form_id===id)?.role;
 const canFill=f=>S.isSuper||(f.type==='laundry_load'?['worker','admin'].includes(roleOf(f.id)):['foreman','admin'].includes(roleOf(f.id)));
@@ -325,7 +330,7 @@ function adminSummary(people){
 }
 function drawSummary(){const el=document.getElementById('asum');if(el)el.innerHTML=adminSummary(Residents.get(shiftDate()));}
 
-const meName=()=>S.me||showLogin(S.session.user.email);
+const meName=()=>{const n=S.names&&S.names[S.session.user.id];return n?String(n).trim():showLogin(S.session.user.email);};
 const meIni=n=>{const w=String(n).trim().split(/\s+/).filter(Boolean);return(w.length>1?w[0][0]+w[1][0]:String(n).slice(0,2)).toUpperCase();};
 const isStaffHome=()=>!isAdm&&!S.isSuper;
 const inLaundry=()=>location.hash==='#laundry';
