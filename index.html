@@ -170,8 +170,8 @@ body{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-ri
 .pc .pch div{display:flex;justify-content:space-between;gap:.5rem;padding:.12rem 0}
 .pc .btn{margin-top:.8rem;width:100%}
 
-.lrow{display:flex;gap:.5rem;margin-top:1rem}.lrow #go{flex:1;height:3rem}
-.qrb{flex:none;width:3rem;height:3rem;padding:0}.qrb svg{width:1.6rem;height:1.6rem}
+.lrow{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-top:1rem}
+.lw .lrow .btn{width:100%;min-width:0;height:3rem;margin:0;padding:0 .5rem;display:flex;align-items:center;justify-content:center;gap:.45rem;font-size:1rem}.lw .lrow .btn svg{width:1.3rem;height:1.3rem;flex:none}
 .hm{display:grid;gap:1rem;grid-template-columns:1fr;margin-top:1rem}
 @media(min-width:700px){.hm{grid-template-columns:1fr 1fr}}
 .ht{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.6rem;text-align:center;min-height:38vh;min-height:38dvh;padding:1.5rem;border-radius:1rem;color:#fff;box-shadow:0 6px 18px rgb(0 0 0/.12);transition:transform .1s}
@@ -206,7 +206,7 @@ function loginView(){
   app.innerHTML=`<div class="lw"><div class="box"><img src="euss-logo.png" alt="EuSS"><h1>Вход</h1>
   <form id="lf"><label>Логин<input id="em" type="text" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required></label>
   <label>Пароль<input id="pw" type="password" autocomplete="current-password" required></label>
-  <p class="err" id="er" role="alert"></p><div class="lrow"><button class="btn p" id="go" type="submit">Войти</button><button class="btn qrb" id="qrb" type="button" aria-label="Войти по QR-коду" title="Войти по QR-коду"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v0M14 20h3M20 17v4M17 20h0"/></svg></button></div></form></div></div>`;
+  <p class="err" id="er" role="alert"></p><div class="lrow"><button class="btn p" id="go" type="submit">Войти</button><button class="btn qrb" id="qrb" type="button" aria-label="Войти по QR-коду" title="Войти по QR-коду"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v0M14 20h3M20 17v4M17 20h0"/></svg><span>По QR</span></button></div></form></div></div>`;
   $('#lf').onsubmit=async e=>{e.preventDefault();const b=$('#go');b.disabled=true;$('#er').textContent='';
     const{error}=await sb.auth.signInWithPassword({email:loginToEmail($('#em').value),password:pwFix($('#em').value,$('#pw').value)});
     if(error){$('#er').textContent=/invalid/i.test(error.message)?'Неверный логин или пароль':error.message;b.disabled=false;return;}
@@ -234,8 +234,9 @@ async function loadAll(session){
     sb.from('chemicals').select('*').order('sort'),
     sb.from('recipes').select('*')]);
   const g=k=>{const x=(set||[]).find(y=>y.key===k);return x?+x.value:null};
-  S={session,isSuper:pr?.role==='superadmin',forms:forms||[],acc:acc||[],can:!!can,tz:g('tz_offset')??5,st:g('shift_start')??6,
+  S={session,isSuper:pr?.role==='superadmin',forms:forms||[],acc:acc||[],can:!!can,tz:g('tz_offset')??5,st:g('shift_start')??6,me:'',
      refs:{water:g('water_l')??55,washTypes:wt||[],chemicals:ch||[],recipes:rc||[]},loads:[],mach:[],changes:[],pool:null,names:{}};
+  try{const n=await sb.rpc('staff_names');const r=((n&&n.data)||[]).find(x=>x.id===uid);if(r&&r.name)S.me=String(r.name).trim();}catch(e){}   // имя из «Пользователи», иначе логин
   isAdm=await Residents.isAdmin();
   await loadLoads();
 }
@@ -316,13 +317,15 @@ function adminSummary(people){
 }
 function drawSummary(){const el=document.getElementById('asum');if(el)el.innerHTML=adminSummary(Residents.get(shiftDate()));}
 
+const meName=()=>S.me||showLogin(S.session.user.email);
+const meIni=n=>{const w=String(n).trim().split(/\s+/).filter(Boolean);return(w.length>1?w[0][0]+w[1][0]:String(n).slice(0,2)).toUpperCase();};
 const isStaffHome=()=>!isAdm&&!S.isSuper;
 const inLaundry=()=>location.hash==='#laundry';
 function route(){if(isStaffHome()&&!inLaundry())homeView();else dashView();}
 window.addEventListener('hashchange',()=>{if(S){sel=null;route();}});
 
 function homeView(){
-  const em=showLogin(S.session.user.email),ini=em.slice(0,2).toUpperCase();
+  const em=meName(),ini=meIni(em);
   const fc=S.forms.find(f=>f.type==='laundry_chem'&&canFill(f)),fl=S.forms.find(f=>f.type==='laundry_load'&&canFill(f));
   const tile=(cls,ico,t,sub,href)=>href?`<a class="ht ${cls}" href="${href}"><span class="hi">${ico}</span><b>${t}</b><small>${sub}</small></a>`
     :`<div class="ht off" aria-disabled="true"><span class="hi">${ico}</span><b>${t}</b><small>Нет доступа</small></div>`;
@@ -337,7 +340,7 @@ function homeView(){
 }
 
 function dashView(){
-  const ms=machines(),em=showLogin(S.session.user.email),ini=em.slice(0,2).toUpperCase();
+  const ms=machines(),em=meName(),ini=meIni(em);
   const loc=new Date(Date.now()+S.tz*3600e3),first=S.forms.find(f=>f.type==='laundry_load'&&canFill(f)),firstChem=S.forms.find(f=>f.type==='laundry_chem'&&canFill(f));
   const hh=n=>String(n).padStart(2,'0'),acts=[];
   S.forms.filter(canFill).forEach(f=>acts.push([f.type==='laundry_chem'?'<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 2.5h5v3h-5z"/><path d="M8.5 5.5h7l2 3.2v10.8a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2V8.7z"/><rect x="8.5" y="12" width="7" height="5" rx="1"/></svg>':'<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>',f.name,f.type==='laundry_chem'?'Замена химии':'Загрузка белья','form.html?f='+encodeURIComponent(f.slug),f.type==='laundry_chem'?'ch':'',0]));

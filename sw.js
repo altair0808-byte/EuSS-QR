@@ -1,6 +1,6 @@
 // Service worker EuSS: нужен для установки как приложения и запуска без сети.
 // Данные Supabase НЕ кэшируются — всегда только из сети.
-const VER = 'euss-v6';
+const VER = 'euss-v7';
 const SHELL = [
   './', 'index.html', 'form.html', 'blank.html', 'closing.html', 'closings-report.html',
   'report.html', 'journal.html', 'settings.html', 'admin.html', 'qr.html',

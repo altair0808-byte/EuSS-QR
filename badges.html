@@ -61,14 +61,17 @@ const newCode = () => {
 };
 
 async function load() {
-  const [{ data: ppl }, { data: sup }, { data: adm }, { data: bg, error: be }] = await Promise.all([
-    sb.from('people').select('id,email,full_name').order('created_at'),
+  // list_accounts (stage11.sql) заодно добавляет в people тех, кого создали вручную в Supabase; без неё читаем people напрямую
+  const acc = await sb.rpc('list_accounts');
+  const [{ data: ppl, error: pe }, { data: sup }, { data: adm }, { data: bg, error: be }] = await Promise.all([
+    acc.error ? sb.from('people').select('id,email,full_name').order('created_at') : Promise.resolve({ data: (acc.data || []).map(a => ({ id: a.acc_id, email: a.acc_email, full_name: a.acc_name })) }),
     sb.from('profiles').select('id').eq('role', 'superadmin'),
     sb.from('form_access').select('user_id').eq('role', 'admin'),
     sb.from('badges').select('user_id,code,created_at,last_used_at')]);
   if (be) { $('#warn').hidden = false; $('#warn').textContent = 'Сначала выполните stage20.sql в Supabase (SQL Editor). Ошибка: ' + be.message; }
+  if (pe && !be) { $('#warn').hidden = false; $('#warn').textContent = 'Не удалось загрузить список сотрудников: ' + pe.message; }
   const skip = new Set([...(sup || []).map(x => x.id), ...(adm || []).map(x => x.user_id)]);
-  people = (ppl || []).filter(p => !skip.has(p.id));
+  people = (ppl || []).filter(p => p.email && !skip.has(p.id));
   badges = {}; (bg || []).forEach(b => badges[b.user_id] = b);
   [...picked].forEach(id => { if (!badges[id]) picked.delete(id); });
   draw();
@@ -85,7 +88,7 @@ function draw() {
       <span class="st ${b ? 'ok' : ''}">${b ? 'QR есть' : 'нет QR'}</span>
       <button class="mini" data-mk="${p.id}" type="button">${b ? 'Новый QR' : 'Создать QR'}</button>
       ${b ? `<button class="mini" data-rv="${p.id}" type="button">Отозвать</button>` : ''}</div>`;
-  }).join('') : '<p class="hint">Сотрудников нет</p>';
+  }).join('') : '<p class="hint">' + (k ? 'Никого не найдено' : 'Сотрудников нет: все аккаунты — админы или суперадмин. Создайте сотрудника на странице «Пользователи».') + '</p>';
   document.querySelectorAll('[data-pick]').forEach(c => c.onchange = () => { c.checked ? picked.add(c.dataset.pick) : picked.delete(c.dataset.pick); });
   document.querySelectorAll('[data-mk]').forEach(b => b.onclick = async () => {
     const id = b.dataset.mk;
