@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Бейджи QR — EuSS</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#2aa3b5">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="EuSS">
+<meta name="format-detection" content="telephone=no">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="favicon.png" type="image/png"><link rel="stylesheet" href="style.css">
+<style>
+.bt{display:flex;flex-wrap:wrap;gap:.5rem;margin:.75rem 0 1rem}
+.bt .mini,.bt .go{width:auto;margin:0;padding:0 1rem;min-height:2.75rem}
+.rw{display:flex;align-items:center;gap:.75rem;padding:.7rem .8rem;margin-top:.5rem;border:1px solid var(--ln,#d5e1e4);border-radius:.5rem;background:#fff}
+.rw .nm{flex:1;min-width:0}.rw .nm b{display:block;overflow-wrap:anywhere}.rw .nm small{color:#566}
+.rw input[type=checkbox]{width:1.4rem;height:1.4rem;flex:none}
+.rw .st{font-size:.75rem;font-weight:800;padding:.2rem .5rem;border-radius:99px;background:#eef3f4;color:#566;white-space:nowrap}
+.rw .st.ok{background:#e3f6ea;color:#176b3a}
+.rw .mini{width:auto;min-height:2.5rem;margin:0;padding:0 .8rem;white-space:nowrap}
+#sheet{display:none}
+@media print{
+  @page{size:A4;margin:10mm}
+  body>*:not(#sheet){display:none!important}
+  #sheet{display:grid!important;grid-template-columns:repeat(3,60mm);justify-content:center}
+  .card{width:60mm;height:90mm;box-sizing:border-box;padding:4mm;border:.3mm dashed #999;display:flex;flex-direction:column;align-items:center;justify-content:space-between;break-inside:avoid;page-break-inside:avoid;background:#fff;color:#000}
+  .card img.lg{height:9mm;width:auto}
+  .card .qr{width:46mm;height:46mm}
+  .card .qr canvas{display:none!important}
+  .card .qr img{display:block!important;width:46mm!important;height:46mm!important;image-rendering:pixelated}
+  .card .pn{font:700 5mm/1.15 Manrope,Arial,sans-serif;text-align:center;overflow-wrap:anywhere;max-height:18mm;overflow:hidden}
+  .card .pl{font:400 3mm Arial,sans-serif;color:#444}
+}
+</style></head>
+<body>
+<header class="hd"><div><a class="lg" href="index.html" aria-label="На панель смены"><img src="euss-logo.png" alt="EuSS"><span class="sep"></span><span class="sub">Бейджи QR</span></a><nav class="nav"><a class="btn s" href="admin.html">Пользователи</a><a class="btn s" href="index.html">← Панель</a></nav></div></header>
+<main class="wide">
+<div class="top"><h1>Бейджи для входа по QR</h1></div>
+<p class="hint">У каждого сотрудника свой QR-код. Сотрудник нажимает на экране входа значок QR и подносит бейдж к камере. Новый QR отключает старый. Админам и суперадмину вход по QR недоступен, они в списке не показаны.</p>
+<p class="hint" id="warn" hidden></p>
+<div class="bt">
+  <button class="mini" id="mkAll" type="button">Создать QR всем, у кого его нет</button>
+  <button class="go" id="prSel" type="button">Печать выбранных</button>
+  <button class="mini" id="selAll" type="button">Выбрать всех с QR</button>
+</div>
+<label>Поиск<input id="q2" type="search" placeholder="Имя или логин" autocomplete="off"></label>
+<div id="list"><p class="hint">Загрузка…</p></div>
+</main>
+<div id="sheet" aria-hidden="true"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="config.js"></script><script src="app.js"></script>
+<script>
+const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+let people = [], badges = {}, picked = new Set();
+
+const newCode = () => {
+  const a = new Uint8Array(24); crypto.getRandomValues(a);
+  return btoa(String.fromCharCode(...a)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');   // 32 символа
+};
+
+async function load() {
+  const [{ data: ppl }, { data: sup }, { data: adm }, { data: bg, error: be }] = await Promise.all([
+    sb.from('people').select('id,email,full_name').order('created_at'),
+    sb.from('profiles').select('id').eq('role', 'superadmin'),
+    sb.from('form_access').select('user_id').eq('role', 'admin'),
+    sb.from('badges').select('user_id,code,created_at,last_used_at')]);
+  if (be) { $('#warn').hidden = false; $('#warn').textContent = 'Сначала выполните stage20.sql в Supabase (SQL Editor). Ошибка: ' + be.message; }
+  const skip = new Set([...(sup || []).map(x => x.id), ...(adm || []).map(x => x.user_id)]);
+  people = (ppl || []).filter(p => !skip.has(p.id));
+  badges = {}; (bg || []).forEach(b => badges[b.user_id] = b);
+  [...picked].forEach(id => { if (!badges[id]) picked.delete(id); });
+  draw();
+}
+
+const fmtD = t => t ? new Date(t).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+function draw() {
+  const k = $('#q2').value.trim().toLowerCase();
+  const list = people.filter(p => !k || (p.full_name || '').toLowerCase().includes(k) || showLogin(p.email).toLowerCase().includes(k));
+  $('#list').innerHTML = list.length ? list.map(p => {
+    const b = badges[p.id];
+    return `<div class="rw"><input type="checkbox" data-pick="${p.id}" ${b ? '' : 'disabled'} ${picked.has(p.id) ? 'checked' : ''} aria-label="Выбрать для печати">
+      <div class="nm"><b>${esc(p.full_name || showLogin(p.email))}</b><small>${esc(showLogin(p.email))}${b && b.last_used_at ? ' · вход по QR: ' + fmtD(b.last_used_at) : ''}</small></div>
+      <span class="st ${b ? 'ok' : ''}">${b ? 'QR есть' : 'нет QR'}</span>
+      <button class="mini" data-mk="${p.id}" type="button">${b ? 'Новый QR' : 'Создать QR'}</button>
+      ${b ? `<button class="mini" data-rv="${p.id}" type="button">Отозвать</button>` : ''}</div>`;
+  }).join('') : '<p class="hint">Сотрудников нет</p>';
+  document.querySelectorAll('[data-pick]').forEach(c => c.onchange = () => { c.checked ? picked.add(c.dataset.pick) : picked.delete(c.dataset.pick); });
+  document.querySelectorAll('[data-mk]').forEach(b => b.onclick = async () => {
+    const id = b.dataset.mk;
+    if (badges[id] && !confirm('Старый бейдж перестанет работать. Создать новый QR?')) return;
+    b.disabled = true; const { error } = await sb.from('badges').upsert({ user_id: id, code: newCode(), created_at: new Date().toISOString(), last_used_at: null });
+    if (error) { toast('Не удалось: ' + error.message); b.disabled = false; return; }
+    toast('QR создан'); load();
+  });
+  document.querySelectorAll('[data-rv]').forEach(b => b.onclick = async () => {
+    if (!confirm('Отозвать QR? Бейдж перестанет работать.')) return;
+    const { error } = await sb.from('badges').delete().eq('user_id', b.dataset.rv);
+    if (error) { toast('Не удалось: ' + error.message); return; }
+    picked.delete(b.dataset.rv); toast('QR отозван'); load();
+  });
+}
+$('#q2').oninput = draw;
+
+$('#mkAll').onclick = async () => {
+  const todo = people.filter(p => !badges[p.id]);
+  if (!todo.length) { toast('У всех уже есть QR'); return; }
+  if (!confirm('Создать QR для ' + todo.length + ' сотрудников?')) return;
+  const { error } = await sb.from('badges').insert(todo.map(p => ({ user_id: p.id, code: newCode() })));
+  if (error) { toast('Не удалось: ' + error.message); return; }
+  toast('Создано: ' + todo.length); load();
+};
+$('#selAll').onclick = () => { people.forEach(p => { if (badges[p.id]) picked.add(p.id); }); draw(); };
+
+$('#prSel').onclick = () => {
+  const sel = people.filter(p => picked.has(p.id) && badges[p.id]);
+  if (!sel.length) { toast('Отметьте сотрудников галочкой'); return; }
+  const sh = $('#sheet'); sh.innerHTML = '';
+  sel.forEach(p => {
+    const c = document.createElement('div'); c.className = 'card';
+    c.innerHTML = '<img class="lg" src="euss-logo.png" alt=""><div class="qr"></div><div class="pn"></div><div class="pl"></div>';
+    c.querySelector('.pn').textContent = p.full_name || showLogin(p.email);
+    c.querySelector('.pl').textContent = showLogin(p.email);
+    sh.appendChild(c);
+    new QRCode(c.querySelector('.qr'), { text: 'euss-badge:' + badges[p.id].code, width: 360, height: 360, correctLevel: QRCode.CorrectLevel.Q });
+  });
+  setTimeout(() => window.print(), 300);
+};
+
+(async () => {
+  const s = await need(); if (!s) return;
+  const { data: pr } = await sb.from('profiles').select('role').eq('id', s.user.id).maybeSingle();
+  if (!pr || pr.role !== 'superadmin') { location.replace('index.html'); return; }
+  load();
+})();
+</script><script src="idle.js"></script>
+<script src="pwa.js"></script>
+</body></html>

@@ -1,12 +1,12 @@
 // Service worker EuSS: нужен для установки как приложения и запуска без сети.
 // Данные Supabase НЕ кэшируются — всегда только из сети.
-const VER = 'euss-v3';
+const VER = 'euss-v4';
 const SHELL = [
   './', 'index.html', 'form.html', 'blank.html', 'closing.html', 'closings-report.html',
   'report.html', 'journal.html', 'settings.html', 'admin.html', 'qr.html',
   'style.css', 'config.js', 'num.js', 'app.js', 'report-calc.js', 'leftover.js', 'residents.js',
   'wm.js', 'closing-dash.js', 'chem-stats.js', 'blanc.js', 'storage-anim.js', 'dash-visuals.js',
-  'xlsx-writer.js', 'closing-xlsx.js', 'pwa.js', 'idle.js', 'favicon.png', 'euss-logo.png',
+  'xlsx-writer.js', 'closing-xlsx.js', 'pwa.js', 'idle.js', 'scanner.js', 'badges.html', 'favicon.png', 'euss-logo.png',
   'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'
 ];
 

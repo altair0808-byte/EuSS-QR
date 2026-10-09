@@ -169,10 +169,20 @@ body{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-ri
 .pc .pch{margin:.7rem 0 0;padding:.6rem .7rem;border-radius:.7rem;background:#fff;font-size:.82rem}.pc .pch p{margin:0 0 .25rem;font-size:.68rem;font-weight:800;text-transform:uppercase;color:var(--mf)}
 .pc .pch div{display:flex;justify-content:space-between;gap:.5rem;padding:.12rem 0}
 .pc .btn{margin-top:.8rem;width:100%}
+
+.lrow{display:flex;gap:.5rem;margin-top:1rem}.lrow #go{flex:1;height:3rem}
+.qrb{flex:none;width:3rem;height:3rem;padding:0}.qrb svg{width:1.6rem;height:1.6rem}
+.hm{display:grid;gap:1rem;grid-template-columns:1fr;margin-top:1rem}
+@media(min-width:700px){.hm{grid-template-columns:1fr 1fr}}
+.ht{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.6rem;text-align:center;min-height:38dvh;padding:1.5rem;border-radius:1rem;color:#fff;box-shadow:0 6px 18px rgb(0 0 0/.12);transition:transform .1s}
+.ht.ld{background:var(--pri)}.ht.ch{background:var(--ch)}
+.ht .hi{font-size:4.5rem;line-height:1}.ht b{font:800 1.8rem/1.15 Sora,Manrope,sans-serif}.ht small{font-size:1rem;opacity:.92}
+.ht:active{transform:scale(.985)}.ht.off{background:#d8e2e4;color:#68797e;box-shadow:none}
+.bk{margin-bottom:.75rem}
 </style></head>
 <body><div id="app"><p class="hint" style="padding:1rem">Загрузка…</p></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="config.js"></script><script src="num.js"></script><script src="app.js"></script><script src="report-calc.js"></script><script src="leftover.js"></script><script src="residents.js"></script><script src="wm.js"></script><script src="closing-dash.js"></script><script src="chem-stats.js"></script>
+<script src="config.js"></script><script src="num.js"></script><script src="app.js"></script><script src="scanner.js"></script><script src="report-calc.js"></script><script src="leftover.js"></script><script src="residents.js"></script><script src="wm.js"></script><script src="closing-dash.js"></script><script src="chem-stats.js"></script>
 <script>
 const esc=t=>String(t??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const fmt=n=>Num.fmt(n);   // без округления: 0,175 → «0,175», 0,350 → «0,35»
@@ -183,15 +193,24 @@ const who=id=>(id&&S.names[id])||'';
 const nextUrl=()=>{const n=q.get('next')||'';return /^[a-z0-9_-]+\.html(\?[^#]*)?$/i.test(n)?n:null;};
 
 function loginView(){
-  clearInterval(timer);
+  clearInterval(timer);if(location.hash)history.replaceState(null,'',location.pathname+location.search);
   app.innerHTML=`<div class="lw"><div class="box"><img src="euss-logo.png" alt="EuSS"><h1>Вход</h1>
   <form id="lf"><label>Логин<input id="em" type="text" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required></label>
   <label>Пароль<input id="pw" type="password" autocomplete="current-password" required></label>
-  <p class="err" id="er" role="alert"></p><button class="btn p" id="go" type="submit">Войти</button></form></div></div>`;
+  <p class="err" id="er" role="alert"></p><div class="lrow"><button class="btn p" id="go" type="submit">Войти</button><button class="btn qrb" id="qrb" type="button" aria-label="Войти по QR-коду" title="Войти по QR-коду"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v0M14 20h3M20 17v4M17 20h0"/></svg></button></div></form></div></div>`;
   $('#lf').onsubmit=async e=>{e.preventDefault();const b=$('#go');b.disabled=true;$('#er').textContent='';
     const{error}=await sb.auth.signInWithPassword({email:loginToEmail($('#em').value),password:pwFix($('#em').value,$('#pw').value)});
     if(error){$('#er').textContent=/invalid/i.test(error.message)?'Неверный логин или пароль':error.message;b.disabled=false;return;}
     const n=nextUrl();if(n){location.href=n;return;}start();};
+  $('#qrb').onclick=()=>QrScan.open(async code=>{
+    const er=$('#er');er.style.color='var(--mf)';er.textContent='Входим…';
+    const{data,error}=await sb.functions.invoke('badge-login',{body:{code}});
+    const fail=m=>{er.style.color='';er.textContent=m;};
+    if(error||!data||!data.token_hash){let m='Не удалось войти по QR';try{const j=await error.context.json();if(j&&j.error)m=j.error;}catch(e){}fail(m);return;}
+    const r=await sb.auth.verifyOtp({token_hash:data.token_hash,type:'magiclink'});
+    if(r.error){fail('Не удалось войти по QR: '+r.error.message);return;}
+    const n=nextUrl();if(n){location.href=n;return;}start();
+  });
 }
 
 async function loadAll(session){
@@ -288,6 +307,26 @@ function adminSummary(people){
 }
 function drawSummary(){const el=document.getElementById('asum');if(el)el.innerHTML=adminSummary(Residents.get(shiftDate()));}
 
+const isStaffHome=()=>!isAdm&&!S.isSuper;
+const inLaundry=()=>location.hash==='#laundry';
+function route(){if(isStaffHome()&&!inLaundry())homeView();else dashView();}
+window.addEventListener('hashchange',()=>{if(S){sel=null;route();}});
+
+function homeView(){
+  const em=showLogin(S.session.user.email),ini=em.slice(0,2).toUpperCase();
+  const fc=S.forms.find(f=>f.type==='laundry_chem'&&canFill(f)),fl=S.forms.find(f=>f.type==='laundry_load'&&canFill(f));
+  const tile=(cls,ico,t,sub,href)=>href?`<a class="ht ${cls}" href="${href}"><span class="hi">${ico}</span><b>${t}</b><small>${sub}</small></a>`
+    :`<div class="ht off" aria-disabled="true"><span class="hi">${ico}</span><b>${t}</b><small>Нет доступа</small></div>`;
+  const rep=S.can?[['▦','Бланк за смену','Проверить и подготовить отчёт','blank.html'],['▥','Отчёт по сменам','Теория и факт по химии','report.html'],['☰','Журнал','Все операции','journal.html'],['⚖','Отчёт по закрытиям','Замеры, эталон, динамика','closings-report.html']]:[];
+  app.innerHTML=`
+  <header class="hd"><div><div class="lg"><img src="euss-logo.png" alt="EuSS"><span class="sep hide-s"></span><span class="sub">Прачечная</span></div>
+   <div class="me"><div class="t hide-s"><p>${esc(em)}</p></div><div class="av">${esc(ini)}</div><button class="ib" id="out" aria-label="Выйти" title="Выйти">⎋</button></div></div></header>
+  <main>${!fl&&!fc?'<p class="hint" style="padding-top:1rem">Вам пока не выдан доступ ни к одному бланку. Обратитесь к суперадмину.</p>':''}<div class="hm">${tile('ld','🧺','Загрузка белья','Машины и запись загрузки',fl?'#laundry':'')}${tile('ch','⚗','Загрузка химиката','Замена бутыли с химией',fc?'form.html?f='+encodeURIComponent(fc.slug):'')}</div>
+  ${rep.length?`<p class="gl" style="margin-top:1.5rem">Отчёты и журнал</p><div class="qg" style="margin-top:.25rem">${rep.map(a=>`<a class="qa" href="${a[3]}"><span class="qi">${a[0]}</span><span><b>${esc(a[1])}</b><small>${esc(a[2])}</small></span><span>→</span></a>`).join('')}</div>`:''}
+  </main><div id="ovl"></div>`;
+  $('#out').onclick=async()=>{await sb.auth.signOut();Residents.reset();isAdm=false;loginView();};
+}
+
 function dashView(){
   const ms=machines(),em=showLogin(S.session.user.email),ini=em.slice(0,2).toUpperCase();
   const loc=new Date(Date.now()+S.tz*3600e3),first=S.forms.find(f=>f.type==='laundry_load'&&canFill(f)),firstChem=S.forms.find(f=>f.type==='laundry_chem'&&canFill(f));
@@ -295,7 +334,7 @@ function dashView(){
   S.forms.filter(canFill).forEach(f=>acts.push([f.type==='laundry_chem'?'⚗':'▤',f.name,f.type==='laundry_chem'?'Замена химии':'Загрузка белья','form.html?f='+encodeURIComponent(f.slug),f.type==='laundry_chem'?'ch':'',0]));
   if(S.can){acts.push(['▦','Бланк за смену','Проверить и подготовить отчёт','blank.html','',1]);acts.push(['▥','Отчёт по сменам','Теория и факт по химии','report.html','',1]);acts.push(['☰','Журнал','Все операции: кто что добавил, исправил и удалил','journal.html','',1]);acts.push(['⚖','Отчёт по закрытиям','Точный факт по замерам, эталон, динамика','closings-report.html','',1]);}
   if(isAdm||S.isSuper)acts.push(['⚖','Закрытие','Замер остатков, закрыть месяц или прошедшие смены','closing.html','',1]);
-  if(S.isSuper){acts.push(['⚙','Настройки','Химия, рецепты, бланки','settings.html','',2]);acts.push(['☺','Пользователи','Создать и выдать доступ','admin.html','',2]);
+  if(S.isSuper){acts.push(['⚙','Настройки','Химия, рецепты, бланки','settings.html','',2]);acts.push(['☺','Пользователи','Создать и выдать доступ','admin.html','',2]);acts.push(['▦','Бейджи QR','Вход по QR: создать и распечатать','badges.html','',2]);
     S.forms.forEach(f=>acts.push(['▣','QR: '+f.name,'Печать QR-кода','qr.html?f='+encodeURIComponent(f.slug),'',2]));}
   const vis=ms.filter(m=>tab==='all'||(tab==='main'?m.id<=10:m.id>=11));
   const T=[['all','Все машины'],['main','Дозатор 1 · 1–10'],['extra','Дозатор 2 · 11–12']];
@@ -304,7 +343,7 @@ function dashView(){
    <div class="me"><div class="t hide-s"><p class="eb">Смена ${hh(S.st)}:00–${hh(S.st)}:00</p><p>${esc(em)}${S.isSuper?' · суперадмин':''}</p></div>
    <div class="av">${esc(ini)}</div><button class="ib" id="out" aria-label="Выйти" title="Выйти">⎋</button></div></div></header>
   <main><div class="top"><div><p class="eb">Сегодня, ${loc.getUTCDate()} ${MON[loc.getUTCMonth()]}</p><h1>Обзор текущей смены</h1></div>
-   <div class="acts">${first?`<a class="btn p" href="form.html?f=${encodeURIComponent(first.slug)}">🧺 Загрузка белья</a>`:''}${firstChem?`<a class="btn c" href="form.html?f=${encodeURIComponent(firstChem.slug)}">⚗ Замена химии</a>`:''}</div></div>
+   <div class="acts">${isStaffHome()?'<a class="btn" href="#" id="bkh">← Главная</a>':''}${first?`<a class="btn p" href="form.html?f=${encodeURIComponent(first.slug)}">🧺 Загрузка белья</a>`:''}${firstChem?`<a class="btn c" href="form.html?f=${encodeURIComponent(firstChem.slug)}">⚗ Замена химии</a>`:''}</div></div>
   ${isAdm?'<div id="asum"></div>':''}
   ${isAdm||S.isSuper?'<div id="cmo"></div><div id="clp"></div>':''}
   <section><div class="sh"><div><h2>Стиральные машины</h2><p>Нажмите на машину, чтобы открыть запись</p></div>
@@ -316,6 +355,7 @@ function dashView(){
    :'<p class="hint">Вам пока не выдан доступ ни к одному бланку. Обратитесь к суперадмину.</p>'}
   </main><div id="ovl"></div>`;
   $('#out').onclick=async()=>{await sb.auth.signOut();Residents.reset();isAdm=false;loginView();};
+  const bk=$('#bkh');if(bk)bk.onclick=e=>{e.preventDefault();location.hash='';};
   bindLeftover();
   if(isAdm||S.isSuper){ChemStats.mountMonth($('#cmo'),{tz:S.tz,st:S.st,refs:S.refs||null});ClosingDash.mount($('#clp'),{tz:S.tz,st:S.st,refs:S.refs||null});}
   if(isAdm){drawSummary();Residents.mount($('#rsd'),shiftDate(),{today:shiftDate(),toast,onValue:drawSummary});}
@@ -379,9 +419,9 @@ async function start(){
   if(!session)return loginView();
   const n=nextUrl();if(n){location.replace(n);return;}
   try{await loadAll(session);}catch(e){app.innerHTML='<p class="err" style="padding:1rem">Не удалось загрузить данные: '+esc(e.message)+'</p>';return;}
-  dashView();
+  route();
   clearInterval(timer);
-  let k=0;timer=setInterval(async()=>{if(++k%2===0)await loadLoads();if(!sel&&!Residents.busy())dashView();},30000);
+  let k=0;timer=setInterval(async()=>{if(isStaffHome()&&!inLaundry())return;if(++k%2===0)await loadLoads();if(!sel&&!Residents.busy())dashView();},30000);
 }
 start();
 </script><script src="idle.js"></script>
