@@ -29,7 +29,7 @@
   document.title = f.name + ' — EuSS';
   const kind = { laundry_load: 'Загрузка белья', laundry_chem: 'Замена химии' }[f.type] || 'Бланк';
   document.body.classList.add(f.type === 'laundry_chem' ? 'k-chem' : 'k-load');
-  const bannerHtml = f.type === 'laundry_chem' ? '<div class="kind">⚗ Замена химии</div>' : f.type === 'laundry_load' ? '<div class="kind">🧺 Загрузка белья</div>' : '';
+  const bannerHtml = f.type === 'laundry_chem' ? '<div class="kind"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 2.5h5v3h-5z"/><path d="M8.5 5.5h7l2 3.2v10.8a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2V8.7z"/><rect x="8.5" y="12" width="7" height="5" rx="1"/></svg> Замена химии</div>' : f.type === 'laundry_load' ? '<div class="kind"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="2.5" width="16" height="19" rx="2.5"/><circle cx="12" cy="13.5" r="4.6"/><path d="M8.7 13.5c1.1-1 2.2 1 3.3 0s2.2 1 3.3 0"/><path d="M7 6h.01M10 6h.01M14 6h4"/></svg> Загрузка белья</div>' : '';
   const head = `${bannerHtml}<div class="top"><p class="eb">${kind}</p><h1>${esc(f.name)}</h1></div>`;
   const washList = w => w || [];
   const toTop = () => window.scrollTo({ top: 0 });
@@ -65,11 +65,11 @@
           start: hhmm(t0), end: hhmm(end), pc: tot > 0 ? Math.min(100, Math.max(0, (now - t0) / tot * 100)) : 0, who: names[l.created_by] || '' });
       });
     }
-    { const st = document.createElement('style'); st.textContent = '.bi{margin:.75rem 0;padding:.85rem 1rem;border:1px solid var(--ac);border-radius:1rem;background:color-mix(in oklab,var(--ac) 7%,#fff)}.bi .bt{display:flex;justify-content:space-between;gap:.5rem;font-size:1.05rem}.bi .bt span{font-weight:800;color:var(--ac)}.bi .bp{height:.65rem;margin:.6rem 0 .4rem;border-radius:99px;background:rgb(0 0 0/.08);overflow:hidden}.bi .bp i{display:block;height:100%;border-radius:99px;background:var(--ac)}.bi .bs{display:flex;justify-content:space-between;gap:.5rem;font-size:.78rem;opacity:.8}.bi .bs b{display:block;font-size:1rem}.bi p{margin:.5rem 0 0;font-size:.8rem;opacity:.8}'; document.head.appendChild(st); }
-    const busyInfo = m => { const b = busy.get(m); if (!b) return ''; return `<div class="bi"><div class="bt"><b>🧺 Сейчас в машине: ${esc(b.name)}</b><span>${fmt(b.kg)} кг</span></div><div class="bp"><i style="width:${b.pc.toFixed(0)}%"></i></div><div class="bs"><span>Начало<b>${b.start}</b></span><span>Осталось<b>${b.left} мин</b></span><span>Конец<b>${b.end}</b></span></div>${b.who ? `<p>Загрузил: ${esc(b.who)}</p>` : ''}</div>`; };
+    { const st = document.createElement('style'); st.textContent = '.bi{margin:.75rem 0;padding:.85rem 1rem;border:1px solid var(--ac);border-radius:1rem;background:#f1f8f9;background:color-mix(in oklab,var(--ac) 7%,#fff)}.bi .bt{display:flex;justify-content:space-between;gap:.5rem;font-size:1.05rem}.bi .bt span{font-weight:800;color:var(--ac)}.bi .bp{height:.65rem;margin:.6rem 0 .4rem;border-radius:99px;background:rgb(0 0 0/.08);overflow:hidden}.bi .bp i{display:block;height:100%;border-radius:99px;background:var(--ac)}.bi .bs{display:flex;justify-content:space-between;gap:.5rem;font-size:.78rem;opacity:.8}.bi .bs b{display:block;font-size:1rem}.bi p{margin:.5rem 0 0;font-size:.8rem;opacity:.8}'; document.head.appendChild(st); }
+    const busyInfo = m => { const b = busy.get(m); if (!b) return ''; return `<div class="bi"><div class="bt"><b><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="2.5" width="16" height="19" rx="2.5"/><circle cx="12" cy="13.5" r="4.6"/><path d="M8.7 13.5c1.1-1 2.2 1 3.3 0s2.2 1 3.3 0"/><path d="M7 6h.01M10 6h.01M14 6h4"/></svg> Сейчас в машине: ${esc(b.name)}</b><span>${fmt(b.kg)} кг</span></div><div class="bp"><i style="width:${b.pc.toFixed(0)}%"></i></div><div class="bs"><span>Начало<b>${b.start}</b></span><span>Осталось<b>${b.left} мин</b></span><span>Конец<b>${b.end}</b></span></div>${b.who ? `<p>Загрузил: ${esc(b.who)}</p>` : ''}</div>`; };
     const busyLine = m => { const b = busy.get(m); return `${esc(b.name)} · ${fmt(b.kg)} кг · ${b.left} мин`; };
     if (!document.getElementById('busy-css')) { const st = document.createElement('style'); st.id = 'busy-css';
-      st.textContent = '.on .dr::after{content:"";position:absolute;inset:-.45rem;border:.22rem solid transparent;border-top-color:var(--ac);border-radius:99px;animation:bsp 3.2s linear infinite}.on .dr{animation:bsh .35s linear infinite}@keyframes bsp{to{transform:rotate(360deg)}}@keyframes bsh{25%{transform:translate(.6px,-.4px)}75%{transform:translate(-.5px,.4px)}}@media(prefers-reduced-motion:reduce){.on .dr,.on .dr::after{animation:none}}';
+      st.textContent = '.on .dr::after{content:"";position:absolute;top:-.45rem;right:-.45rem;bottom:-.45rem;left:-.45rem;border:.22rem solid transparent;border-top-color:var(--ac);border-radius:99px;animation:bsp 3.2s linear infinite}.on .dr{animation:bsh .35s linear infinite}@keyframes bsp{to{transform:rotate(360deg)}}@keyframes bsh{25%{transform:translate(.6px,-.4px)}75%{transform:translate(-.5px,.4px)}}@media(prefers-reduced-motion:reduce){.on .dr,.on .dr::after{animation:none}}';
       document.head.appendChild(st); }
     { const st2 = document.createElement('style'); st2.textContent = '.mv .wm{max-width:min(82%,8.5rem)}'; document.head.appendChild(st2); }
     await loadBusy();
@@ -181,9 +181,9 @@
   const fmt = n => Num.fmt(+n || 0);                // без округления: 0,175 → «0,175», 0,350 → «0,35»
   const fmtC = fmt;                                  // пересчёт «≈» (литры ↔ кг по плотности) тоже без округления до сотых
   const hue = s => { let h = 0; for (const ch of String(s)) h = (h * 31 + ch.charCodeAt(0)) % 360; return h; };
-  const safeUrl = u => /^https?:\/\/\S+$/i.test(String(u || '').trim()) ? String(u).trim() : '';
+  const safeUrl = u => /^https?:\/\/\S+$/i.test(String(u || '').trim()) ? String(u).trim().replace(/^http:\/\//i, 'https://') : '';
   // картинка химиката; если ссылки нет или фото не загрузилось, видна цветная буква
-  const chemImg = (x, cls = '') => `<span class="ci ${cls}" style="--h:${hue(x.name)}"><span class="lt">${esc(String(x.name || '?').trim().charAt(0).toUpperCase())}</span>${safeUrl(x.image_url) ? `<img src="${esc(safeUrl(x.image_url))}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ''}</span>`;
+  const chemImg = (x, cls = '') => `<span class="ci ${cls}" style="--h:${hue(x.name)}"><span class="lt"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 2.5h5v3h-5z"/><path d="M8.5 5.5h7l2 3.2v10.8a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2V8.7z"/><rect x="8.5" y="12" width="7" height="5" rx="1"/></svg></span>${safeUrl(x.image_url) ? `<img src="${esc(safeUrl(x.image_url))}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ''}</span>`;
   const imgFallback = root => root.querySelectorAll('.ci img').forEach(i => { i.onerror = () => i.remove(); });
   const sizeTxt = x => { const p = []; if (+x.bottle_l > 0) p.push(fmt(+x.bottle_l) + ' л'); if (+x.bottle_kg > 0) p.push(fmt(+x.bottle_kg) + ' кг'); return p.length ? 'Бутыль ' + p.join(' · ') : 'Размер бутыли не задан'; };
 
@@ -244,7 +244,7 @@
       <div class="box"><h2>1 · Дозатор</h2>
         <div class="dz" id="cg">${groups.map(([v, n, s, b]) => `<button type="button" class="dzc ${g === v ? 'sel' : ''}" data-v="${v}" aria-pressed="${g === v}"><b>${b}</b><span>${n}</span><small>${s}</small></button>`).join('')}</div></div>
       <div class="box"><div class="sh2"><h2>2 · Какая химия закончилась</h2>${isSuper ? '<button type="button" class="mini opt" id="addc">+ Добавить</button>' : ''}</div>
-        <div class="chg" id="chem">${chems.map(x => `<div class="cw"><button type="button" class="cc ${String(x.id) === c ? 'sel' : ''}" data-v="${x.id}" aria-pressed="${String(x.id) === c}">${chemImg(x)}<span class="cn">${esc(x.name)}</span><small>${sizeTxt(x)}</small><i class="ck" aria-hidden="true">✓</i></button>${isSuper ? `<button type="button" class="ed" data-e="${x.id}" aria-label="Изменить ${esc(x.name)}" title="Изменить">✎</button>` : ''}</div>`).join('') || '<p class="hint">Химия пока не добавлена.</p>'}</div></div>
+        <div class="chg" id="chem">${chems.map(x => `<div class="cw"><button type="button" class="cc ${String(x.id) === c ? 'sel' : ''}" data-v="${x.id}" aria-pressed="${String(x.id) === c}">${chemImg(x)}<span class="cn">${esc(x.name)}</span><small>${sizeTxt(x)}</small><i class="ck" aria-hidden="true">✓</i></button>${isSuper ? `<button type="button" class="ed" data-e="${x.id}" aria-label="Изменить ${esc(x.name)}" title="Изменить"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20l1-5L16 4l4 4L9 19zM13 7l4 4"/></svg></button>` : ''}</div>`).join('') || '<p class="hint">Химия пока не добавлена.</p>'}</div></div>
       <div class="box"><h2>3 · Остаток в бутыли</h2>
         <p class="hint">Сколько осталось в снятой бутыли. Остаток запишется вместе с заменой и попадёт в запас: он виден на панели смены, там же его отмечают подключённым.</p>
         <div class="seg" id="lm"><button data-v="empty" class="on">Бутыль пустая</button><button data-v="some">Остался остаток</button></div>
@@ -326,6 +326,7 @@
 
   ({ laundry_load: laundryLoad, laundry_chem: laundryChem }[f.type] || (() => app.innerHTML = head + '<p class="hint">Этот тип бланка пока не подключён.</p>'))();
 })();
-</script><script src="idle.js"></script>
+</script><script src="compat.js"></script>
+<script src="idle.js"></script>
 <script src="pwa.js"></script>
 </body></html>

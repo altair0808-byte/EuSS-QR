@@ -63,7 +63,7 @@ function withPw(title, text, run) {
     const login = showLogin(session ? session.user.email : '');
     const E = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
     const d = document.createElement('div');
-    d.style.cssText = 'position:fixed;inset:0;z-index:120;display:flex;align-items:center;justify-content:center;padding:1rem;background:rgb(10 40 55/.45)';
+    d.style.cssText = 'position:fixed;top:0;right:0;bottom:0;left:0;z-index:120;display:flex;align-items:center;justify-content:center;padding:1rem;background:rgb(10 40 55/.45)';
     d.innerHTML = `<form role="dialog" aria-modal="true" style="width:100%;max-width:22rem;padding:1.25rem;border-radius:.75rem;background:#fff;color:#123;box-shadow:0 20px 50px rgb(0 0 0/.3);font:inherit">
       <p style="margin:0;font-size:.72rem;font-weight:800;text-transform:uppercase;color:#566">Подтверждение паролем</p>
       <h2 style="margin:.25rem 0 0;font-size:1.2rem">${E(title)}</h2>

@@ -21,14 +21,14 @@
 .tw{overflow-x:auto;margin:.5rem 0;border:1px solid var(--ln);border-radius:var(--r);background:var(--card)}
 .tw table{width:100%;border-collapse:collapse;font-size:.84rem}.tw th,.tw td{padding:.45rem .6rem;border-bottom:1px solid var(--ln);text-align:right;white-space:nowrap}
 .tw th:first-child,.tw td:first-child{text-align:left;position:sticky;left:0;background:var(--card)}.tw th{font-size:.68rem;text-transform:uppercase;color:var(--mut)}
-.bad{color:#b42318}.good{color:oklch(.5 .12 160)}
+.bad{color:#b42318}.good{color:#00764c}
 .msg{margin:.6rem 0;padding:.7rem .9rem;border-radius:var(--r);font-size:.88rem}.msg.wr{background:#fff6e0;color:#6b4a00;border:1px solid #f1d58a}.msg.er{background:#fdecea;color:#7a1a12;border:1px solid #f3b8b1}
 .ab{display:flex;flex-wrap:wrap;gap:.5rem;margin:.6rem 0}
 </style></head>
 <body>
 <header class="hd"><div><a class="lg" href="index.html" aria-label="На панель смены"><img src="euss-logo.png" alt="EuSS"><span class="sep"></span><span class="sub">Закрытия</span></a><nav class="nav"><a class="btn s" href="report.html">Отчёт по сменам</a><a class="btn s" href="index.html">← Панель</a></nav></div></header>
 <main class="wide">
-<div class="top" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.75rem"><h1>Отчёт по закрытиям</h1><a class="btn" id="tocl" href="closing.html" hidden>⚖ Новое закрытие</a></div>
+<div class="top" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.75rem"><h1>Отчёт по закрытиям</h1><a class="btn" id="tocl" href="closing.html" hidden><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v17M7 21h10M4 7h16"/><path d="M4 7l-2.5 6.5a3 3 0 0 0 5 0zM20 7l-2.5 6.5a3 3 0 0 0 5 0z"/></svg> Новое закрытие</a></div>
 <div class="seg" role="group" aria-label="Вид"><button data-v="list" class="on">Закрытия</button><button data-v="months">Динамика по месяцам</button></div>
 <div id="out"><p class="hint">Загрузка…</p></div>
 </main>
@@ -71,7 +71,7 @@ function card(c){
   const s=c.snapshot,E=etalon(),P=prevOf(c);
   let h=`<div class="ab"><button class="btn s" id="back">← Ко всем закрытиям</button></div>
    <h2 style="margin-top:.2rem">${KIND[c.kind]} · ${fmtTs(c.at_ts)} ${c.is_etalon?'<span class="tg2 et">эталон</span>':''}</h2>
-   <p class="hint" style="margin:0">🔒 Данные зафиксированы при закрытии (${fmtTs(c.closed_at)}) и не пересчитываются.</p>`;
+   <p class="hint" style="margin:0"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg> Данные зафиксированы при закрытии (${fmtTs(c.closed_at)}) и не пересчитываются.</p>`;
   if(c.note) h+=`<p class="hint">Комментарий: ${esc(c.note)}</p>`;
   if(c.needs_recalc) h+='<div class="msg er">После закрытия суперадмин поправил запись внутри периода. Цифры ниже — на момент закрытия (в Excel это тоже указано). Пересчитать их может суперадмин кнопкой внизу.</div>';
   if(!s){h+='<p class="hint">Начальный замер: расчёта нет. Остатки:</p>'+await_meas(c)+adminBtns(c);return h;}
@@ -100,7 +100,7 @@ function card(c){
 function await_meas(c){return measTable(c);}
 function measTable(c){const nm={};(refs?.chemicals||[]).forEach(x=>nm[x.id]=x.name);return `<div class="tw"><table><thead><tr><th>Химикат</th><th>Дозатор 1</th><th>Дозатор 2</th></tr></thead><tbody>${Object.entries((c.m||[]).reduce((o,m)=>{(o[m.chemical_id]=o[m.chemical_id]||{})[m.machine_group]=m.amount_kg;return o;},{})).map(([id,v])=>`<tr><td>${esc(nm[id]||id)}</td><td>${v['1_10']==null?'–':f(v['1_10'])} кг</td><td>${v['11_12']==null?'–':f(v['11_12'])} кг</td></tr>`).join('')}</tbody></table></div>`;}
 function adminBtns(c){
-  const b=[`<button class="btn" data-a="xlsx">⬇ Скачать Excel</button>`];
+  const b=[`<button class="btn" data-a="xlsx"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg> Скачать Excel</button>`];
   if(isSuper){
     if(c.kind!=='start'&&!c.is_etalon) b.push('<button class="btn" data-a="etalon">Сделать эталоном</button>');
     if(c.kind!=='start'&&c.needs_recalc) b.push('<button class="btn" data-a="recalc">Пересчитать после правки записи</button>');
@@ -194,6 +194,7 @@ async function load(openId){
   await load(new URLSearchParams(location.search).get('id'));
 })();
 </script>
+<script src="compat.js"></script>
 <script src="idle.js"></script>
 <script src="pwa.js"></script>
 </body></html>

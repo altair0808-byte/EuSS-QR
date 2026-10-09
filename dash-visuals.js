@@ -5,7 +5,7 @@ const Vis = (() => {
   const E = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const N = (n, d = 1) => (Math.round(n * 10 ** d) / 10 ** d).toLocaleString('ru-RU');
   const hue = s => { let h = 0; for (const ch of String(s)) h = (h * 31 + ch.charCodeAt(0)) % 360; return h; };
-  const safeUrl = u => /^https?:\/\/\S+$/i.test(String(u || '').trim()) ? String(u).trim() : '';
+  const safeUrl = u => /^https?:\/\/\S+$/i.test(String(u || '').trim()) ? String(u).trim().replace(/^http:\/\//i, 'https://') : '';
   const prim = c => (+c.bottle_l > 0 ? 'l' : (+c.bottle_kg > 0 ? 'kg' : null));
   const dens = c => (+c.bottle_l > 0 && +c.bottle_kg > 0) ? +c.bottle_kg / +c.bottle_l : null;
   const conv = (c, v, from, to) => { if (from === to) return v; const d = dens(c); if (!d) return null; return from === 'l' ? v * d : v / d; };
@@ -28,13 +28,13 @@ const Vis = (() => {
 .wm-d{font-family:Sora,Manrope,sans-serif;font-size:10px;font-weight:700;fill:#8ff0ff}
 .wm-led{fill:var(--mf);opacity:.35}
 .wm-trk{fill:var(--bd)}.wm-prg{fill:var(--pri)}
-.wm-ring{fill:color-mix(in oklab,var(--pri) 10%,#fff);stroke:color-mix(in oklab,var(--pri) 35%,var(--bd));stroke-width:5}
-.wm-glass{fill:color-mix(in oklab,var(--pri) 6%,#fff)}
-.wm-holes{fill:none;stroke:color-mix(in oklab,var(--pri) 35%,#fff);stroke-width:2.2;stroke-dasharray:1.5 7;stroke-linecap:round}
-.wm-w1{fill:color-mix(in oklab,var(--pri) 62%,#fff);opacity:.8}
+.wm-ring{fill:#ebf5f6;fill:color-mix(in oklab,var(--pri) 10%,#fff);stroke:#98c5cc;stroke:color-mix(in oklab,var(--pri) 35%,var(--bd));stroke-width:5}
+.wm-glass{fill:#f3f9fa;fill:color-mix(in oklab,var(--pri) 6%,#fff)}
+.wm-holes{fill:none;stroke:#b8dae0;stroke:color-mix(in oklab,var(--pri) 35%,#fff);stroke-width:2.2;stroke-dasharray:1.5 7;stroke-linecap:round}
+.wm-w1{fill:#7fbec9;fill:color-mix(in oklab,var(--pri) 62%,#fff);opacity:.8}
 .wm-w2{fill:var(--pri);opacity:.35}
-.wm-c1{fill:color-mix(in oklab,var(--pri) 45%,#fff)}.wm-c2{fill:oklch(.82 .1 60)}.wm-c3{fill:#fff;stroke:var(--bd);stroke-width:1}
-.wm-bub{fill:#fff;opacity:0;stroke:color-mix(in oklab,var(--pri) 40%,#fff);stroke-width:.8}
+.wm-c1{fill:#a3d0d8;fill:color-mix(in oklab,var(--pri) 45%,#fff)}.wm-c2{fill:#f4b581}.wm-c3{fill:#fff;stroke:var(--bd);stroke-width:1}
+.wm-bub{fill:#fff;opacity:0;stroke:#aed5dc;stroke:color-mix(in oklab,var(--pri) 40%,#fff);stroke-width:.8}
 .wm-shine{fill:none;stroke:#fff;stroke-width:3;stroke-linecap:round;opacity:.75}
 .wm.on .wm-led{fill:#2fbf71;opacity:1;animation:wmb 1s steps(2,jump-none) infinite}
 .wm.on .wm-b{animation:wmv .35s linear infinite}
@@ -42,7 +42,7 @@ const Vis = (() => {
 .wm.on .wm-w1{animation:wmw 1.3s linear infinite}
 .wm.on .wm-w2{animation:wmw2 1.9s linear infinite}
 .wm.on .wm-bub{animation:wmup 2.6s ease-in infinite}
-.mc.on .mv{border-color:color-mix(in oklab,var(--pri) 45%,var(--bd))}
+.mc.on .mv{border-color:#88bec7;border-color:color-mix(in oklab,var(--pri) 45%,var(--bd))}
 @keyframes wmspin{to{transform:rotate(360deg)}}
 @keyframes wmw{to{transform:translateX(32px)}}
 @keyframes wmw2{to{transform:translateX(-32px)}}
@@ -65,7 +65,7 @@ const Vis = (() => {
 .cn-tk i:nth-child(1){bottom:25%}.cn-tk i:nth-child(2){bottom:50%}.cn-tk i:nth-child(3){bottom:75%}
 .cn-lab{position:absolute;left:50%;top:50%;z-index:3;display:grid;place-items:center;width:68%;aspect-ratio:1/1.05;transform:translate(-50%,-50%);overflow:hidden;border-radius:.5rem;background:#fff;box-shadow:0 2px 8px rgb(0 0 0/.22)}
 .cn-lab b{font-family:Sora,sans-serif;font-size:1.8rem;color:hsl(var(--h) 45% 32%)}
-.cn-lab img{position:absolute;inset:0;width:100%;height:100%;padding:.2rem;object-fit:contain;background:#fff}
+.cn-lab img{position:absolute;top:0;right:0;bottom:0;left:0;width:100%;height:100%;padding:.2rem;object-fit:contain;background:#fff}
 .cn-sh{position:absolute;left:.35rem;top:.7rem;bottom:.8rem;z-index:4;width:.3rem;border-radius:99px;background:linear-gradient(#fffc,#fff3)}
 .cn-pop{position:absolute;left:50%;top:-1.3rem;z-index:5;transform:translateX(-50%);font-family:Sora,sans-serif;font-size:.9rem;font-weight:700;white-space:nowrap;color:hsl(var(--h) 55% 38%);animation:cnpop 2.6s ease-out forwards;pointer-events:none}
 .cn-in{display:grid;gap:.1rem;width:100%;text-align:center}
@@ -187,7 +187,7 @@ const Vis = (() => {
       <div class="cn-vis"><span class="cn-cap"></span><span class="cn-neck"></span>
         <div class="cn-body"><div class="cn-liq" style="height:${L.pct.toFixed(2)}%"></div>
           <span class="cn-tk"><i></i><i></i><i></i></span>
-          <div class="cn-lab"><b>${E(String(c.name || '?').trim().charAt(0).toUpperCase())}</b>${img ? `<img src="${E(img)}" alt="${E(c.name)}" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}</div>
+          <div class="cn-lab"><b><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 2.5h5v3h-5z"/><path d="M8.5 5.5h7l2 3.2v10.8a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2V8.7z"/><rect x="8.5" y="12" width="7" height="5" rx="1"/></svg></b>${img ? `<img src="${E(img)}" alt="${E(c.name)}" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}</div>
           <span class="cn-sh"></span></div></div>
       <div class="cn-in"><b>${E(c.name)}</b><strong>${N(L.rem)} ${U(L.p)}</strong>
         <small>из ${N(L.cap)} ${U(L.p)} · ${N(L.pct, 0)}%${L.fromLeft ? ' · подключён остаток' : ''}</small>

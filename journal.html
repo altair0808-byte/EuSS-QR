@@ -18,7 +18,7 @@
   <h3 style="margin-top:0">Период</h3>
   <div class="seg" id="pf" role="group" aria-label="Период"><button data-v="0">Эта смена</button><button data-v="3">3 дня</button><button data-v="7">7 дней</button><button data-v="30">30 дней</button></div>
   <h3>Что показывать</h3>
-  <div class="seg" id="ef" role="group" aria-label="Тип записи"><button data-v="all">Все</button><button data-v="load">🧺 Загрузки</button><button data-v="chem">⚗ Химия</button></div>
+  <div class="seg" id="ef" role="group" aria-label="Тип записи"><button data-v="all">Все</button><button data-v="load"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="2.5" width="16" height="19" rx="2.5"/><circle cx="12" cy="13.5" r="4.6"/><path d="M8.7 13.5c1.1-1 2.2 1 3.3 0s2.2 1 3.3 0"/><path d="M7 6h.01M10 6h.01M14 6h4"/></svg> Загрузки</button><button data-v="chem"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 2.5h5v3h-5z"/><path d="M8.5 5.5h7l2 3.2v10.8a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2V8.7z"/><rect x="8.5" y="12" width="7" height="5" rx="1"/></svg> Химия</button></div>
   <div class="seg" id="af" role="group" aria-label="Действие"><button data-v="all">Любое действие</button><button data-v="insert">Добавлено</button><button data-v="update">Исправлено</button><button data-v="delete">Удалено</button></div>
 </div>
 <div id="out"><p class="hint">Загрузка…</p></div>
@@ -63,7 +63,7 @@ function diff(entity,o,n){
 }
 function card(r){
   const e=r.entity,isL=e==='load',isC=e==='chem';
-  const tg=isL?'<span class="tg ld">🧺 Загрузка белья</span>':isC?'<span class="tg ch">⚗ Замена химии</span>':'<span class="tg cn">🔗 Остаток подключён</span>';
+  const tg=isL?'<span class="tg ld"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="2.5" width="16" height="19" rx="2.5"/><circle cx="12" cy="13.5" r="4.6"/><path d="M8.7 13.5c1.1-1 2.2 1 3.3 0s2.2 1 3.3 0"/><path d="M7 6h.01M10 6h.01M14 6h4"/></svg> Загрузка белья</span>':isC?'<span class="tg ch"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 2.5h5v3h-5z"/><path d="M8.5 5.5h7l2 3.2v10.8a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2V8.7z"/><rect x="8.5" y="12" width="7" height="5" rx="1"/></svg> Замена химии</span>':'<span class="tg cn"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg> Остаток подключён</span>';
   const ac={insert:['ad','Добавлено'],update:['up','Исправлено'],delete:['rm','Удалено']}[r.action]||['up',r.action];
   const d=r.action==='delete'?r.old_data:r.new_data;
   const cls=isL?'ld':isC?'ch':'cn';
@@ -106,6 +106,7 @@ document.getElementById('af').onclick=e=>{const b=e.target.closest('button');if(
   nm=Object.fromEntries(((n&&n.data)||[]).map(x=>[x.id,x.name]));
   load();
 })();
-</script><script src="idle.js"></script>
+</script><script src="compat.js"></script>
+<script src="idle.js"></script>
 <script src="pwa.js"></script>
 </body></html>

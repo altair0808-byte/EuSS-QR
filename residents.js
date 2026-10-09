@@ -38,7 +38,7 @@ const Residents = (() => {
 .rs-f button{min-height:3rem;padding:0 1.1rem;border:0;border-radius:.5rem;background:var(--pr);color:#fff;font:inherit;font-weight:700;cursor:pointer}
 .rs-f button:disabled{opacity:.5;cursor:default}
 .rs-m{margin:.5rem 0 0;min-height:1.2em;font-size:.82rem;color:var(--mu)}
-.rs-m.ok{color:oklch(.5 .12 160)}.rs-m.er{color:#b42318}
+.rs-m.ok{color:#00764c}.rs-m.er{color:#b42318}
 @media(max-width:520px){.rs-f{width:100%}.rs-f input{flex:1}}`;
     document.head.appendChild(s);
   }

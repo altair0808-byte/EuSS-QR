@@ -14,7 +14,7 @@
 .sbx{padding:.7rem .9rem;border:1px solid var(--ln);border-radius:var(--r);background:var(--card);box-shadow:var(--sh)}
 .sbx .sl{display:flex;justify-content:space-between;gap:.5rem;font-size:.78rem;color:var(--mut)}.sbx .sl b{color:var(--ink)}
 .sbx .sb2{display:flex;height:.6rem;margin:.4rem 0;border-radius:99px;overflow:hidden;background:var(--tint)}
-.sbx .sb2 i{display:block;background:var(--ac)}.sbx .sb2 i+i{background:oklch(.69 .17 48)}
+.sbx .sb2 i{display:block;background:var(--ac)}.sbx .sb2 i+i{background:#ed7429}
 .sbx>p{margin:0 0 .1rem;font-size:.68rem;font-weight:800;text-transform:uppercase;color:var(--mut)}
 .sgrid{display:grid;gap:.6rem}@media(min-width:720px){.sgrid{grid-template-columns:1fr 1fr}}
 .rtabs{margin:.9rem 0 0}
@@ -22,9 +22,9 @@
 .csum{display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem;margin:.6rem 0}
 .csum div{padding:.65rem .8rem;border:1px solid var(--ln);border-radius:var(--r);background:var(--card);box-shadow:var(--sh)}
 .csum span{display:block;font-size:.66rem;font-weight:800;text-transform:uppercase;color:var(--mut)}.csum b{font-family:Sora,sans-serif;font-size:1.15rem}
-.csum .bad b{color:#b42318}.csum .good b{color:oklch(.5 .12 160)}
+.csum .bad b{color:#b42318}.csum .good b{color:#00764c}
 .cn3{margin:.2rem 0 .6rem;font-size:.75rem;color:var(--mut)}
-.stt td small{display:block;color:var(--mut);font-size:.72rem}.stt td,.stt th{text-align:right;white-space:nowrap}.stt td:first-child,.stt th:first-child{text-align:left;white-space:normal}.stt .stk{background:oklch(.97 .03 80)}
+.stt td small{display:block;color:var(--mut);font-size:.72rem}.stt td,.stt th{text-align:right;white-space:nowrap}.stt td:first-child,.stt th:first-child{text-align:left;white-space:normal}.stt .stk{background:#fff4e1}
 .cmw{display:grid;gap:.6rem}.cmw .cm+.cm{margin-top:0}@media(min-width:1000px){.cmw{grid-template-columns:1fr 1fr}}
 .wb .bz{width:38%}.wb .bz span{display:block;height:.55rem;border-radius:99px;background:var(--tint);overflow:hidden}.wb .bz i{display:block;height:100%;border-radius:99px;background:var(--ac)}
 .wb td:last-child,.wb th:last-child{text-align:right;white-space:nowrap}
@@ -34,7 +34,7 @@
 <body>
 <header class="hd"><div><a class="lg" href="index.html" aria-label="На панель смены"><img src="euss-logo.png" alt="EuSS"><span class="sep"></span><span class="sub">Отчёты</span></a><nav class="nav"><a class="btn s" href="index.html">← Панель</a></nav></div></header>
 <main class="wide">
-<div class="top" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.75rem"><h1>Отчёт по сменам</h1><span><a class="btn" id="tocl" href="closings-report.html" hidden>⚖ Закрытия</a> <a class="btn" href="journal.html">☰ Журнал изменений</a></span></div>
+<div class="top" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.75rem"><h1>Отчёт по сменам</h1><span><a class="btn" id="tocl" href="closings-report.html" hidden><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v17M7 21h10M4 7h16"/><path d="M4 7l-2.5 6.5a3 3 0 0 0 5 0zM20 7l-2.5 6.5a3 3 0 0 0 5 0z"/></svg> Закрытия</a> <a class="btn" href="journal.html"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg> Журнал изменений</a></span></div>
 <div class="box">
   <div class="acc"><label>С даты смены<input type="date" id="d1"></label><label>По дату смены<input type="date" id="d2"></label></div>
   <div class="seg" role="group" aria-label="Период"><button id="t">Сегодня</button><button id="y">Вчера</button><button id="w">7 дней</button><button id="mo">Этот месяц</button><button id="pm">Прошлый месяц</button></div>
@@ -127,7 +127,7 @@ function draw(){
   const chL=g=>g.chem.filter(c=>c.kind==='main').reduce((x,c)=>x+(c.theory?.l||0),0);
   let body;
   if(tabR==='ops')body=`<div class="gh"><h2>Журнал операций</h2></div><p class="hint">Синие записи — загрузка белья, оранжевые — замена химии, фиолетовые — подключение остатка.</p>
-    <div class="seg" id="kf" role="group" aria-label="Что показывать"><button data-v="all">Все</button><button data-v="ld">🧺 Загрузки</button><button data-v="ch">⚗ Химия</button></div>
+    <div class="seg" id="kf" role="group" aria-label="Что показывать"><button data-v="all">Все</button><button data-v="ld"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="2.5" width="16" height="19" rx="2.5"/><circle cx="12" cy="13.5" r="4.6"/><path d="M8.7 13.5c1.1-1 2.2 1 3.3 0s2.2 1 3.3 0"/><path d="M7 6h.01M10 6h.01M14 6h4"/></svg> Загрузки</button><button data-v="ch"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 2.5h5v3h-5z"/><path d="M8.5 5.5h7l2 3.2v10.8a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2V8.7z"/><rect x="8.5" y="12" width="7" height="5" rx="1"/></svg> Химия</button></div>
     <div class="ops" id="opsw" style="margin-top:.75rem"></div>`;
   else body=groupBlock(tabR==='all'?'Итого · оба дозатора':tabR==='1_10'?'Дозатор 1 · машины 1–10':'Дозатор 2 · машины 11–12',r.groups[tabR]);
   $('#out').innerHTML=`<div class="rv"><div class="kpi"><div><b>${r.total}</b><span>стирок всего</span></div><div><b>${f(r.kg,0)}</b><span>кг всего</span></div><div><b>${r.total?Num.fmt(r.kg/r.total,1):'–'}</b><span>средний вес, кг</span></div><div><b>${f(chL(A))} л</b><span>химия, теория</span></div></div>
@@ -160,7 +160,7 @@ function renderOps(){
     .filter(i=>kindF==='all'||(kindF==='ld'?i.k==='ld':i.k!=='ld')).sort((a,b)=>new Date(b.ts)-new Date(a.ts));
   const shown=all.slice(0,300);
   document.querySelectorAll('#kf button').forEach(b=>{const on=b.dataset.v===kindF;b.classList.toggle('on',on);b.setAttribute('aria-pressed',on);});
-  const act=(k,id,ed)=>canEdit?`<div class="act"><button class="mini" data-${ed}="${id}">✎ Изменить</button><button class="mini danger" data-del="${id}" data-k="${k}">🗑 Удалить</button></div>`:'';
+  const act=(k,id,ed)=>canEdit?`<div class="act"><button class="mini" data-${ed}="${id}"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20l1-5L16 4l4 4L9 19zM13 7l4 4"/></svg> Изменить</button><button class="mini danger" data-del="${id}" data-k="${k}"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg> Удалить</button></div>`:'';
   let day='';
   const html=shown.map(i=>{
     const o=i.o,by=who(o.created_by),byT=by?' · внёс: '+esc(by):'',sd=o.shift_date;
@@ -168,7 +168,7 @@ function renderOps(){
     if(i.k==='ld'){
       byId[o.id]=o;
       const ex=Object.entries(o.extras||{}).map(([id,q])=>{const c=refs.chemicals.find(x=>String(x.id)===String(id));return c?esc(c.name)+': '+q+' шт':''}).filter(Boolean).join(', ');
-      return head+`<article class="op ld"><div class="r1"><span class="tg ld">🧺 Загрузка белья</span><span class="tm">${o.part==='night'?'ночь':'день'} · ${hhmm(o.ts)}</span></div>
+      return head+`<article class="op ld"><div class="r1"><span class="tg ld"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="2.5" width="16" height="19" rx="2.5"/><circle cx="12" cy="13.5" r="4.6"/><path d="M8.7 13.5c1.1-1 2.2 1 3.3 0s2.2 1 3.3 0"/><path d="M7 6h.01M10 6h.01M14 6h4"/></svg> Загрузка белья</span><span class="tm">${o.part==='night'?'ночь':'день'} · ${hhmm(o.ts)}</span></div>
         <div class="tt">Машина ${o.machine} · ${esc(wn[o.wash_type_id]||'вид '+o.wash_type_id)} · ${f(o.weight_kg)} кг</div>
         <div class="mt">дозатор ${o.machine<=10?'1–10':'11–12'}${ex?' · '+ex:''}${byT}${o.edited_at?' · <b>исправлено</b>':''}</div>${act('ld',o.id,'ed')}</article>`;
     }
@@ -176,12 +176,12 @@ function renderOps(){
       byCh[o.id]=o;
       const left=+o.leftover_l>0?f(o.leftover_l)+' л':+o.leftover_kg>0?f(o.leftover_kg)+' кг':'бутыль пустая';
       const has=+o.leftover_l>0||+o.leftover_kg>0;
-      return head+`<article class="op ch"><div class="r1"><span class="tg ch">⚗ Замена химии</span><span class="tm">${hhmm(o.ts)}</span></div>
+      return head+`<article class="op ch"><div class="r1"><span class="tg ch"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 2.5h5v3h-5z"/><path d="M8.5 5.5h7l2 3.2v10.8a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2V8.7z"/><rect x="8.5" y="12" width="7" height="5" rx="1"/></svg> Замена химии</span><span class="tm">${hhmm(o.ts)}</span></div>
         <div class="tt">${esc(cn2[o.chemical_id]||'Химия')} · дозатор ${o.machine_group==='11_12'?'11–12':'1–10'}</div>
         <div class="mt">остаток: ${left}${has?(o.connect_id?' · <b>подключён</b>':o.written_off_at?'':' · в запасе'):''}${byT}${o.edited_at?' · <b>исправлено</b>':''}</div>${act('ch',o.id,'edc')}</article>`;
     }
     const amt=+o.amount_l>0?f(o.amount_l)+' л':+o.amount_kg>0?f(o.amount_kg)+' кг':'';
-    return head+`<article class="op cn"><div class="r1"><span class="tg cn">🔗 Остаток подключён</span><span class="tm">${hhmm(o.ts)}</span></div>
+    return head+`<article class="op cn"><div class="r1"><span class="tg cn"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg> Остаток подключён</span><span class="tm">${hhmm(o.ts)}</span></div>
       <div class="tt">${esc(cn2[o.chemical_id]||'Химия')} · ${amt} → дозатор ${o.machine_group==='11_12'?'11–12':'1–10'}</div>
       <div class="mt">объединено остатков: ${o.n}${byT}</div></article>`;
   }).join('');
@@ -298,6 +298,7 @@ $('#w').onclick=()=>setRange(addDays(shiftToday(),-6),shiftToday());
   refs={water:g('water_l')??55,washTypes:w.data||[],chemicals:c.data||[],recipes:r.data||[]};
   setRange(shiftToday(),shiftToday());
 })();
-</script><script src="idle.js"></script>
+</script><script src="compat.js"></script>
+<script src="idle.js"></script>
 <script src="pwa.js"></script>
 </body></html>

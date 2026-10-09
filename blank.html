@@ -19,8 +19,8 @@
 .sum small{display:block;font-size:.75rem;color:var(--mut)}
 @media(max-width:639px){.sum{grid-template-columns:1fr 1fr}.sum>div:nth-child(3){border-left:0}.sum>div:nth-child(n+3){border-top:1px solid var(--ln)}.sum b{font-size:1.15rem}}
 .okl{margin:.6rem 0 0;font-size:.82rem;color:var(--mut)}.okl::before{content:"✓ ";color:var(--good);font-weight:800}
-details.cx{margin:.6rem 0 0;border:1px solid color-mix(in oklab,oklch(.69 .17 48) 45%,var(--ln));border-radius:var(--r);background:color-mix(in oklab,oklch(.69 .17 48) 7%,#fff)}
-details.cx.bad{border-color:color-mix(in oklab,var(--bad) 40%,var(--ln));background:color-mix(in oklab,var(--bad) 5%,#fff)}
+details.cx{margin:.6rem 0 0;border:1px solid #e2b296;border:1px solid color-mix(in oklab,#ed7429 45%,var(--ln));border-radius:var(--r);background:#fff6f1;background:color-mix(in oklab,#ed7429 7%,#fff)}
+details.cx.bad{border-color:#e39e95;border-color:color-mix(in oklab,var(--bad) 40%,var(--ln));background:#fff5f4;background:color-mix(in oklab,var(--bad) 5%,#fff)}
 details.cx>summary{padding:.6rem .9rem;cursor:pointer;font-size:.88rem;font-weight:700;list-style:none}
 details.cx>summary::-webkit-details-marker{display:none}
 details.cx>div{padding:.1rem .9rem .6rem;font-size:.85rem}details.cx>div+div{border-top:1px dashed var(--ln);padding-top:.5rem}
@@ -30,18 +30,18 @@ details.cx span{display:block;color:var(--mut);font-size:.8rem}
 .tw{border:1px solid var(--ln);border-radius:var(--r);background:#fff;box-shadow:var(--sh);overflow-x:auto}
 .tw.scroll{max-height:70vh;overflow:auto}
 .t2{width:100%;border-collapse:collapse;font-size:.86rem;font-variant-numeric:tabular-nums}
-.t2 th,.t2 td{padding:.34rem .65rem;text-align:right;white-space:nowrap;border-top:1px solid color-mix(in oklab,var(--ln) 60%,#fff)}
+.t2 th,.t2 td{padding:.34rem .65rem;text-align:right;white-space:nowrap;border-top:1px solid #e1ebec;border-top:1px solid color-mix(in oklab,var(--ln) 60%,#fff)}
 .t2 thead th{position:sticky;top:0;z-index:1;background:var(--soft);border-top:0;font-size:.68rem;font-weight:800;text-transform:uppercase;color:var(--mut)}
 .t2 thead tr+tr th{top:1.85rem}
 .t2 th.l,.t2 td.l{text-align:left}
 .t2 tbody th{font-weight:600;color:var(--ink)}
-.t2 .z{color:color-mix(in oklab,var(--mut) 40%,#fff)}
+.t2 .z{color:#b6c3c7;color:color-mix(in oklab,var(--mut) 40%,#fff)}
 .t2 .dim{color:var(--mut);font-weight:500}
 .t2 tr.sub th,.t2 tr.sub td{background:var(--soft);font-weight:700;border-top:1px solid var(--ln)}
 .t2 tr.tot th,.t2 tr.tot td{background:var(--tint);font-weight:800;border-top:2px solid var(--ink)}
 .t2 tfoot th,.t2 tfoot td{position:sticky;bottom:0;background:var(--tint);font-weight:800;border-top:2px solid var(--ink)}
-.t2 tr.flag th,.t2 tr.flag td{background:color-mix(in oklab,oklch(.69 .17 48) 9%,#fff)}
-.t2 tr.miss th,.t2 tr.miss td{background:color-mix(in oklab,oklch(.69 .17 48) 8%,#fff)}
+.t2 tr.flag th,.t2 tr.flag td{background:#fff3ed;background:color-mix(in oklab,#ed7429 9%,#fff)}
+.t2 tr.miss th,.t2 tr.miss td{background:#fff4ef;background:color-mix(in oklab,#ed7429 8%,#fff)}
 .t2 td.none{text-align:left;color:var(--mut);font-size:.8rem}
 .t2 tr.go-day{cursor:pointer}.t2 tr.go-day:hover th,.t2 tr.go-day:hover td{background:var(--soft)}
 .t2 th a{color:var(--ac-d);text-decoration:underline;text-underline-offset:2px}
@@ -66,7 +66,7 @@ details.det{margin-top:.75rem}
     <div class="seg" role="group" aria-label="Период"><button id="mt">Этот месяц</button><button id="mp">Прошлый месяц</button></div>
   </div>
   <p class="hint" id="msg"></p>
-  <button class="go" id="x" style="margin-top:.5rem">⬇ Скачать Excel за месяц</button>
+  <button class="go" id="x" style="margin-top:.5rem"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg> Скачать Excel за месяц</button>
 </div>
 <div id="out"><p class="hint">Загрузка…</p></div>
 </main>
@@ -130,7 +130,7 @@ function chkLine(out) {
   const ok = out.filter(c => c.k === 'ok'), bad = out.filter(c => c.k === 'bad'), warn = out.filter(c => c.k === 'warn'), n = bad.length + warn.length;
   const line = ok.length ? `<p class="okl">${ok.map(c => c.t).join(' · ')}</p>` : '';
   if (!n) return line;
-  return `${line}<details class="cx${bad.length ? ' bad' : ''}"${bad.length ? ' open' : ''}><summary>${bad.length ? '✕' : '⚠'} Замечаний: ${n}</summary>${[...bad, ...warn].map(c => `<div><b>${c.t}</b>${c.n ? `<span>${c.n}</span>` : ''}</div>`).join('')}</details>`;
+  return `${line}<details class="cx${bad.length ? ' bad' : ''}"${bad.length ? ' open' : ''}><summary>${bad.length ? '✕' : '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l10 18H2zM12 10v5M12 18h.01"/></svg>'} Замечаний: ${n}</summary>${[...bad, ...warn].map(c => `<div><b>${c.t}</b>${c.n ? `<span>${c.n}</span>` : ''}</div>`).join('')}</details>`;
 }
 const tabBar = (g, items) => `<div class="seg tabs2" data-tabs="${g}" role="tablist">${items.map(([v, l]) => `<button role="tab" data-tab="${v}" aria-selected="${v === tabState[g]}" class="${v === tabState[g] ? 'on' : ''}">${l}</button>`).join('')}</div>`;
 function setTab(g, v) {
@@ -286,7 +286,7 @@ async function mountStats(d1, d2, data, my) {
 async function showMonth() {
   const my = ++seq; if (!ym) return;
   $('#ttl').textContent = 'Отчёт за ' + ymLabel(ym);
-  $('#x').textContent = '⬇ Скачать Excel за ' + ymLabel(ym);
+  $('#x').textContent = 'Скачать Excel за ' + ymLabel(ym);
   $('#msg').textContent = `Смена начинается в ${String(st).padStart(2, '0')}:00 и длится сутки; ночная часть после полуночи входит в смену предыдущего дня. Машины 1–10 и 11–12 считаются отдельно.`;
   $('#out').innerHTML = '<p class="hint">Загрузка…</p>';
   try {
@@ -304,7 +304,7 @@ async function showDay() {
   const date = $('#d').value, my = ++seq;
   if (!date) return;
   $('#ttl').textContent = 'Смена ' + longDate(date);
-  $('#x').textContent = '⬇ Скачать Excel за месяц';
+  $('#x').textContent = 'Скачать Excel за месяц';
   $('#msg').textContent = `Смена начинается в ${String(st).padStart(2, '0')}:00 и длится сутки: день ${String(st).padStart(2, '0')}:00–${String((st + 12) % 24).padStart(2, '0')}:00, ночь до ${String(st).padStart(2, '0')}:00.`;
   try {
     const data = await loads(date, date);
@@ -399,6 +399,7 @@ $('#out').onclick = e => { const t = e.target.closest('[data-tab]'); if (t) { se
   const qm = q.get('m');                                           // blank.html?m=2026-10 открывает месяц сразу
   if (/^\d{4}-(0[1-9]|1[0-2])$/.test(qm || '')) { ym = qm; setMode('month'); } else go(shiftToday());
 })();
-</script><script src="idle.js"></script>
+</script><script src="compat.js"></script>
+<script src="idle.js"></script>
 <script src="pwa.js"></script>
 </body></html>

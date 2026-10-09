@@ -59,7 +59,7 @@ const ClosingDash = (() => {
       const t = new Date(today + 'T00:00:00Z');
       el.innerHTML = `<section aria-label="Текущий период по замерам" style="margin:1rem 0">
         <div style="display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:.5rem"><p class="gl" style="margin:0">Текущий период по замерам · ${t.getUTCDate()} ${MON[t.getUTCMonth()]}</p>
-        <span><a class="btn s" href="closings-report.html">Закрытия</a> <a class="btn s" href="closing.html">⚖ Закрыть</a></span></div>
+        <span><a class="btn s" href="closings-report.html">Закрытия</a> <a class="btn s" href="closing.html"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v17M7 21h10M4 7h16"/><path d="M4 7l-2.5 6.5a3 3 0 0 0 5 0zM20 7l-2.5 6.5a3 3 0 0 0 5 0z"/></svg> Закрыть</a></span></div>
         ${rem ? `<div style="margin:.5rem 0;padding:.65rem .85rem;border:1px solid var(--ln);border-radius:var(--r);background:${col};font-size:.9rem;font-weight:600">${E(rem.text)}</div>` : ''}
         ${stats}${et ? `<p class="hint" style="margin:.4rem 0 0">${E(et)}</p>` : ''}</section>`;
       cache.html = el.innerHTML; const cur = document.getElementById('clp'); if (cur && cur !== el) cur.innerHTML = cache.html;

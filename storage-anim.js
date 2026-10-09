@@ -75,8 +75,8 @@ const StorageAnim = (() => {
       const c = D.chems[sel], d = dens(c), g = G[j], last = [...D.ch, ...D.cn].filter(x => +x.chemical_id === +c.id && (x.machine_group || '1_10') === g).map(T).sort((a, b) => a - b).pop();
       const now = Date.now(), def = Math.min(now, last || D.d0), ov = document.createElement('div');
       let exact = def;   // точный момент в мс; поле datetime-local режет секунды и уводило уровень раньше замены
-      ov.style.cssText = 'position:fixed;inset:0;z-index:90;display:flex;align-items:center;justify-content:center;background:rgb(0 0 0/.35);padding:1rem';
-      ov.innerHTML = `<section role="dialog" aria-modal="true" style="background:#fff;color:#123;border-radius:.75rem;max-width:26rem;width:100%;padding:1.1rem;max-height:92dvh;overflow:auto;box-shadow:0 20px 50px rgb(0 0 0/.3)">
+      ov.style.cssText = 'position:fixed;top:0;right:0;bottom:0;left:0;z-index:90;display:flex;align-items:center;justify-content:center;background:rgb(0 0 0/.35);padding:1rem';
+      ov.innerHTML = `<section role="dialog" aria-modal="true" style="background:#fff;color:#123;border-radius:.75rem;max-width:26rem;width:100%;padding:1.1rem;max-height:92vh;max-height:92dvh;overflow:auto;box-shadow:0 20px 50px rgb(0 0 0/.3)">
         <h3 style="margin:0 0 .3rem">${E(c.name)} · дозатор ${GN[j]}</h3>
         <p class="hint" style="margin:0 0 .7rem">Сколько в дозаторе было на выбранный момент (до стирок). Все стирки после него система вычтет сама, и покажет реальный остаток.</p>
         <label style="display:block;font-weight:600;margin-bottom:.2rem">Сколько было</label>
@@ -109,8 +109,8 @@ const StorageAnim = (() => {
     // окно «Добавить химию» (только суперадмин): любое количество, не обязательно целая бутыль
     function addPanel(j) {
       const c = D.chems[sel], d = dens(c), g = G[j], cap = +c.bottle_l, cur = S.lvl[sel][j], ov = document.createElement('div');
-      ov.style.cssText = 'position:fixed;inset:0;z-index:90;display:flex;align-items:center;justify-content:center;background:rgb(0 0 0/.35);padding:1rem';
-      ov.innerHTML = `<section role="dialog" aria-modal="true" style="background:#fff;color:#123;border-radius:.75rem;max-width:26rem;width:100%;padding:1.1rem;max-height:92dvh;overflow:auto;box-shadow:0 20px 50px rgb(0 0 0/.3)">
+      ov.style.cssText = 'position:fixed;top:0;right:0;bottom:0;left:0;z-index:90;display:flex;align-items:center;justify-content:center;background:rgb(0 0 0/.35);padding:1rem';
+      ov.innerHTML = `<section role="dialog" aria-modal="true" style="background:#fff;color:#123;border-radius:.75rem;max-width:26rem;width:100%;padding:1.1rem;max-height:92vh;max-height:92dvh;overflow:auto;box-shadow:0 20px 50px rgb(0 0 0/.3)">
         <p class="hint" style="margin:0;font-weight:800;text-transform:uppercase;font-size:.7rem">Только суперадмин</p>
         <h3 style="margin:.15rem 0 .3rem">Добавить химию · ${E(c.name)} · дозатор ${GN[j]}</h3>
         <p class="hint" style="margin:0 0 .7rem">Укажите любое количество, не обязательно целая бутыль. Оно запишется как поступление в запас и сразу зальётся в этот дозатор: уровень дозатора вырастет, общий запас не изменится.</p>
@@ -143,8 +143,8 @@ const StorageAnim = (() => {
     // окно «Поступление»: химия приходит в общий запас; при желании сразу заливается в дозатор
     function overlay(html) {
       const ov = document.createElement('div');
-      ov.style.cssText = 'position:fixed;inset:0;z-index:90;display:flex;align-items:center;justify-content:center;background:rgb(0 0 0/.35);padding:1rem';
-      ov.innerHTML = `<section role="dialog" aria-modal="true" style="background:#fff;color:#123;border-radius:.75rem;max-width:26rem;width:100%;padding:1.1rem;max-height:92dvh;overflow:auto;box-shadow:0 20px 50px rgb(0 0 0/.3)">${html}</section>`;
+      ov.style.cssText = 'position:fixed;top:0;right:0;bottom:0;left:0;z-index:90;display:flex;align-items:center;justify-content:center;background:rgb(0 0 0/.35);padding:1rem';
+      ov.innerHTML = `<section role="dialog" aria-modal="true" style="background:#fff;color:#123;border-radius:.75rem;max-width:26rem;width:100%;padding:1.1rem;max-height:92vh;max-height:92dvh;overflow:auto;box-shadow:0 20px 50px rgb(0 0 0/.3)">${html}</section>`;
       document.body.appendChild(ov);
       const close = () => { ov.remove(); document.removeEventListener('keydown', esc); }, esc = e => { if (e.key === 'Escape') close(); };
       document.addEventListener('keydown', esc); ov.onmousedown = e => { if (e.target === ov) close(); };

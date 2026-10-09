@@ -61,8 +61,8 @@ const num = v => v === '' ? null : +v;
 const done = e => { toast(e ? 'Не сохранено: ' + e.message : 'Сохранено'); return !e; };
 let chems = [], wts = [], rec = [];
 const hue = s => { let h = 0; for (const ch of String(s)) h = (h * 31 + ch.charCodeAt(0)) % 360; return h; };
-const safeUrl = u => /^https?:\/\/\S+$/i.test(String(u || '').trim()) ? String(u).trim() : '';
-const chemImg = x => `<span class="ci sm" style="--h:${hue(x.name)}"><span class="lt">${esc(String(x.name || '?').trim().charAt(0).toUpperCase())}</span>${safeUrl(x.image_url) ? `<img src="${esc(safeUrl(x.image_url))}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ''}</span>`;
+const safeUrl = u => /^https?:\/\/\S+$/i.test(String(u || '').trim()) ? String(u).trim().replace(/^http:\/\//i, 'https://') : '';
+const chemImg = x => `<span class="ci sm" style="--h:${hue(x.name)}"><span class="lt"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 2.5h5v3h-5z"/><path d="M8.5 5.5h7l2 3.2v10.8a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2V8.7z"/><rect x="8.5" y="12" width="7" height="5" rx="1"/></svg></span>${safeUrl(x.image_url) ? `<img src="${esc(safeUrl(x.image_url))}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ''}</span>`;
 const imgFallback = root => root.querySelectorAll('.ci img').forEach(i => { i.onerror = () => i.remove(); });
 
 async function load() {
@@ -181,6 +181,7 @@ $('#fa').onclick = async () => {
   if (!pr || pr.role !== 'superadmin') { location.replace('index.html'); return; }
   load();
 })();
-</script><script src="idle.js"></script>
+</script><script src="compat.js"></script>
+<script src="idle.js"></script>
 <script src="pwa.js"></script>
 </body></html>

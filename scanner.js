@@ -18,10 +18,10 @@ const QrScan = (() => {
   function open(onCode) {
     const ov = document.createElement('div');
     ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true'); ov.setAttribute('aria-label', 'Сканирование QR-кода');
-    ov.style.cssText = 'position:fixed;inset:0;z-index:300;background:#000;display:flex;flex-direction:column;color:#fff;font:600 1rem Manrope,system-ui,sans-serif';
-    ov.innerHTML = `<video playsinline muted style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover"></video>
-      <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none">
-        <div style="width:min(70vw,70vh,18rem);aspect-ratio:1;border:4px solid #fff;border-radius:1rem;box-shadow:0 0 0 100vmax rgb(0 0 0/.55)"></div></div>
+    ov.style.cssText = 'position:fixed;top:0;right:0;bottom:0;left:0;z-index:300;background:#000;display:flex;flex-direction:column;color:#fff;font:600 1rem Manrope,system-ui,sans-serif';
+    ov.innerHTML = `<video playsinline muted style="position:absolute;top:0;right:0;bottom:0;left:0;width:100%;height:100%;object-fit:cover"></video>
+      <div style="position:absolute;top:0;right:0;bottom:0;left:0;display:flex;align-items:center;justify-content:center;pointer-events:none">
+        <div style="width:70vmin;height:70vmin;max-width:18rem;max-height:18rem;border:4px solid #fff;border-radius:1rem;box-shadow:0 0 0 100vmax rgb(0 0 0/.55)"></div></div>
       <div style="position:relative;padding:calc(1rem + env(safe-area-inset-top)) 1rem 0;text-align:center;text-shadow:0 1px 4px #000">
         <p style="margin:0">Поднесите бейдж к камере</p><p data-msg style="margin:.4rem 0 0;font-size:.9rem;min-height:1.3em;color:#ffd8d8"></p></div>
       <div style="position:relative;margin-top:auto;display:flex;gap:.6rem;padding:1rem 1rem calc(1rem + env(safe-area-inset-bottom))">
