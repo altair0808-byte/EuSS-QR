@@ -13,8 +13,9 @@
 <style>
 .bt{display:flex;flex-wrap:wrap;gap:.5rem;margin:.75rem 0 1rem}
 .bt .mini,.bt .go{width:auto;margin:0;padding:0 1rem;min-height:2.75rem}
-.rw{display:flex;align-items:center;gap:.75rem;padding:.7rem .8rem;margin-top:.5rem;border:1px solid var(--ln,#d5e1e4);border-radius:.5rem;background:#fff}
-.rw .nm{flex:1;min-width:0}.rw .nm b{display:block;overflow-wrap:anywhere}.rw .nm small{color:#566}
+.rw{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem .75rem;padding:.7rem .8rem;margin-top:.5rem;border:1px solid var(--ln,#d5e1e4);border-radius:.5rem;background:#fff}
+.rw .nm{flex:1 1 10rem;min-width:0}.rw .ac{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem}
+@media(max-width:639px){.rw .ac{flex:1 0 100%}.rw .ac .mini{flex:1 1 auto}}.rw .nm b{display:block;overflow-wrap:anywhere}.rw .nm small{color:#566}
 .rw input[type=checkbox]{width:1.4rem;height:1.4rem;flex:none}
 .rw .st{font-size:.75rem;font-weight:800;padding:.2rem .5rem;border-radius:99px;background:#eef3f4;color:#566;white-space:nowrap}
 .rw .st.ok{background:#e3f6ea;color:#176b3a}
@@ -48,7 +49,7 @@
 <header class="hd"><div><a class="lg" href="index.html" aria-label="На панель смены"><img src="euss-logo.png" alt="EuSS"><span class="sep"></span><span class="sub">Бейджи QR</span></a><nav class="nav"><a class="btn s" href="admin.html">Пользователи</a><a class="btn s" href="index.html">← Панель</a></nav></div></header>
 <main class="wide">
 <div class="top"><h1>Бейджи для входа по QR</h1></div>
-<p class="hint">У каждого сотрудника свой QR-код. Сотрудник нажимает на экране входа значок QR и подносит бейдж к камере. Новый QR отключает старый. Админам и суперадмину вход по QR недоступен, они в списке не показаны.</p>
+<p class="hint">У каждого сотрудника свой QR-код. Сотрудник нажимает на экране входа значок QR и подносит бейдж к камере. Новый QR отключает старый. QR есть и у админов, и у суперадмина. Видит и создаёт QR только суперадмин. Кнопка «Показать» открывает QR картинкой: её можно отправить в WhatsApp или сохранить.</p>
 <p class="hint" id="warn" hidden></p>
 <div class="bt">
   <button class="mini" id="mkAll" type="button">Создать QR всем, у кого его нет</button>
@@ -61,28 +62,36 @@
 <div id="sheet" aria-hidden="true"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="config.js"></script><script src="app.js"></script>
+<script src="config.js"></script><script src="app.js"></script><script src="badge-share.js"></script>
 <script>
 const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 let people = [], badges = {}, picked = new Set();
 
-const newCode = () => {
-  const a = new Uint8Array(24); crypto.getRandomValues(a);
-  return btoa(String.fromCharCode(...a)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');   // 32 символа
-};
+const newCode = BadgeShare.newCode;
+let roleOf = {};   // id -> 'super' | 'admin'
+const roleName = id => roleOf[id] === 'super' ? 'суперадмин' : roleOf[id] === 'admin' ? 'админ' : '';
 
 async function load() {
-  // list_accounts (stage11.sql) заодно добавляет в people тех, кого создали вручную в Supabase; без неё читаем people напрямую
+  // list_accounts (stage11.sql) отдаёт все аккаунты; если её нет, берём таблицу people и добавляем админов/суперадмина по ролям
   const acc = await sb.rpc('list_accounts');
-  const [{ data: ppl, error: pe }, { data: sup }, { data: adm }, { data: bg, error: be }] = await Promise.all([
+  const [pp, { data: sup }, { data: adm }, { data: bg, error: be }, { data: { session } }] = await Promise.all([
     acc.error ? sb.from('people').select('id,email,full_name').order('created_at') : Promise.resolve({ data: (acc.data || []).map(a => ({ id: a.acc_id, email: a.acc_email, full_name: a.acc_name })) }),
     sb.from('profiles').select('id').eq('role', 'superadmin'),
     sb.from('form_access').select('user_id').eq('role', 'admin'),
-    sb.from('badges').select('user_id,code,created_at,last_used_at')]);
-  if (be) { $('#warn').hidden = false; $('#warn').textContent = 'Сначала выполните stage20.sql в Supabase (SQL Editor). Ошибка: ' + be.message; }
-  if (pe && !be) { $('#warn').hidden = false; $('#warn').textContent = 'Не удалось загрузить список сотрудников: ' + pe.message; }
-  const skip = new Set([...(sup || []).map(x => x.id), ...(adm || []).map(x => x.user_id)]);
-  people = (ppl || []).filter(p => p.email && !skip.has(p.id));
+    sb.from('badges').select('user_id,code,created_at,last_used_at'),
+    sb.auth.getSession()]);
+  const ppl = (pp.data || []).slice(), pe = pp.error;
+  const warn = [];
+  if (be) warn.push('Сначала выполните stage20.sql в Supabase (SQL Editor). Ошибка: ' + be.message);
+  if (pe) warn.push('Не удалось загрузить список аккаунтов: ' + pe.message);
+  if (acc.error) warn.push('Не выполнен stage11.sql (' + acc.error.message + '): часть аккаунтов может быть не видна. Выполните stage11.sql в Supabase.');
+  roleOf = {}; (adm || []).forEach(x => roleOf[x.user_id] = 'admin'); (sup || []).forEach(x => roleOf[x.id] = 'super');
+  // кто имеет роль, но не попал в список: добавляем, чтобы не пропадали
+  const have = new Set(ppl.map(p => p.id));
+  if (session && !have.has(session.user.id)) { ppl.push({ id: session.user.id, email: session.user.email, full_name: null }); have.add(session.user.id); }
+  Object.keys(roleOf).forEach(id => { if (!have.has(id)) { ppl.push({ id, email: 'id-' + id.slice(0, 8), full_name: null }); have.add(id); } });
+  $('#warn').hidden = !warn.length; $('#warn').textContent = warn.join(' ');
+  people = ppl.filter(p => p.email).sort((a, b) => ({ super: 0, admin: 1 }[roleOf[a.id]] ?? 2) - ({ super: 0, admin: 1 }[roleOf[b.id]] ?? 2));
   badges = {}; (bg || []).forEach(b => badges[b.user_id] = b);
   [...picked].forEach(id => { if (!badges[id]) picked.delete(id); });
   draw();
@@ -95,11 +104,11 @@ function draw() {
   $('#list').innerHTML = list.length ? list.map(p => {
     const b = badges[p.id];
     return `<div class="rw"><input type="checkbox" data-pick="${p.id}" ${b ? '' : 'disabled'} ${picked.has(p.id) ? 'checked' : ''} aria-label="Выбрать для печати">
-      <div class="nm"><b>${esc(p.full_name || showLogin(p.email))}</b><small>${esc(showLogin(p.email))}${b && b.last_used_at ? ' · вход по QR: ' + fmtD(b.last_used_at) : ''}</small></div>
-      <span class="st ${b ? 'ok' : ''}">${b ? 'QR есть' : 'нет QR'}</span>
+      <div class="nm"><b>${esc(p.full_name || showLogin(p.email))}</b><small>${esc(showLogin(p.email))}${roleName(p.id) ? ' · ' + roleName(p.id) : ''}${b && b.last_used_at ? ' · вход по QR: ' + fmtD(b.last_used_at) : ''}</small></div>
+      <div class="ac"><span class="st ${b ? 'ok' : ''}">${b ? 'QR есть' : 'нет QR'}</span>
       <button class="mini" data-mk="${p.id}" type="button">${b ? 'Новый QR' : 'Создать QR'}</button>
-      ${b ? `<button class="mini" data-rv="${p.id}" type="button">Отозвать</button>` : ''}</div>`;
-  }).join('') : '<p class="hint">' + (k ? 'Никого не найдено' : 'Сотрудников нет: все аккаунты — админы или суперадмин. Создайте сотрудника на странице «Пользователи».') + '</p>';
+      ${b ? `<button class="mini" data-sh="${p.id}" type="button">Показать</button><button class="mini" data-rv="${p.id}" type="button">Отозвать</button>` : ''}</div></div>`;
+  }).join('') : '<p class="hint">' + (k ? 'Никого не найдено' : 'Аккаунтов нет. Создайте сотрудника на странице «Пользователи».') + '</p>';
   document.querySelectorAll('[data-pick]').forEach(c => c.onchange = () => { c.checked ? picked.add(c.dataset.pick) : picked.delete(c.dataset.pick); });
   document.querySelectorAll('[data-mk]').forEach(b => b.onclick = async () => {
     const id = b.dataset.mk;
@@ -107,6 +116,10 @@ function draw() {
     b.disabled = true; const { error } = await sb.from('badges').upsert({ user_id: id, code: newCode(), created_at: new Date().toISOString(), last_used_at: null });
     if (error) { toast('Не удалось: ' + error.message); b.disabled = false; return; }
     toast('QR создан'); load();
+  });
+  document.querySelectorAll('[data-sh]').forEach(b => b.onclick = () => {
+    const p = people.find(x => x.id === b.dataset.sh); if (!p) return;
+    BadgeShare.show({ id: p.id, name: p.full_name || showLogin(p.email), login: showLogin(p.email), level: roleOf[p.id] || '' }, load);
   });
   document.querySelectorAll('[data-rv]').forEach(b => b.onclick = async () => {
     if (!confirm('Отозвать QR? Бейдж перестанет работать.')) return;
@@ -120,30 +133,14 @@ $('#q2').oninput = draw;
 $('#mkAll').onclick = async () => {
   const todo = people.filter(p => !badges[p.id]);
   if (!todo.length) { toast('У всех уже есть QR'); return; }
-  if (!confirm('Создать QR для ' + todo.length + ' сотрудников?')) return;
+  if (!confirm('Создать QR для ' + todo.length + ' аккаунтов (включая админов)?')) return;
   const { error } = await sb.from('badges').insert(todo.map(p => ({ user_id: p.id, code: newCode() })));
   if (error) { toast('Не удалось: ' + error.message); return; }
   toast('Создано: ' + todo.length); load();
 };
 $('#selAll').onclick = () => { people.forEach(p => { if (badges[p.id]) picked.add(p.id); }); draw(); };
 
-// QR -> векторная картинка (SVG): резкая при печати. Библиотека рисует в canvas с неравным полем справа и снизу,
-// поэтому берём только сам код и кладём его в рамку ровно по центру.
-function qrSvg(text) {
-  const h = document.createElement('div');
-  new QRCode(h, { text, width: 512, height: 512, correctLevel: QRCode.CorrectLevel.Q });
-  const cv = h.querySelector('canvas'); if (!cv) return '';
-  const W = cv.width, H = cv.height, d = cv.getContext('2d').getImageData(0, 0, W, H).data;
-  const dark = (x, y) => { const i = (y * W + x) * 4; return d[i + 3] > 128 && d[i] < 128; };
-  let x0 = W, y0 = H, x1 = -1, y1 = -1;
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (dark(x, y)) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
-  if (x1 < 0) return '';
-  let run = 0; while (x0 + run < W && dark(x0 + run, y0)) run++;       // верхняя кромка угловой метки = 7 модулей
-  const m = run / 7, n = Math.round((x1 - x0 + 1) / m);
-  let path = '';
-  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (dark(Math.min(W - 1, Math.round(x0 + (c + .5) * m)), Math.min(H - 1, Math.round(y0 + (r + .5) * m)))) path += `M${c} ${r}h1v1h-1z`;
-  return 'data:image/svg+xml,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${n} ${n}" shape-rendering="crispEdges"><path d="${path}" fill="#000"/></svg>`);
-}
+const qrSvg = BadgeShare.qrSvg;
 const nameMm = t => t.length <= 14 ? 5.4 : t.length <= 22 ? 4.6 : t.length <= 30 ? 4 : 3.5;
 const badgeHtml = (p, qr) => { const nm = p.full_name || showLogin(p.email);
   return `<div class="bcell"><div class="bdg"><div class="b-top"><img src="euss-logo.png" alt=""></div><div class="b-tag">Пропуск · вход по QR</div>
