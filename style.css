@@ -337,3 +337,9 @@ body.k-chem{--ac:var(--ch);--ac-d:var(--ch-d);--tint:var(--ch-t);--soft:oklch(.9
 /* поле остатка: рядом сразу пересчёт в другую единицу (кг ↔ л) */
 .lfw{display:flex;align-items:center;gap:.6rem}.lfw input{flex:1;min-width:0}
 .cvo,.cv{flex:none;font-weight:700;color:var(--ac,#0a7);white-space:nowrap;font-size:.85rem}
+
+/* ---------- PWA: режим «приложение» (без интерфейса браузера) ---------- */
+html{overscroll-behavior-y:none}
+@media (display-mode:standalone){
+  body{-webkit-touch-callout:none}
+}

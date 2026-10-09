@@ -6,5 +6,7 @@ window.CFG = {
   // Значение должно совпадать с LOGIN_DOMAIN в функции admin-users.
   LOGIN_DOMAIN: 'euss.local',
   // Дополняет пароль короче 6 знаков (Supabase требует минимум 6). Должно совпадать с PW_PAD в функции admin-users.
-  PW_PAD: 'euss-pin'
+  PW_PAD: 'euss-pin',
+  // Автовыход при бездействии (минуты) для всех, кроме админов и суперадмина
+  IDLE_MINUTES: 1
 };

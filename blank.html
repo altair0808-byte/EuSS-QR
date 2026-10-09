@@ -1,6 +1,15 @@
 <!doctype html>
 <html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Бланк за смену — EuSS</title><link rel="icon" href="favicon.png" type="image/png"><link rel="stylesheet" href="style.css"><style>
+<title>Бланк за смену — EuSS</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#2aa3b5">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="EuSS">
+<meta name="format-detection" content="telephone=no">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="favicon.png" type="image/png"><link rel="stylesheet" href="style.css"><style>
 /* бланк за смену: спокойный вид таблиц */
 .sum{display:grid;grid-template-columns:repeat(4,1fr);margin-top:.75rem;border:1px solid var(--ln);border-radius:var(--r);background:#fff;box-shadow:var(--sh)}
 .sum>div{padding:.7rem .9rem;min-width:0}.sum>div+div{border-left:1px solid var(--ln)}
@@ -390,4 +399,6 @@ $('#out').onclick = e => { const t = e.target.closest('[data-tab]'); if (t) { se
   const qm = q.get('m');                                           // blank.html?m=2026-10 открывает месяц сразу
   if (/^\d{4}-(0[1-9]|1[0-2])$/.test(qm || '')) { ym = qm; setMode('month'); } else go(shiftToday());
 })();
-</script></body></html>
+</script><script src="idle.js"></script>
+<script src="pwa.js"></script>
+</body></html>

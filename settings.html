@@ -1,6 +1,15 @@
 <!doctype html>
-<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Настройки — EuSS</title><link rel="icon" href="favicon.png" type="image/png"><link rel="stylesheet" href="style.css"></head>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Настройки — EuSS</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#2aa3b5">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="EuSS">
+<meta name="format-detection" content="telephone=no">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="favicon.png" type="image/png"><link rel="stylesheet" href="style.css"></head>
 <body>
 <header class="hd"><div><a class="lg" href="index.html" aria-label="На панель смены"><img src="euss-logo.png" alt="EuSS"><span class="sep"></span><span class="sub">Администрирование</span></a><nav class="nav"><a class="btn s" href="admin.html">Пользователи</a><a class="btn s" href="index.html">← Панель</a></nav></div></header>
 <main class="wide">
@@ -172,4 +181,6 @@ $('#fa').onclick = async () => {
   if (!pr || pr.role !== 'superadmin') { location.replace('index.html'); return; }
   load();
 })();
-</script></body></html>
+</script><script src="idle.js"></script>
+<script src="pwa.js"></script>
+</body></html>
