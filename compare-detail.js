@@ -109,7 +109,7 @@ const CompareDetail = (() => {
     ['bottles', 'Новые бутыли', '+', b => b.bottles],
     ['leftovers', 'Остатки замен (ушли из дозатора)', '−', b => b.leftovers],
     ['connects', 'Подключённые остатки', '+', b => b.connects],
-    ['replacedByConnect', 'Бутыль, вместо которой подключили остаток', '−', b => b.replacedByConnect],
+    ['replacedByConnect', 'Бутыль, вместо которой подключили остаток (всегда 0)', '−', b => b.replacedByConnect],
     ['pours', 'Залито из запаса', '+', b => b.pours],
     ['adds', 'Добавлено суперадмином', '+', b => b.adds],
     ['takes', 'Забрано из дозатора', '−', b => b.takes],

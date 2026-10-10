@@ -25,16 +25,16 @@ function chemUsed(refs, changes, connects, moves, levels) {
       (moves || []).filter(x => +x.chemical_id === +c.id && (x.machine_group || '1_10') === g).forEach(x => ev.push({ k: -1, t: T(x), x }));
       (levels || []).filter(x => +x.chemical_id === +c.id && (x.machine_group || '1_10') === g).forEach(x => ev.push({ k: 2, t: T(x), x }));
       ev.sort((a, b) => a.t - b.t || a.k - b.k);            // при равном времени сначала перемещение, потом замена, потом подключение, потом «реальный уровень»
-      let pending = 0, adj = 0, lvl = null;                  // adj: забрали (−) и залили (+) в дозатор с момента прошлой замены; lvl: реальный уровень, указанный вручную
+      let conn = 0, adj = 0, lvl = null;                     // conn: подключённые остатки (только ДОБАВЛЯЮТСЯ к бутыли); adj: забрали (−) и залили (+) с момента прошлой замены; lvl: реальный уровень, указанный вручную
       ev.forEach(e => {
         if (e.k === -1) { if (e.x.kind === 'receipt' || e.x.kind === 'writeoff') return; const a = amt(e.x); if (a > 0) adj += e.x.kind === 'take' ? -a : a; return; }   // поступление и списание — это запас, дозатор не меняют   // 'pour' и 'add' (добавил суперадмин) поднимают уровень, 'take' снижает
-        if (e.k === 1) { const a = amt(e.x); if (a > 0) pending += a; return; }
-        if (e.k === 2) { const a = amt(e.x); if (a != null && isFinite(a) && a >= 0) { lvl = a; pending = 0; adj = 0; } return; }   // «в дозаторе было X»: заменяет и бутыль, и подключённый остаток
+        if (e.k === 1) { const a = amt(e.x); if (a > 0) conn += a; return; }   // подключённый остаток НЕ заменяет бутыль, а добавляется к ней
+        if (e.k === 2) { const a = amt(e.x); if (a != null && isFinite(a) && a >= 0) { lvl = a; conn = 0; adj = 0; } return; }   // «в дозаторе было X»: заменяет и бутыль, и подключённый остаток
         let left = leftOf(e.x);
         if (left == null || !isFinite(left)) { noLeft[e.x.id] = true; left = 0; }
-        const cap = Math.max(0, (pending > 0 ? pending : lvl != null ? lvl : size) + adj);   // забранное не расход, залитое — не «лишний» расход
+        const cap = Math.max(0, (lvl != null ? lvl : size) + conn + adj);   // бутыль (или уровень) + подключённые остатки; забранное не расход, залитое — не «лишний» расход
         used[e.x.id] = cap - Math.max(0, Math.min(cap, left));
-        pending = 0; adj = 0; lvl = null;
+        conn = 0; adj = 0; lvl = null;
       });
     });
   });
@@ -44,8 +44,8 @@ function addDaysISO(d, n) { const t = new Date(d + 'T00:00:00Z'); t.setUTCDate(t
 
 // Теория и факт расхода химии с раздельными дозаторами.
 // Группа 1_10 = машины 1-10, группа 11_12 = машины 11-12.
-// connects: подключения остатка (report_connects). Они уменьшают факт: подключённый остаток уже был посчитан
-// как «не израсходованный» при замене, а следующая замена посчитает всю бутыль целиком.
+// connects: подключения остатка (report_connects). Подключённый остаток уже был посчитан как «не израсходованный» при замене
+// и теперь ДОБАВЛЯЕТСЯ к ёмкости дозатора (новая бутыль + подключённый остаток), поэтому следующая замена считает расход от суммы.
 // ctx (необязательно): { changes, connects } с запасом назад по времени, чтобы подключения из прошлого периода учитывались.
 function calcReport(loads, changes, refs, connects, ctx, moves, levels) {
   connects = connects || []; moves = moves || [];
@@ -161,8 +161,9 @@ function calcReport(loads, changes, refs, connects, ctx, moves, levels) {
 // «Приход» (нетто) строится из событий, которые сайт уже ведёт, и считается тем же проходом по событиям, что и chemUsed:
 //   + новая бутыль при замене (номинал «1 шт = кг» из настроек)
 //   − остаток старой бутыли, который при замене ушёл из дозатора в запас (его вводит бригадир)
-//   + подключённый остаток; при этом подключение ЗАМЕНЯЕТ бутыль (как в chemUsed: ёмкость = подключённый остаток),
-//     поэтому не поставленная бутыль вычитается (строка «вместо бутыли»)
+//   + подключённый остаток: он только ДОБАВЛЯЕТСЯ к содержимому дозатора и не заменяет новую бутыль
+//     (на место убранной бутыли всегда ставят новую; строка «вместо бутыли» всегда 0 — оставлена для совместимости снимков)
+//     Остаток, перелитый в ДРУГОЙ дозатор, уходит из источника (остаток замены) и приходит в получатель (подключённый остаток)
 //   + залили из запаса (pour), + добавил суперадмин (add)
 //   − забрали из дозатора (take)
 //   ± поправка «в дозаторе реально было X» (levels): ёмкость заменяется на X, разница идёт в поправку
@@ -201,8 +202,8 @@ function dispenserFlows(c, group, t0, t1, ev) {
   mine(ev.moves).forEach(x => ev2.push({ k: -1, t: T(x), x }));
   mine(ev.levels).forEach(x => ev2.push({ k: 2, t: T(x), x }));
   ev2.sort((a, b) => a.t - b.t || a.k - b.k);                // тот же порядок, что в chemUsed
-  let pending = 0, adj = 0, lvl = null;
-  const base = () => pending > 0 ? pending : lvl != null ? lvl : size;
+  let conn = 0, adj = 0, lvl = null;
+  const base = () => lvl != null ? lvl : size;                // бутыль (или уровень, указанный вручную); подключённый остаток считается отдельно (conn)
   for (const e of ev2) {
     if (e.t >= B) break;
     const inP = e.t >= A;
@@ -220,31 +221,29 @@ function dispenserFlows(c, group, t0, t1, ev) {
       const a = kgOf(e.x, 'amount');
       if (a === undefined && inP) f.needDensity = true;
       if (!(a > 0)) continue;
-      if (inP && base() == null) f.needSize = true;
-      const old = pending > 0 ? 0 : (base() || 0);             // первое подключение заменяет бутыль (или уровень); следующие только добавляются
-      pending += a;
-      if (inP) { f.connects += a; f.replacedByConnect -= old; }
+      conn += a;                                               // подключённый остаток только добавляется: бутыль не заменяет и не вычитается
+      if (inP) f.connects += a;                                // f.replacedByConnect всегда 0
     } else if (e.k === 2) {                                    // «в дозаторе реально было X»
       const a = kgOf(e.x, 'amount');
       if (a === undefined && inP) f.needDensity = true;
       if (a == null || !isFinite(a) || a < 0) continue;
       if (inP && base() == null) f.needSize = true;
-      if (inP) f.levelAdj += a - ((base() || 0) + adj);
-      pending = 0; adj = 0; lvl = a;
+      if (inP) f.levelAdj += a - ((base() || 0) + conn + adj);
+      conn = 0; adj = 0; lvl = a;
     } else {                                                   // замена бутыли
       let left = kgOf(e.x, 'leftover');
       if (left === undefined && inP) f.needDensity = true;
       const noLeft = left == null || !isFinite(left);
       if (noLeft) left = 0;
       if (size == null) { if (inP) f.needSize = true; }
-      const cap = Math.max(0, (base() || 0) + adj);
+      const cap = Math.max(0, (base() || 0) + conn + adj);
       const eff = Math.max(0, Math.min(cap, left));
       if (inP) {
         f.bottles += size || 0; f.leftovers += eff; f.nBottles++;
         if (noLeft) f.noLeft++;
         if (!noLeft && left > cap + 1e-9) f.clipped++;
       }
-      pending = 0; adj = 0; lvl = null;
+      conn = 0; adj = 0; lvl = null;
     }
   }
   f.inflow = f.bottles + f.connects + f.replacedByConnect + f.pours + f.adds + f.levelAdj - f.leftovers - f.takes;   // «приход, нетто»
