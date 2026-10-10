@@ -31,6 +31,7 @@
 const esc=t=>String(t??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const f=n=>Num.fmt(n);   // без округления: 0,175 → «0,175», 0,350 → «0,35»
 let tz=5,st=6,refs=null,nm={},rows=[],per='0',ent='all',act='all',seq=0;
+const tsParam=new URLSearchParams(location.search).get('ts'),around=tsParam&&isFinite(Date.parse(tsParam))?Date.parse(tsParam):null;
 const who=id=>(id&&nm[id])||'система';
 const dmy=d=>d.split('-').reverse().join('.');
 const loc=ts=>new Date(new Date(ts).getTime()+tz*3600e3).toISOString();      // местное время как ISO-строка
@@ -81,7 +82,8 @@ function render(){
   const list=rows.filter(r=>(ent==='all'||(ent==='load'?r.entity==='load':r.entity!=='load'))&&(act==='all'||r.action===act));
   let day='',h='';
   list.forEach(r=>{const d=loc(r.ts).slice(0,10);if(d!==day){day=d;h+=`<p class="day">${dmy(d)}</p>`;}h+=card(r);});
-  $('#out').innerHTML=list.length?`<div class="ops">${h}</div>`+(rows.length>=1000?'<p class="hint">Показаны последние 1000 записей.</p>':''):'<p class="hint">За выбранный период записей нет.</p>';
+  const bn=around?`<p class="hint">Записи вокруг ${dmy(loc(new Date(around).toISOString()).slice(0,10))} ${hhmm(new Date(around).toISOString())} (±12 часов). <a href="journal.html">Показать журнал за сегодня</a></p>`:'';
+  $('#out').innerHTML=bn+(list.length?`<div class="ops">${h}</div>`+(rows.length>=1000?'<p class="hint">Показаны последние 1000 записей.</p>':''):'<p class="hint">За выбранный период записей нет.</p>');
 }
 async function load(){
   const my=++seq;
@@ -89,7 +91,11 @@ async function load(){
   const shiftStart=Date.UTC(t[0],t[1]-1,t[2],st)-tz*3600e3;
   const since=new Date(per==='0'?shiftStart:shiftStart-(+per)*864e5).toISOString();
   $('#out').innerHTML='<p class="hint">Загрузка…</p>';
-  const {data,error}=await sb.from('audit_log').select('*').gte('ts',since).order('ts',{ascending:false}).limit(1000);
+  let q=sb.from('audit_log').select('*');
+  // ссылка из «Сравнения химии — подробно»: ?ts=момент записи → показать записи журнала вокруг этого момента (±12 часов)
+  if(around){q=q.gte('ts',new Date(around-12*36e5).toISOString()).lte('ts',new Date(around+12*36e5).toISOString());}
+  else q=q.gte('ts',since);
+  const {data,error}=await q.order('ts',{ascending:false}).limit(1000);
   if(my!==seq)return;
   if(error){$('#out').innerHTML='<p class="err">Не удалось загрузить журнал. Выполните stage6.sql в Supabase.</p>';return;}
   rows=data||[];render();

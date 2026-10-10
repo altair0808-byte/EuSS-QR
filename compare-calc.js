@@ -32,6 +32,15 @@ function chainFromRows(closingRows, measureRows) {
     .sort((a, b) => new Date(a.at_ts) - new Date(b.at_ts));
 }
 
+// Баланс одной строки calcClosing в виде, пригодном для суммирования и показа (все числа в кг)
+function balOf(x) {
+  const f = x.flows || {};
+  return { start_measured_kg: x.start_measured_kg == null ? (x.start_kg || 0) + (x.to_reserve_in_kg || 0) : x.start_measured_kg, to_reserve_kg: x.to_reserve_in_kg || 0,
+    start_kg: x.start_kg || 0, bottles: f.bottles || 0, leftovers: f.leftovers || 0, connects: f.connects || 0, replacedByConnect: f.replacedByConnect || 0,
+    pours: f.pours || 0, adds: f.adds || 0, takes: f.takes || 0, levelAdj: f.levelAdj || 0, inflow_kg: x.inflow_kg || 0, end_kg: x.end_kg == null ? null : x.end_kg,
+    noLeft: f.noLeft || 0, clipped: f.clipped || 0 };
+}
+
 function calcCompare(refs, inp) {
   const tz = inp.tz == null ? 5 : +inp.tz, st = inp.st == null ? 6 : +inp.st;
   const t0 = inp.fromTs ? new Date(inp.fromTs).toISOString() : boundaryTs(inp.from, tz, st);
@@ -96,7 +105,7 @@ function calcCompare(refs, inp) {
   const slot = (c, g) => agg[c.id + ':' + g] || (agg[c.id + ':' + g] = {
     chemical_id: c.id, name: c.name, kind: c.kind, group: g, density: null, bottle_kg: null,
     fact_kg: 0, factNull: false, theory_kg: 0, theoryNull: false, legacy_kg: 0, legacyNull: false, laundry_kg: 0, washes: 0,
-    bal: { start_kg: 0, bottles: 0, leftovers: 0, connects: 0, replacedByConnect: 0, pours: 0, adds: 0, takes: 0, levelAdj: 0, inflow_kg: 0, end_kg: 0, endNull: false }, nSeg: 0 });
+    bal: { start_measured_kg: 0, to_reserve_kg: 0, noLeft: 0, clipped: 0, start_kg: 0, bottles: 0, leftovers: 0, connects: 0, replacedByConnect: 0, pours: 0, adds: 0, takes: 0, levelAdj: 0, inflow_kg: 0, end_kg: 0, endNull: false }, nSeg: 0 });
   let residentDays = null, residentMissing = 0, residentSeen = false;
   const seen = new Set();
   segs.forEach(sg => {
@@ -106,7 +115,9 @@ function calcCompare(refs, inp) {
       loads: allLoads, changes: inp.changes || [], connects: inp.connects || [], moves: inp.moves || [], levels: inp.levels || [], residents: inp.residents || null
     });
     const segOut = { from_ts: r.from_ts, to_ts: r.to_ts, days_exact: r.days_exact, closing_from: sg.a.id || null, closing_to: sg.b.id || null,
-                     washes: r.totals.washes, laundry_kg: r.totals.laundry_kg, warnings: r.warnings, problems: r.problems, rows: r.rows.filter(x => x.group === 'all').map(x => ({ chemical_id: x.chemical_id, name: x.name, fact_kg: x.fact_kg, theory_kg: x.theory_kg, dev_pct: x.dev_pct })) };
+                     washes: r.totals.washes, laundry_kg: r.totals.laundry_kg, warnings: r.warnings, problems: r.problems, rows: r.rows.filter(x => x.group === 'all').map(x => ({ chemical_id: x.chemical_id, name: x.name, fact_kg: x.fact_kg, theory_kg: x.theory_kg, dev_pct: x.dev_pct })),
+                     // этап 3: строки отрезка по каждому дозатору (баланс, факт, теория) — для «Подробно» и графика по закрытиям
+                     rows_g: r.rows.map(x => ({ chemical_id: x.chemical_id, name: x.name, group: x.group, fact_kg: x.fact_kg, theory_kg: x.theory_kg, dev_pct: x.dev_pct, balance: balOf(x) })) };
     out.segments.push(segOut);
     r.problems.forEach(p => { const k = p.type + '|' + p.chemical_id + '|' + p.text; if (!seen.has(k)) { seen.add(k); out.problems.push(p); } });
     r.warnings.forEach(w => out.warnings.push({ ...w, segment_from_ts: r.from_ts, segment_to_ts: r.to_ts }));
@@ -121,6 +132,7 @@ function calcCompare(refs, inp) {
       if (x.old_fact_kg == null) s.legacyNull = true; else s.legacy_kg += x.old_fact_kg;
       s.laundry_kg += x.laundry_kg || 0; s.washes += x.washes || 0;
       s.bal.start_kg += x.start_kg || 0;
+      const bo = balOf(x); s.bal.start_measured_kg += bo.start_measured_kg; s.bal.to_reserve_kg += bo.to_reserve_kg; s.bal.noLeft += bo.noLeft; s.bal.clipped += bo.clipped;
       const f = x.flows || {};
       ['bottles', 'leftovers', 'connects', 'replacedByConnect', 'pours', 'adds', 'takes', 'levelAdj'].forEach(k => { s.bal[k] += f[k] || 0; });
       s.bal.inflow_kg += x.inflow_kg || 0;
@@ -128,6 +140,15 @@ function calcCompare(refs, inp) {
     });
   });
   const hasRes = residentSeen && residentDays > 0;
+  out.residents_info = { entered: hasRes, missing_days: residentMissing, resident_days: hasRes ? residentDays : null };
+  // неполная смена: граница отрезка (замер) не на начале смены (по умолчанию 06:00 местного времени)
+  const edges = []; const edgeSeen = new Set();
+  segs.forEach(sg => [sg.a, sg.b].forEach(c => {
+    const t = new Date(c.at_ts).getTime(), loc = new Date(t + tz * 3600e3), k = c.at_ts + '';
+    const aligned = loc.getUTCHours() === st && loc.getUTCMinutes() === 0 && loc.getUTCSeconds() === 0;
+    if (!aligned && !edgeSeen.has(k)) { edgeSeen.add(k); edges.push({ ts: new Date(t).toISOString(), closing_id: c.id || null }); }
+  }));
+  out.coverage.partial_shift = edges.length > 0; out.coverage.partial_edges = edges;
   out.totals = {
     washes: winLoads.length, laundry_kg: cov.laundry_kg_in_fact,
     by_group: {
@@ -170,8 +191,8 @@ function calcCompare(refs, inp) {
         per_kg_laundry: small != null && lmk > 0 ? small / lmk : null,
         per_wash: small != null && wsh > 0 ? small / wsh : null,
         per_resident_day: small != null && g === 'all' && hasRes ? small / residentDays : null,
-        laundry_kg: lmk, washes: wsh, density: d,
-        balance: s && s.nSeg ? { start_kg: s.bal.start_kg, bottles: s.bal.bottles, leftovers: s.bal.leftovers, connects: s.bal.connects, replacedByConnect: s.bal.replacedByConnect,
+        laundry_kg: lmk, washes: wsh, density: d, bottle_kg: +c.bottle_kg > 0 ? +c.bottle_kg : null,
+        balance: s && s.nSeg ? { start_measured_kg: s.bal.start_measured_kg, to_reserve_kg: s.bal.to_reserve_kg, noLeft: s.bal.noLeft, clipped: s.bal.clipped, start_kg: s.bal.start_kg, bottles: s.bal.bottles, leftovers: s.bal.leftovers, connects: s.bal.connects, replacedByConnect: s.bal.replacedByConnect,
           pours: s.bal.pours, adds: s.bal.adds, takes: s.bal.takes, levelAdj: s.bal.levelAdj, inflow_kg: s.bal.inflow_kg, end_kg: s.bal.endNull ? null : s.bal.end_kg } : null
       });
     });

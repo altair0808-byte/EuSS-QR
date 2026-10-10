@@ -1,0 +1,57 @@
+/* Этап 3 «Сравнение химии»: светофор, карточка «Подробно», график, источники чисел. Используется compare.html и compare-detail.html. */
+.acts{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
+h2{font-family:Sora,sans-serif;font-size:1.05rem;margin:1.1rem 0 .4rem}
+/* светофор */
+.dot{display:inline-block;width:.85rem;height:.85rem;border-radius:50%;vertical-align:-.1rem;background:#9fb4bb}
+.dot.g{background:#1f9d62}.dot.y{background:#e0a100}.dot.r{background:#d92d20}
+.trust{margin:.7rem 0;padding:.8rem .9rem;border:1px solid var(--ln);border-left-width:6px;border-radius:var(--r);background:var(--card);box-shadow:var(--sh)}
+.trust.g{border-left-color:#1f9d62}.trust.y{border-left-color:#e0a100}.trust.r{border-left-color:#d92d20}
+.trust h2{margin:0 0 .5rem;display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
+.chipT{display:inline-block;padding:.1rem .55rem;border-radius:99px;font-size:.72rem;font-weight:800}
+.chipT.g{background:#e7f6ef;color:#14532d}.chipT.y{background:#fff6e0;color:#6b4a00}.chipT.r{background:#fdecea;color:#7a1a12}
+.tgrid{display:grid;grid-template-columns:1fr;gap:.6rem}@media(min-width:720px){.tgrid{grid-template-columns:1fr 1fr}}
+.tc{padding:.55rem .7rem;border:1px solid var(--ln);border-radius:var(--r);background:var(--bg)}
+.tc .th{display:flex;gap:.45rem;align-items:center;margin-bottom:.25rem}
+.tc ul,.rsl{list-style:none;margin:0;padding:0}
+.tc li.tl{margin:.3rem 0}.tc li.tl small.ok{display:block;color:#14532d;font-size:.78rem}
+.rs{margin:.3rem 0 .3rem .2rem;padding:.35rem .5rem;border-radius:.4rem;font-size:.84rem}
+.rs.red{background:#fdecea;color:#7a1a12}.rs.yellow{background:#fff6e0;color:#6b4a00}
+.fx{margin-left:.3rem;min-height:1.7rem;padding:0 .55rem;font-size:.74rem;border-radius:99px}
+.fixbox{margin-top:.35rem;padding:.5rem .65rem;border-radius:.4rem;background:var(--card);color:var(--ink);border:1px dashed var(--ln);font-size:.84rem;line-height:1.45}
+.fixbox[hidden],.dr[hidden],.sb[hidden]{display:none}
+/* «Подробно» в таблице */
+button.mr{min-height:1.9rem;padding:0 .7rem;font-size:.76rem;border-radius:99px}
+tr.dr>td{padding:0;text-align:left;white-space:normal;background:var(--bg)}
+tr.dr .dcard{margin:.6rem}
+details.chem{margin:.6rem 0;border:1px solid var(--ln);border-radius:var(--r);background:var(--card)}
+details.chem>summary{cursor:pointer;padding:.65rem .8rem;font-family:Sora,sans-serif;font-weight:700}
+/* карточка */
+.dcard{margin:.6rem 0;padding:.8rem .9rem;border:1px solid var(--ln);border-radius:var(--r);background:var(--card);box-shadow:var(--sh);text-align:left;white-space:normal}
+.dcard h3{margin:0 0 .4rem;font-size:1rem}.dcard h3 small{color:var(--mut);font-weight:600;font-size:.78rem}
+.dcard h4{margin:1rem 0 .3rem;font-size:.9rem;display:flex;gap:.45rem;align-items:center}
+.sn{display:inline-grid;place-items:center;width:1.35rem;height:1.35rem;border-radius:50%;background:var(--tint);color:var(--ac-d);font-size:.72rem;font-weight:800}
+.dcard .tw{white-space:normal}.dcard .tw th,.dcard .tw td{white-space:normal}
+.dcard table.bal td:first-child{min-width:12rem}
+button.nb{min-height:1.7rem;padding:0 .5rem;font-size:.86rem;font-weight:700;border:1px solid var(--ln);border-radius:.4rem;background:var(--card);color:var(--ink);cursor:pointer}
+button.nb:hover{border-color:var(--ac);color:var(--ac-d)}
+tr.sb>td{padding:0;background:var(--bg)}
+.srcbox{margin:.4rem;padding:.5rem;border:1px solid var(--ln);border-radius:.4rem;background:var(--card);overflow-x:auto;text-align:left}
+.srcbox table{width:100%;border-collapse:collapse;font-size:.8rem}.srcbox th,.srcbox td{padding:.3rem .45rem;border-bottom:1px solid var(--ln);text-align:left;white-space:normal}
+.srcbox th{font-size:.66rem;text-transform:uppercase;color:var(--mut)}
+/* сравнение с эталоном: рост красным, снижение зелёным */
+td.d{font-weight:800}td.d.up{color:#b42318}td.d.down{color:#14532d}td.d.eq{color:var(--mut)}
+/* график */
+.chartbox{overflow-x:auto}
+svg.chart{width:100%;max-width:640px;height:auto;display:block}
+svg.chart .gl{stroke:var(--ln);stroke-width:1}svg.chart .ax{fill:var(--mut);font-size:10px}
+svg.chart polyline{stroke-width:2.5;stroke-linejoin:round}svg.chart polyline.th{stroke:#5b7480;stroke-dasharray:6 4}svg.chart polyline.fc{stroke:#0097a8}
+svg.chart circle.th{fill:#5b7480}svg.chart circle.fc{fill:#0097a8}
+.legend{display:flex;flex-wrap:wrap;gap:.9rem;align-items:center;font-size:.8rem;color:var(--mut);margin:.2rem 0}
+.lg{display:inline-block;width:1.4rem;height:0;border-top:3px solid #0097a8;vertical-align:middle;margin-right:.25rem}.lg.th{border-top:3px dashed #5b7480}
+/* хронология */
+ol.tlv{list-style:none;margin:0;padding:0;border-left:3px solid var(--tint)}
+ol.tlv li{position:relative;margin:0;padding:.35rem 0 .35rem .8rem;font-size:.84rem}
+ol.tlv li::before{content:"";position:absolute;left:-.45rem;top:.7rem;width:.6rem;height:.6rem;border-radius:50%;background:#9fb4bb;border:2px solid var(--card)}
+ol.tlv li.measure::before{background:#0097a8}ol.tlv li.pour::before,ol.tlv li.add::before{background:#1f9d62}ol.tlv li.take::before{background:#e0a100}ol.tlv li.change::before,ol.tlv li.connect::before{background:#5b7480}
+ol.tlv time{color:var(--mut);font-variant-numeric:tabular-nums;margin-right:.3rem}ol.tlv small{display:block;color:var(--mut)}
+@media(max-width:560px){button.mr{min-height:2.4rem}button.nb,.fx{min-height:2.2rem}}

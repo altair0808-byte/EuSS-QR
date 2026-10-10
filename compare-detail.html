@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Сравнение химии — EuSS</title>
+<title>Сравнение химии — подробно — EuSS</title>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#2aa3b5">
 <meta name="mobile-web-app-capable" content="yes">
@@ -27,9 +27,9 @@ td.bad{color:#b42318;font-weight:700}td.low{color:#175cd3;font-weight:700}td.ck{
 .pick label{margin-top:0}.pick .go{min-height:2.75rem}
 </style></head>
 <body>
-<header class="hd"><div><a class="lg" href="index.html" aria-label="На панель смены"><img src="euss-logo.png" alt="EuSS"><span class="sep"></span><span class="sub">Сравнение химии</span></a><nav class="nav"><a class="btn s" href="closings-report.html">Закрытия</a><a class="btn s" href="report.html">Отчёт по сменам</a><a class="btn s" href="index.html">← Панель</a></nav></div></header>
+<header class="hd"><div><a class="lg" href="index.html" aria-label="На панель смены"><img src="euss-logo.png" alt="EuSS"><span class="sep"></span><span class="sub">Сравнение химии — подробно</span></a><nav class="nav"><a class="btn s" id="tobrief" href="compare.html">Кратко</a><a class="btn s" href="closings-report.html">Закрытия</a><a class="btn s" href="index.html">← Панель</a></nav></div></header>
 <main class="wide">
-<div class="top" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.75rem"><h1>Сравнение химии: теория и факт</h1><div class="acts"><a class="btn s" id="todet" href="compare-detail.html" hidden>Подробно: отдельный экран</a><button class="btn" id="xl" type="button" hidden>Скачать Excel</button></div></div>
+<div class="top" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.75rem"><h1>Сравнение химии — подробно</h1><div class="acts"><button class="btn" id="xl" type="button" hidden>Скачать Excel</button></div></div>
 <div class="seg" id="mode" role="group" aria-label="Период"><button data-m="last" class="on">Последнее закрытие</button><button data-m="month">Месяц</button><button data-m="custom">Свой период</button></div>
 <div id="pick"></div>
 <div class="seg" id="grp" role="group" aria-label="Дозатор"><button data-g="all" class="on">Оба</button><button data-g="1_10">Дозатор 1</button><button data-g="11_12">Дозатор 2</button></div>
@@ -40,51 +40,58 @@ td.bad{color:#b42318;font-weight:700}td.low{color:#175cd3;font-weight:700}td.ck{
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script><script src="num.js"></script><script src="app.js"></script><script src="report-calc.js"></script><script src="compare-calc.js"></script><script src="compare-view.js"></script><script src="xlsx-writer.js"></script><script src="compare-detail.js"></script><script src="compare-xlsx.js"></script><script src="compare-data.js"></script>
 <script>
-// Сравнение химии: краткий вид (этап 2) + «Подробно» у каждой строки и «Скачать Excel» (этап 3). Только для админов и суперадмина:
-// доступ проверяет CompareData.init (is_admin / роль superadmin); светофор «Можно ли верить цифрам» и предупреждения видит только админ.
-// Факт считается по замерам остатков между закрытиями (compare-calc.js); здесь только выбор периода, показ и кнопки.
-let env=null,mode='last',group='all',res=null,inp=null,seq=0,customFrom=null,customTo=null,month=null,ctxCache=null,ctxVal=null;
+// Сравнение химии — подробно (этап 3). Только для админов и суперадмина: доступ проверяет CompareData.init (is_admin / роль superadmin).
+// Те же данные и тот же расчёт, что в кратком виде (compare.html), поэтому итоги совпадают. Здесь: светофор, итоги, карточка по каждому химикату
+// (баланс, теория, расход на кг/стирку/жителя, эталон, график по закрытиям, хронология) и «Скачать Excel» (7 листов).
+let env=null,mode='last',group='all',month=null,customFrom=null,customTo=null,res=null,inp=null,ctx=null,seq=0;
 const V=CompareView,D=CompareDetail,out=()=>document.getElementById('out'),$id=i=>document.getElementById(i);
+const qget=k=>{const m=new RegExp('[?&]'+k+'=([^&]*)').exec(typeof location!=='undefined'?location.search:'');return m?decodeURIComponent(m[1]):null;};
 
 function range(){return CompareData.rangeOf(env,mode,month,customFrom,customTo);}
-function detLink(){const a=$id('todet');if(!a)return;let h='compare-detail.html?m='+mode+'&g='+group;if(mode==='month')h+='&month='+month;if(mode==='custom'&&customFrom&&customTo)h+='&from='+encodeURIComponent(customFrom)+'&to='+encodeURIComponent(customTo);a.href=h;}
-// контекст для карточки «Подробно» и Excel (имена, эталон, предыдущее закрытие, расчёт за месяц): строится один раз на расчёт
-function getCtx(){if(!ctxCache){ctxCache=CompareData.makeCtx(sb,env,res,inp,mode,true).then(c=>(ctxVal=c),e=>{ctxCache=null;throw e;});}return ctxCache;}
+function briefLink(){const a=$id('tobrief');if(a)a.href='compare.html';}
 
 async function compute(){
-  const my=++seq,r=range();ctxCache=null;ctxVal=null;res=null;$id('xl').hidden=true;$id('todet').hidden=true;
-  if(!r){out().innerHTML=mode==='last'?'<div class="msg wr">Нужно хотя бы два закрытия (начальный замер и ещё одно). Выберите «Месяц» или «Свой период», чтобы увидеть теорию.</div>':'<p class="hint">Выберите период и нажмите «Показать».</p>';return;}
+  const my=++seq,r=range();res=null;ctx=null;$id('xl').hidden=true;
+  if(!r){out().innerHTML=mode==='last'?'<div class="msg wr">Нужно хотя бы два закрытия (начальный замер и ещё одно). Выберите «Месяц» или «Свой период».</div>':'<p class="hint">Выберите период и нажмите «Показать».</p>';return;}
   if(!(new Date(r.toTs)>new Date(r.fromTs))){out().innerHTML='<div class="msg er">Конец периода должен быть позже начала.</div>';return;}
   out().innerHTML='<p class="hint">Считаю…</p>';
   try{
     const x=await CompareData.compute(sb,env,r);
-    if(my!==seq)return;                                                                           // пока считали, выбрали другой период
-    res=x.res;inp=x.inp;draw();
+    if(my!==seq)return;
+    res=x.res;inp=x.inp;
+    ctx=await CompareData.makeCtx(sb,env,res,inp,mode,false);                                     // сначала без месяца: экран появляется быстро
+    if(my!==seq)return;
+    draw();
+    CompareData.makeCtx(sb,env,res,inp,mode,true).then(c=>{if(my!==seq)return;ctx=c;fillCharts();}).catch(()=>{});   // график за месяц дорисовывается позже
   }catch(e){if(my===seq)out().innerHTML=`<div class="msg er">Не удалось посчитать: ${V.esc(e.message)}</div>`;}
 }
+
+function chemIds(){const ids=[];(res.rows||[]).filter(r=>group==='all'||r.group===group).forEach(r=>{if(!ids.includes(r.chemical_id))ids.push(r.chemical_id);});return ids;}
 function draw(){
   if(!res)return;
-  out().innerHTML=V.screenHTML(res,group,env.tz,{before:D.trustHTML(res,group,{isAdmin:true,tz:env.tz}),detail:true});
-  $id('xl').hidden=false;$id('todet').hidden=false;detLink();
+  const tr=D.trust(res,{isAdmin:true,tz:env.tz});
+  const cards=chemIds().map(id=>{
+    const row=res.rows.find(r=>+r.chemical_id===+id),it=tr.chems.find(c=>+c.chemical_id===+id);
+    return `<details class="chem" open><summary>${it?`<span class="dot ${({green:'g',yellow:'y',red:'r'})[it.level]}" aria-hidden="true"></span> `:''}${V.esc(row.name)}</summary>${D.cardHTML(res,inp,ctx,id,group,{isAdmin:true})}</details>`;
+  }).join('');
+  out().innerHTML=`<h2>Итоги</h2>`+V.screenHTML(res,group,env.tz,{before:D.trustHTML(res,group,{isAdmin:true,tz:env.tz})})+`<h2>По химикатам</h2>`+(cards||'<p class="hint">Нет химикатов для сравнения.</p>');
+  $id('xl').hidden=false;
+}
+function fillCharts(){
+  (out().querySelectorAll?out().querySelectorAll('.chartbox'):[]).forEach(b=>{
+    const p=String(b.dataset.chart||'').split('|'),row=res.rows.find(r=>+r.chemical_id===+p[0]&&r.group===p[1]);
+    if(row)b.innerHTML=D.chartBlock(res,ctx,row);
+  });
 }
 
-// клики внутри экрана: «Что исправить», числа-источники, «Подробно»
-out().onclick=async e=>{
-  if(D.onClick(e,()=>({res,inp,ctx:ctxVal})))return;
-  const b=e.target.closest&&e.target.closest('button.mr');if(!b)return;
-  const tr=b.closest('tr'),box=tr&&tr.nextElementSibling;if(!box||!box.classList.contains('dr'))return;
-  if(!box.hidden){box.hidden=true;b.setAttribute('aria-expanded','false');return;}
-  const cell=box.firstElementChild;cell.innerHTML='<p class="hint">Загружаю подробности…</p>';box.hidden=false;b.setAttribute('aria-expanded','true');
-  try{const ctx=await getCtx();cell.innerHTML=D.cardHTML(res,inp,ctx,b.dataset.chem,group,{isAdmin:true});}
-  catch(err){cell.innerHTML=`<div class="msg er">Не удалось загрузить подробности: ${V.esc(err.message)}</div>`;}
-};
-$id('xl').onclick=async()=>{
-  if(!res)return;const b=$id('xl');b.disabled=true;
-  try{const ctx=await getCtx();CompareXlsx.download(res,inp,ctx,{view:'brief',isAdmin:true});}
+out().onclick=e=>{D.onClick(e,()=>({res,inp,ctx}));};
+$id('xl').onclick=()=>{
+  if(!res)return;
+  try{CompareXlsx.download(res,inp,ctx,{view:'full',isAdmin:true});}
   catch(err){out().insertAdjacentHTML('afterbegin',`<div class="msg er">Не удалось сформировать Excel: ${V.esc(err.message)}</div>`);}
-  finally{b.disabled=false;}
 };
 
+function setOn(sel,attr,val){document.querySelectorAll(sel).forEach(x=>x.classList.toggle('on',x.dataset[attr]===val));}
 function drawPick(){
   const p=$id('pick');
   if(mode==='last'){const r=V.lastClosingRange(env.closings);p.innerHTML=r?`<p class="hint">От предыдущего замера до последнего закрытия.</p>`:'';return;}
@@ -100,8 +107,15 @@ function drawPick(){
   if(env.error){out().innerHTML=`<div class="msg er">${V.esc(env.error)}</div>`;return;}
   month=V.monthKeyOf(Date.now(),env.tz,env.st);
   const def=V.lastClosingRange(env.closings)||{fromTs:new Date(Date.now()-7*864e5).toISOString(),toTs:new Date().toISOString()};customFrom=def.fromTs;customTo=def.toTs;
-  $id('mode').onclick=e=>{const b=e.target.closest('button');if(!b)return;mode=b.dataset.m;document.querySelectorAll('#mode button').forEach(x=>x.classList.toggle('on',x===b));drawPick();compute();};
-  $id('grp').onclick=e=>{const b=e.target.closest('button');if(!b)return;group=b.dataset.g;document.querySelectorAll('#grp button').forEach(x=>x.classList.toggle('on',x===b));draw();};   // дозаторы переключаются без пересчёта
+  // параметры из ссылки краткого вида: ?m=last|month|custom&g=all|1_10|11_12&month=YYYY-MM&from=…&to=…
+  const m=qget('m'),g=qget('g');
+  if(m==='month'||m==='custom'||m==='last')mode=m;
+  if(g==='1_10'||g==='11_12'||g==='all')group=g;
+  if(mode==='month'&&/^\d{4}-\d{2}$/.test(qget('month')||''))month=qget('month');
+  if(mode==='custom'&&qget('from')&&qget('to')){customFrom=qget('from');customTo=qget('to');}
+  setOn('#mode button','m',mode);setOn('#grp button','g',group);
+  $id('mode').onclick=e=>{const b=e.target.closest('button');if(!b)return;mode=b.dataset.m;setOn('#mode button','m',mode);drawPick();compute();};
+  $id('grp').onclick=e=>{const b=e.target.closest('button');if(!b)return;group=b.dataset.g;setOn('#grp button','g',group);draw();fillCharts();};
   drawPick();await compute();
 })();
 </script>

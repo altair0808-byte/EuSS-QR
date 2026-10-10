@@ -79,19 +79,22 @@ const CompareView = (() => {
   }
 
   // таблица: химикат · теория · факт · разница · отклонение · статус
-  function tableHTML(res, g) {
+  // opts.detail (этап 3, только админу): у каждой строки химии кнопка «Подробно» и скрытая строка для карточки (заполняет страница)
+  function tableHTML(res, g, opts) {
     const rows = (res.rows || []).filter(r => r.group === g);
     if (!rows.length) return '<p class="hint">Нет химикатов для сравнения.</p>';
-    const line = r => `<tr><td>${esc(r.name)}</td><td>${num(r.theory_l)}</td><td>${num(r.fact_l)}</td><td class="${devCls(r.status)}">${sg(r.diff_l)}${num(r.diff_l)}</td><td class="${devCls(r.status)}">${pctTxt(r.dev_pct)}</td><td>${statusChip(r.status)}</td></tr>`;
+    const det = !!(opts && opts.detail);
+    const line = r => `<tr><td>${esc(r.name)}</td><td>${num(r.theory_l)}</td><td>${num(r.fact_l)}</td><td class="${devCls(r.status)}">${sg(r.diff_l)}${num(r.diff_l)}</td><td class="${devCls(r.status)}">${pctTxt(r.dev_pct)}</td><td>${statusChip(r.status)}</td>${det ? `<td><button type="button" class="mr" data-chem="${esc(r.chemical_id)}" aria-expanded="false">Подробно</button></td>` : ''}</tr>` +
+      (det ? `<tr class="dr" hidden><td colspan="7" data-chem="${esc(r.chemical_id)}"></td></tr>` : '');
     const tot = (kind, label) => {
       const t = res.totals_by_kind && res.totals_by_kind[kind] && res.totals_by_kind[kind][g];
       if (!t) return '';
       const star = t.incomplete ? '<sup title="Посчитаны не все химикаты: по части нет данных">*</sup>' : '';
-      return `<tr class="tt"><td>${label}${star}</td><td>${num(t.theory_l)}</td><td>${num(t.fact_l)}</td><td class="${devCls(t.status)}">${sg(t.diff_l)}${num(t.diff_l)}</td><td class="${devCls(t.status)}">${pctTxt(t.dev_pct)}</td><td>${statusChip(t.status)}</td></tr>`;
+      return `<tr class="tt"><td>${label}${star}</td><td>${num(t.theory_l)}</td><td>${num(t.fact_l)}</td><td class="${devCls(t.status)}">${sg(t.diff_l)}${num(t.diff_l)}</td><td class="${devCls(t.status)}">${pctTxt(t.dev_pct)}</td><td>${statusChip(t.status)}</td>${det ? '<td></td>' : ''}</tr>`;
     };
     const main = rows.filter(r => r.kind === 'main'), extra = rows.filter(r => r.kind !== 'main');
     const body = main.map(line).join('') + (main.length ? tot('main', 'ИТОГО основная химия') : '') + extra.map(line).join('') + (extra.length ? tot('extra', 'ИТОГО доп. средства') : '');
-    return `<div class="tw"><table><thead><tr><th>Химикат</th><th>Теория, л</th><th>Факт, л</th><th>Разница, л</th><th>Откл., %</th><th>Статус</th></tr></thead><tbody>${body}</tbody></table></div>`;
+    return `<div class="tw"><table><thead><tr><th>Химикат</th><th>Теория, л</th><th>Факт, л</th><th>Разница, л</th><th>Откл., %</th><th>Статус</th>${det ? '<th></th>' : ''}</tr></thead><tbody>${body}</tbody></table></div>`;
   }
 
   // под таблицей: справка про теорию за весь период и доп. средства без замеров
@@ -116,8 +119,10 @@ const CompareView = (() => {
   }
 
   // весь экран одним куском
-  function screenHTML(res, g, tz) {
-    return periodHTML(res, tz) + coverageHTML(res, tz) + cardsHTML(res, g) + tableHTML(res, g) + notesHTML(res, g) + warningsHTML(res, g);
+  // opts.before — блок перед таблицей (светофор «Можно ли верить цифрам», только админу); opts.detail — кнопки «Подробно»
+  function screenHTML(res, g, tz, opts) {
+    const o = opts || {};
+    return periodHTML(res, tz) + coverageHTML(res, tz) + (o.before || '') + cardsHTML(res, g) + tableHTML(res, g, o) + notesHTML(res, g) + warningsHTML(res, g);
   }
 
   return { esc, num, fmtTs, toLocalInput, fromLocalInput, monthLabel, monthKeyOf, monthRange, monthOptions, lastClosingRange,
