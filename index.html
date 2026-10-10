@@ -255,14 +255,15 @@ async function loadAll(session){
 const shiftDate=()=>new Date(Date.now()+(S.tz-S.st)*3600e3).toISOString().slice(0,10);
 async function loadLoads(){
   const d=shiftDate();
-  const[r,ms,c,lo]=await Promise.all([
+  const[r,ms,c,lo,cn]=await Promise.all([
     S.can?sb.rpc('report_loads',{d1:d,d2:d}):sb.from('loads').select('id,ts,shift_date,part,machine,wash_type_id,weight_kg,extras,finished_at,created_by').eq('shift_date',d).order('ts'),
     sb.rpc('machine_status',{d}),                       // статус машин виден всем; до stage14.sql берём свои загрузки
     S.can?sb.rpc('report_changes',{d1:d,d2:d}):Promise.resolve(null),
-    Leftover.fetch()]);
+    Leftover.fetch(),
+    S.isSuper?Leftover.fetchConnects(d):Promise.resolve(undefined)]);          // список подключений нужен только суперадмину (исправление дозатора)
   S.loads=r.data||[];S.mach=ms.error?S.loads:(ms.data||[]);
   if(c)S.changes=c.data||[];
-  S.pool=lo.rows;S.names=lo.names;S.poolErr=lo.error;
+  S.pool=lo.rows;S.names=lo.names;S.poolErr=lo.error;S.conns=cn;
 }
 const roleOf=id=>S.isSuper?'admin':S.acc.find(a=>a.form_id===id)?.role;
 const canFill=f=>S.isSuper||(f.type==='laundry_load'?['worker','admin'].includes(roleOf(f.id)):['foreman','admin'].includes(roleOf(f.id)));
@@ -295,11 +296,13 @@ function metrics(ms){
 const canConnect=()=>S.isSuper||S.forms.some(f=>f.type==='laundry_chem'&&canFill(f));
 function leftoverBlock(){
   if(S.pool==null)return S.poolErr?'<p class="hint" style="margin:1rem 0 0">Остатки химии появятся после выполнения stage6.sql.</p>':'';
-  return `<section aria-label="Остатки химии"><p class="gl" style="color:var(--chd)">Остатки химии · в запасе</p><div id="lov">${Leftover.html(S.pool,S.refs.chemicals,S.names,{can:canConnect(),canWriteoff:S.isSuper,today:shiftDate()})}</div></section>`;
+  return `<section aria-label="Остатки химии"><p class="gl" style="color:var(--chd)">Остатки химии · в запасе</p><div id="lov">${Leftover.html(S.pool,S.refs.chemicals,S.names,{can:canConnect(),canWriteoff:S.isSuper,today:shiftDate()})}</div>${S.isSuper?`<div id="lofx">${Leftover.fixHtml(S.conns,S.refs.chemicals,S.names,{today:shiftDate(),tz:S.tz})}</div>`:''}</section>`;
 }
 function bindLeftover(){
   const el=document.getElementById('lov');if(!el||S.pool==null)return;
-  Leftover.bind(el,S.pool,S.refs.chemicals,S.names,{can:canConnect(),canWriteoff:S.isSuper,today:shiftDate()},async()=>{await loadLoads();dashView();});
+  const again=async()=>{await loadLoads();dashView();};
+  Leftover.bind(el,S.pool,S.refs.chemicals,S.names,{can:canConnect(),canWriteoff:S.isSuper,today:shiftDate()},again);
+  const fx=document.getElementById('lofx');if(fx&&S.conns)Leftover.fixBind(fx,S.conns,S.refs.chemicals,S.names,{today:shiftDate(),tz:S.tz},again);
 }
 // ---------- общая статистика за смену (только админы) ----------
 function shiftSeries(){

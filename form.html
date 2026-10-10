@@ -249,12 +249,12 @@
       <div class="box"><div class="sh2"><h2>2 · Какая химия закончилась</h2>${isSuper ? '<button type="button" class="mini opt" id="addc">+ Добавить</button>' : ''}</div>
         <div class="chg" id="chem">${chems.map(x => `<div class="cw"><button type="button" class="cc ${String(x.id) === c ? 'sel' : ''}" data-v="${x.id}" aria-pressed="${String(x.id) === c}">${chemImg(x)}<span class="cn">${esc(x.name)}</span><small>${sizeTxt(x)}</small><i class="ck" aria-hidden="true">✓</i></button>${isSuper ? `<button type="button" class="ed" data-e="${x.id}" aria-label="Изменить ${esc(x.name)}" title="Изменить"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20l1-5L16 4l4 4L9 19zM13 7l4 4"/></svg></button>` : ''}</div>`).join('') || '<p class="hint">Химия пока не добавлена.</p>'}</div></div>
       <div class="box"><h2>3 · Остаток в бутыли</h2>
-        <p class="hint">Сколько осталось в снятой бутыли. Остаток запишется вместе с заменой и попадёт в запас: он виден на панели смены, там же его отмечают подключённым.</p>
+        <p class="hint">Сколько осталось в снятой бутыли. Остаток запишется вместе с заменой и попадёт в запас: он виден на панели смены, там же его переливают в дозатор.</p>
         <div class="seg" id="lm"><button data-v="empty" class="on">Бутыль пустая</button><button data-v="some">Остался остаток</button></div>
         <div id="lw" hidden><div class="seg" id="lu" aria-label="Единица"><button data-v="kg" class="on">кг</button><button data-v="l">литры</button></div>
           <label>Остаток, <span id="lul">кг</span><span class="lfw"><input id="lf" type="number" min="0" step="any" inputmode="decimal" placeholder="0"><output id="lconv" class="cvo" aria-live="polite"></output></span></label><div class="fill"><i id="fb"></i></div></div>
         <p class="hint" id="lh"></p></div>
-      ${lo.rows ? `<div class="box"><h2>Остатки в запасе</h2><p class="hint">Остаток из бутылей, которые сняли не пустыми. Когда подключите его к дозатору, нажмите «Подключили остаток».</p><div id="lov">${Leftover.html(lo.rows, chems, lo.names, { can: canConn, today: new Date(Date.now() + (tzH - stH) * 3600e3).toISOString().slice(0, 10) })}</div></div>` : ''}
+      ${lo.rows ? `<div class="box"><h2>Остатки в запасе</h2><p class="hint">Остаток из бутылей, которые сняли не пустыми. Когда выльете его в дозатор, нажмите «Перелить в дозатор» и выберите, в какой именно.</p><div id="lov">${Leftover.html(lo.rows, chems, lo.names, { can: canConn, today: new Date(Date.now() + (tzH - stH) * 3600e3).toISOString().slice(0, 10) })}</div></div>` : ''}
       <div class="bar"><button class="go" id="save">Проверить и заменить</button>
       <button class="ghost" id="undo" hidden>Отменить последнюю запись</button></div><div id="ovl"></div>`;
     imgFallback(app);

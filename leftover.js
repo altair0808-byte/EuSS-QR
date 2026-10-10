@@ -1,4 +1,6 @@
-// Остатки химии: общий запас по каждой химии и кнопка «Подключили остаток».
+// Остатки химии: общий запас по каждой химии и кнопка «Перелить в дозатор».
+// Правило: объём выбранного дозатора увеличивается ровно на сумму остатков; новую бутыль это не заменяет.
+// Дозатор НЕ выбран по умолчанию: подтвердить без выбора нельзя. Суперадмин может исправить дозатор у уже записанного подключения.
 // Работает и на панели смены (index.html), и в бланке замены химии (form.html).
 // Нужны глобальные sb (supabase), toast; стили подключаются сами.
 const Leftover = (() => {
@@ -30,6 +32,31 @@ const Leftover = (() => {
       out.push({ c, p, total, other: d ? conv(c, total, p, p === 'l' ? 'kg' : 'l') : null, items });
     });
     return out;
+  }
+
+  // «дозатор 1» = машины 1–10 (1_10), «дозатор 2» = машины 11–12 (11_12)
+  const dozName = g => g === '11_12' ? 'дозатор 2' : 'дозатор 1';
+  const dozOf = g => g === '11_12' ? 'дозатора 2' : 'дозатора 1';        // «из дозатора 1»
+  const GRPS = ['1_10', '11_12'];
+  const grpOf = g => g === '11_12' ? '11_12' : '1_10';
+  // количество одной записи сразу в кг и в литрах (то, что записано, берём как есть; недостающее считаем по плотности)
+  const kgl = (c, x) => ({
+    kg: +x.leftover_kg > 0 ? +x.leftover_kg : (+x.leftover_l > 0 ? conv(c, +x.leftover_l, 'l', 'kg') : 0),
+    l: +x.leftover_l > 0 ? +x.leftover_l : (+x.leftover_kg > 0 ? conv(c, +x.leftover_kg, 'kg', 'l') : 0) });
+  // «2,98 кг (2,887 л)»; если плотность неизвестна, показываем только то, что известно
+  const amtTxt = a => a.kg > 0 && a.l > 0 ? `${N(a.kg, 3)} кг (${N(a.l, 3)} л)` : a.kg > 0 ? `${N(a.kg, 3)} кг` : `${N(a.l, 3)} л`;
+  // Модель окна «Перелить в дозатор»: по ней рисуется окно, по ней же проверяют тесты.
+  //   s — запас одной химии (summary), g — выбранный дозатор или null (по умолчанию не выбран).
+  function pourModel(s, g) {
+    const by = {};
+    s.items.forEach(x => { const k = grpOf(x.machine_group), a = kgl(s.c, x), r = by[k] || (by[k] = { g: k, kg: 0, l: 0 }); r.kg += a.kg; r.l += a.l; });
+    const from = GRPS.filter(k => by[k]).map(k => by[k]);
+    const total = from.reduce((t, r) => ({ kg: t.kg + r.kg, l: t.l + r.l }), { kg: 0, l: 0 });
+    const chosen = GRPS.includes(g) ? g : null;
+    return { from, total, totalTxt: amtTxt(total), chosen, canConfirm: !!chosen,
+      fromTxt: from.map(r => `из ${dozOf(r.g)}: ${amtTxt(r)}` + (chosen ? `, будет добавлено в ${dozName(chosen)}` : '')),
+      resultTxt: chosen ? `В ${dozName(chosen)} будет добавлено ${amtTxt(total)}` : 'Выберите дозатор, в который вы выливаете остаток',
+      btnTxt: chosen ? `Перелить в ${dozName(chosen)}` : 'Выберите дозатор' };
   }
   async function fetch() {
     const [p, n] = await Promise.all([sb.rpc('leftover_pool'), sb.rpc('staff_names')]);
@@ -74,6 +101,15 @@ const Leftover = (() => {
 .lo-dz button.sel{border-color:var(--o);background:var(--ot,#fff4e8);box-shadow:0 0 0 3px var(--o);box-shadow:0 0 0 3px color-mix(in oklab,var(--o) 20%,transparent)}.lo-dz button.sel b{color:var(--od)}
 .lo-go{display:flex;align-items:center;justify-content:center;width:100%;min-height:3.25rem;margin-top:1.1rem;border:0;border-radius:.5rem;background:var(--o);color:#fff;font:inherit;font-weight:700;font-size:1rem;cursor:pointer}
 .lo-go:disabled{opacity:.5}.lo-gh{display:flex;align-items:center;justify-content:center;width:100%;min-height:2.75rem;margin-top:.3rem;border:0;background:none;font:inherit;font-weight:600;color:var(--od);cursor:pointer}
+.lo-q{margin:.9rem 0 0;font-size:.95rem;color:var(--ink,var(--fg,#123))}.lo-pn p.lo-q{color:var(--ink,var(--fg,#123))}
+.lo-src{list-style:none;margin:.45rem 0 0;padding:0;display:grid;gap:.2rem;font-size:.85rem;color:var(--mut,var(--mf,#566))}
+.lo-res{margin:.9rem 0 0;padding:.8rem .9rem;border:2px dashed var(--ln,#d6e3e6);border-radius:.6rem;font-family:Sora,sans-serif;font-size:1.05rem;font-weight:700;line-height:1.3;color:var(--mut,#566)}
+.lo-res.on{border:2px solid var(--o);border-style:solid;background:var(--ot,#fff4e8);color:var(--od);font-size:1.25rem}
+.lo-fx{margin-top:1rem;border:1px solid var(--ln);border-radius:.5rem;background:#fff;padding:.5rem .8rem;color:var(--ik,#123)}.lo-fx summary{cursor:pointer;font-weight:700;font-size:.88rem;min-height:2.2rem;display:flex;align-items:center}
+.lo-fx ul{list-style:none;margin:.4rem 0 0;padding:0;display:grid;gap:.4rem}.lo-fx li{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;padding:.45rem 0;border-top:1px dashed var(--ln);font-size:.82rem}
+.lo-fx li span{flex:1;min-width:10rem}.lo-fx li em{font-style:normal;color:var(--mut,#566);font-size:.75rem}
+.lo-fx button{min-height:2.4rem;padding:0 .8rem;border:1px solid var(--ln);border-radius:.5rem;background:#fff;font:inherit;font-weight:600;font-size:.8rem;cursor:pointer;color:var(--od,#a74900)}
+.lo-dz button:disabled{opacity:.45;cursor:not-allowed}
 @media(min-width:640px){.lo-w{grid-template-columns:repeat(2,1fr)}.lo-ov{align-items:center}.lo-pn{border-radius:.75rem}}
 @media(min-width:1100px){.lo-w{grid-template-columns:repeat(3,1fr)}}`;
     document.head.appendChild(s);
@@ -87,7 +123,7 @@ const Leftover = (() => {
       <div class="lo-top">${thumb(s.c)}<div class="lo-nm"><b>${E(s.c.name)}</b><small>${s.items.length} ${s.items.length % 10 === 1 && s.items.length !== 11 ? 'остаток' : 'остатка'} в запасе</small></div>
         <div class="lo-tot"><b>${N(s.total)} ${U(s.p)}</b>${s.other != null ? `<small>≈ ${N(s.other)} ${s.p === 'l' ? 'кг' : 'л'}</small>` : ''}</div></div>
       <ul class="lo-l">${s.items.map(x => `<li><span>${N(x.amt)} ${U(s.p)}</span><em>${dayLabel(x.shift_date, o.today)}${names[x.created_by] ? ' · ' + E(names[x.created_by]) : ''} · дозатор ${grpName(x.machine_group)}</em></li>`).join('')}</ul>
-      ${o.can ? `<button class="lo-b" data-lo="${s.c.id}">Подключили остаток</button>` : ''}
+      ${o.can ? `<button class="lo-b" data-lo="${s.c.id}">Перелить в дозатор</button>` : ''}
       ${o.canWriteoff ? `<button class="lo-b2" data-lw="${s.c.id}">Списать остаток</button>` : ''}</article>`).join('')}</div>`;
   }
 
@@ -125,33 +161,106 @@ const Leftover = (() => {
     };
   }
 
+  // Окно «Перелить в дозатор». Дозатор по умолчанию НЕ выбран; пока не выбран, подтвердить нельзя.
   function panel(s, o, onDone) {
     if (!s) return;
     css();
-    const last = s.items[s.items.length - 1];
-    let g = last && last.machine_group || null;
+    let g = null;
+    const m0 = pourModel(s, null);
     const d = document.createElement('div'); d.className = 'lo-ov';
-    d.innerHTML = `<section class="lo-pn" role="dialog" aria-modal="true" aria-label="Подключить остаток">
-      <p class="k">Подключить остаток</p><h2>${E(s.c.name)} · ${N(s.total)} ${U(s.p)}</h2>
-      <p>Остатки (${s.items.map(x => N(x.amt) + ' ' + U(s.p)).join(' + ')}) считаются одним запасом. В какой дозатор подключили?</p>
-      <div class="lo-dz" id="lodz">${[['1_10', '1–10', 'Основной дозатор'], ['11_12', '11–12', 'Отдельный дозатор']].map(([v, b, n]) => `<button type="button" data-v="${v}" class="${g === v ? 'sel' : ''}"><b>${b}</b><span>${n}</span><small>машины ${b}</small></button>`).join('')}</div>
-      <p>Весь запас этой химии отметится как подключённый и пропадёт из остатков. В отчёте расход будет посчитан с учётом этого.</p>
-      <button class="lo-go" id="logo" type="button">Подтвердить подключение</button><button class="lo-gh" id="locl" type="button">Отмена</button></section>`;
+    d.innerHTML = `<section class="lo-pn" role="dialog" aria-modal="true" aria-label="Перелить в дозатор">
+      <p class="k">Перелить в дозатор</p><h2>${E(s.c.name)} · ${E(m0.totalTxt)}</h2>
+      <p class="lo-q"><b>В какой дозатор вы выливаете остаток?</b></p>
+      <ul class="lo-src" id="losrc">${m0.fromTxt.map(t => `<li>${E(t)}</li>`).join('')}</ul>
+      <div class="lo-dz" id="lodz">${[['1_10', '1', 'Основной дозатор', 'машины 1–10'], ['11_12', '2', 'Отдельный дозатор', 'машины 11–12']].map(([v, b, n, ms]) => `<button type="button" data-v="${v}" aria-pressed="false"><b>${b}</b><span>${n}</span><small>${ms}</small></button>`).join('')}</div>
+      <div class="lo-res" id="lores" role="status" aria-live="polite">${E(m0.resultTxt)}</div>
+      <p>Остатки (${s.items.map(x => N(x.amt) + ' ' + U(s.p)).join(' + ')}) считаются одним запасом и выливаются в один дозатор. Объём выбранного дозатора увеличится на эту сумму; новую бутыль это не заменяет. Весь запас этой химии отметится как перелитый и пропадёт из остатков.</p>
+      <button class="lo-go" id="logo" type="button" disabled>${E(m0.btnTxt)}</button><button class="lo-gh" id="locl" type="button">Отмена</button></section>`;
     document.body.appendChild(d);
     const close = () => { d.remove(); document.removeEventListener('keydown', esc); };
     const esc = e => { if (e.key === 'Escape') close(); };
     document.addEventListener('keydown', esc);
     d.onmousedown = e => { if (e.target === d) close(); };
     d.querySelector('#locl').onclick = close;
-    d.querySelector('#lodz').onclick = e => { const b = e.target.closest('button'); if (!b) return; g = b.dataset.v; d.querySelectorAll('#lodz button').forEach(x => x.classList.toggle('sel', x === b)); };
+    const draw = () => {
+      const m = pourModel(s, g);
+      d.querySelectorAll('#lodz button').forEach(x => { const on = x.dataset.v === g; x.classList.toggle('sel', on); x.setAttribute('aria-pressed', on ? 'true' : 'false'); });
+      d.querySelector('#losrc').innerHTML = m.fromTxt.map(t => `<li>${E(t)}</li>`).join('');
+      const r = d.querySelector('#lores'); r.textContent = m.resultTxt; r.classList.toggle('on', m.canConfirm);
+      const b = d.querySelector('#logo'); b.textContent = m.btnTxt; b.disabled = !m.canConfirm;
+    };
+    d.querySelector('#lodz').onclick = e => { const b = e.target.closest('button'); if (!b || !GRPS.includes(b.dataset.v)) return; g = b.dataset.v; draw(); };
     d.querySelector('#logo').onclick = async () => {
-      if (!g) { toast('Выберите дозатор'); return; }
+      if (!g) { toast('Выберите дозатор'); return; }       // подстраховка: кнопка и так неактивна
       const b = d.querySelector('#logo'); b.disabled = true;
       const { error } = await sb.rpc('connect_leftovers', { p_chemical: +s.c.id, p_group: g });
       if (error) { toast('Не удалось: ' + error.message); b.disabled = false; return; }
-      close(); toast('Остаток подключён: ' + s.c.name); if (onDone) onDone();
+      close(); toast('Остаток перелит в ' + dozName(g) + ': ' + s.c.name); if (onDone) onDone();
     };
   }
 
-  return { fetch, summary, html, bind, panel, writeoffPanel, css, N, U, grpName, dayLabel };
+  // ---- Исправление уже записанного подключения (только суперадмин, с паролем) ----
+  // Подключения читаем через report_connects (права: отчёты). Запись правит connect_set_group (stage23.sql).
+  async function fetchConnects(today, days = 45) {
+    const day = k => new Date(Date.parse(today + 'T00:00:00Z') + k * 864e5).toISOString().slice(0, 10);
+    const r = await sb.rpc('report_connects', { d1: day(-days), d2: day(1) });
+    return r.error ? null : (r.data || []).slice().sort((a, b) => String(b.ts).localeCompare(String(a.ts)));
+  }
+  const connAmt = (c, k) => amtTxt(kgl(c, { leftover_kg: k.amount_kg, leftover_l: k.amount_l }));
+  // Описание того, что произойдёт при смене дозатора (по нему же рисуется окно и пишут тесты)
+  function fixModel(c, k, to) {
+    const from = grpOf(k.machine_group), a = connAmt(c, k), ok = GRPS.includes(to) && to !== from;
+    return { from, to: ok ? to : null, amt: a, canConfirm: ok,
+      nowTxt: `Сейчас записано в ${dozName(from)}`,
+      resultTxt: ok ? `Запись перейдёт из ${dozOf(from)} в ${dozName(to)}: в ${dozName(to)} будет +${a}, из ${dozOf(from)} это количество уберётся` : 'Выберите дозатор, в который на самом деле налили',
+      btnTxt: ok ? `Записать в ${dozName(to)}` : 'Выберите другой дозатор' };
+  }
+  function fixHtml(rows, chems, names, o) {
+    css();
+    if (rows == null) return '<details class="lo-fx"><summary>Исправить дозатор у подключения</summary><p class="lo-e">Список подключений не загрузился. Обновите страницу.</p></details>';
+    const hm = ts => new Date(new Date(ts).getTime() + (o.tz ?? 5) * 3600e3).toISOString().slice(11, 16);
+    const list = rows.slice(0, 15).map(k => { const c = chems.find(x => +x.id === +k.chemical_id) || { name: 'Химия #' + k.chemical_id };
+      return `<li><span><b>${E(c.name)}</b> · ${E(connAmt(c, k))}<br><em>${dayLabel(k.shift_date, o.today)} ${hm(k.ts)} · записано в ${E(dozName(k.machine_group))}${names[k.created_by] ? ' · ' + E(names[k.created_by]) : ''}</em></span><button type="button" data-lx="${E(k.id)}">Изменить дозатор</button></li>`; }).join('');
+    return `<details class="lo-fx" id="lofxd"><summary>Исправить дозатор у подключения (суперадмин)</summary>${rows.length ? `<ul>${list}</ul>${rows.length > 15 ? '<p class="lo-e">Показаны 15 последних подключений.</p>' : ''}` : '<p class="lo-e">Подключений за последние недели нет.</p>'}</details>`;
+  }
+  function fixBind(root, rows, chems, names, o, onDone) {
+    (rows || []).forEach(k => { const b = root.querySelector(`[data-lx="${k.id}"]`); if (b) b.onclick = () => fixPanel(k, chems.find(x => +x.id === +k.chemical_id) || { name: 'Химия #' + k.chemical_id }, o, onDone); });
+  }
+  function fixPanel(k, c, o, onDone) {
+    css();
+    let to = null;
+    const m0 = fixModel(c, k, null);
+    const d = document.createElement('div'); d.className = 'lo-ov';
+    d.innerHTML = `<section class="lo-pn" role="dialog" aria-modal="true" aria-label="Изменить дозатор у подключения">
+      <p class="k" style="color:#b42318">Исправить подключение</p><h2>${E(c.name)} · ${E(m0.amt)}</h2>
+      <p>${E(m0.nowTxt)}. В какой дозатор остаток налили на самом деле?</p>
+      <div class="lo-dz" id="fxdz">${[['1_10', '1', 'Основной дозатор', 'машины 1–10'], ['11_12', '2', 'Отдельный дозатор', 'машины 11–12']].map(([v, b, n, ms]) => `<button type="button" data-v="${v}" aria-pressed="false" ${v === grpOf(k.machine_group) ? 'disabled' : ''}><b>${b}</b><span>${v === grpOf(k.machine_group) ? 'сейчас здесь' : n}</span><small>${ms}</small></button>`).join('')}</div>
+      <div class="lo-res" id="fxres" role="status" aria-live="polite">${E(m0.resultTxt)}</div>
+      <p>Нужен пароль. Правка попадёт в журнал со старым и новым дозатором. Если запись относится к закрытому периоду, закрытие получит пометку «нужен пересчёт».</p>
+      <button class="lo-go dg" id="fxgo" type="button" disabled>${E(m0.btnTxt)}</button><button class="lo-gh" id="fxcl" type="button">Отмена</button></section>`;
+    document.body.appendChild(d);
+    const close = () => { d.remove(); document.removeEventListener('keydown', esc); };
+    const esc = e => { if (e.key === 'Escape' && !document.querySelector('form[role=dialog]')) close(); };
+    document.addEventListener('keydown', esc);
+    d.onmousedown = e => { if (e.target === d) close(); };
+    d.querySelector('#fxcl').onclick = close;
+    const draw = () => {
+      const m = fixModel(c, k, to);
+      d.querySelectorAll('#fxdz button').forEach(x => { const on = x.dataset.v === to; x.classList.toggle('sel', on); x.setAttribute('aria-pressed', on ? 'true' : 'false'); });
+      const r = d.querySelector('#fxres'); r.textContent = m.resultTxt; r.classList.toggle('on', m.canConfirm);
+      const b = d.querySelector('#fxgo'); b.textContent = m.btnTxt; b.disabled = !m.canConfirm;
+    };
+    d.querySelector('#fxdz').onclick = e => { const b = e.target.closest('button'); if (!b || b.disabled || !GRPS.includes(b.dataset.v)) return; to = b.dataset.v; draw(); };
+    d.querySelector('#fxgo').onclick = async () => {
+      const m = fixModel(c, k, to); if (!m.canConfirm) return;
+      let res = null;
+      const ok = await withPw('Изменить дозатор?', `${c.name}: ${m.amt}\n${dozName(m.from)} → ${dozName(m.to)}`, async pw => { res = await rpcAsk('connect_set_group', { p_id: k.id, p_group: m.to, p_pw: pw }); return res; });
+      if (!ok) return;
+      close();
+      toast(res && res.closed_period ? 'Исправлено. Запись в закрытом периоде: закрытие помечено «нужен пересчёт», пересчитайте его в отчёте по закрытиям' : 'Дозатор исправлен: ' + dozName(m.to));
+      if (onDone) onDone();
+    };
+  }
+
+  return { fetch, summary, html, bind, panel, pourModel, writeoffPanel, fetchConnects, fixModel, fixHtml, fixBind, fixPanel, css, N, U, grpName, dozName, dozOf, dayLabel };
 })();

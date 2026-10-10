@@ -61,6 +61,8 @@ function diff(entity,o,n){
     add('Время',dmy(shiftOf(o.ts))+' '+hhmm(o.ts),dmy(shiftOf(n.ts))+' '+hhmm(n.ts));
   }else if(entity==='chem'){
     add('Дозатор',grp(o.machine_group),grp(n.machine_group));add('Остаток',leftTxt(o),leftTxt(n));
+  }else if(entity==='connect'){
+    add('Дозатор',grp(o.machine_group),grp(n.machine_group));   // правка подключения суперадмином (connect_set_group)
   }
   return L.length?`<ul class="df">${L.map(x=>'<li>'+x+'</li>').join('')}</ul>`:'';
 }
