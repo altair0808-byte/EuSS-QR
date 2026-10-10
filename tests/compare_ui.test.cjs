@@ -4,7 +4,7 @@ const rd = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
 let ok = 0, bad = 0; const t = (n, f) => { try { f(); ok++; console.log('  ✓', n); } catch (e) { bad++; console.log('  ✗', n, '\n     ', e.message); } };
 const ta = async (n, f) => { try { await f(); ok++; console.log('  ✓', n); } catch (e) { bad++; console.log('  ✗', n, '\n     ', e.message); } };
 
-const ctx = () => { const sb = { module: { exports: {} }, console }; vm.createContext(sb); ['num.js', 'report-calc.js', 'compare-calc.js', 'compare-view.js'].forEach(f => vm.runInContext(rd(f), sb, { filename: f })); return sb; };
+const ctx = () => { const sb = { module: { exports: {} }, console, TextEncoder, Uint8Array, Promise, setImmediate, JSON, Math }; vm.createContext(sb); ['num.js', 'report-calc.js', 'compare-calc.js', 'compare-view.js', 'xlsx-writer.js', 'compare-detail.js', 'compare-xlsx.js', 'compare-data.js'].forEach(f => vm.runInContext(rd(f), sb, { filename: f })); return sb; };
 const sb = ctx(), ev = s => vm.runInContext(s, sb);
 const V = ev('CompareView'), calcCompare = ev('calcCompare');
 
