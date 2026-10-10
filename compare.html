@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Сравнение химии — EuSS</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#2aa3b5">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="EuSS">
+<meta name="format-detection" content="telephone=no">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="favicon.png" type="image/png"><link rel="stylesheet" href="style.css"><style>
+.tot{display:grid;grid-template-columns:repeat(2,1fr);gap:.6rem;margin:.6rem 0}@media(min-width:720px){.tot{grid-template-columns:repeat(4,1fr)}}
+.tot div{padding:.65rem .8rem;border:1px solid var(--ln);border-radius:var(--r);background:var(--card);box-shadow:var(--sh)}
+.tot span{display:block;font-size:.66rem;font-weight:800;text-transform:uppercase;color:var(--mut)}.tot b{font-family:Sora,sans-serif;font-size:1.1rem}
+.tot .bad{border-color:#f3b8b1;background:#fdecea}.tot .low{border-color:#b9d7f0;background:#eaf3fc}.tot .ck,.tot .wn{border-color:#f1d58a;background:#fff6e0}
+.tw{overflow-x:auto;margin:.5rem 0;border:1px solid var(--ln);border-radius:var(--r);background:var(--card)}
+.tw table{width:100%;border-collapse:collapse;font-size:.88rem}.tw th,.tw td{padding:.5rem .65rem;border-bottom:1px solid var(--ln);text-align:right;white-space:nowrap}
+.tw th:first-child,.tw td:first-child{text-align:left;position:sticky;left:0;background:var(--card)}.tw th{font-size:.68rem;text-transform:uppercase;color:var(--mut)}
+.tw tr.tt td{font-weight:800;background:var(--soft)}.tw tr.tt td:first-child{background:var(--soft)}
+td.bad{color:#b42318;font-weight:700}td.low{color:#175cd3;font-weight:700}td.ck{color:#8a5a00;font-weight:700}
+.st{display:inline-block;padding:.1rem .5rem;border-radius:99px;font-size:.7rem;font-weight:800;background:var(--tint);color:var(--mut)}
+.st.ok{background:#e7f6ef;color:#14532d}.st.over{background:#fdecea;color:#7a1a12}.st.under{background:#eaf3fc;color:#0b3f8a}.st.ck{background:#fff6e0;color:#6b4a00}.st.nd{background:#eef2f3;color:#4f6f79}
+.msg{margin:.6rem 0;padding:.7rem .9rem;border-radius:var(--r);font-size:.88rem}.msg.wr{background:#fff6e0;color:#6b4a00;border:1px solid #f1d58a}.msg.er{background:#fdecea;color:#7a1a12;border:1px solid #f3b8b1}
+.msg ul{margin:.3rem 0 0;padding-left:1.1rem}.msg summary{cursor:pointer;font-weight:700}
+.pick{display:grid;grid-template-columns:1fr;gap:.5rem;margin:.6rem 0}@media(min-width:720px){.pick.c{grid-template-columns:1fr 1fr auto;align-items:end}}
+.pick label{margin-top:0}.pick .go{min-height:2.75rem}
+</style></head>
+<body>
+<header class="hd"><div><a class="lg" href="index.html" aria-label="На панель смены"><img src="euss-logo.png" alt="EuSS"><span class="sep"></span><span class="sub">Сравнение химии</span></a><nav class="nav"><a class="btn s" href="closings-report.html">Закрытия</a><a class="btn s" href="report.html">Отчёт по сменам</a><a class="btn s" href="index.html">← Панель</a></nav></div></header>
+<main class="wide">
+<div class="top" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.75rem"><h1>Сравнение химии: теория и факт</h1></div>
+<div class="seg" id="mode" role="group" aria-label="Период"><button data-m="last" class="on">Последнее закрытие</button><button data-m="month">Месяц</button><button data-m="custom">Свой период</button></div>
+<div id="pick"></div>
+<div class="seg" id="grp" role="group" aria-label="Дозатор"><button data-g="all" class="on">Оба</button><button data-g="1_10">Дозатор 1</button><button data-g="11_12">Дозатор 2</button></div>
+<div id="out"><p class="hint">Загрузка…</p></div>
+</main>
+<script src="lite.js"></script>
+<script src="kiosk.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script><script src="num.js"></script><script src="app.js"></script><script src="report-calc.js"></script><script src="compare-calc.js"></script><script src="compare-view.js"></script>
+<script>
+// Сравнение химии (этап 2, краткий вид). Только для админов и суперадмина.
+// Факт считается по замерам остатков между закрытиями (compare-calc.js); здесь только выбор периода, загрузка данных и показ.
+let L=[],refs=null,tz=5,st=6,warnPct=25,mode='last',group='all',res=null,seq=0,customFrom=null,customTo=null,month=null;
+const V=CompareView,out=()=>document.getElementById('out');
+const R=async(fn,a)=>{const {data,error}=await sb.rpc(fn,a);if(error)throw new Error(error.message);return data||[];};
+
+function range(){                                  // [от, до) для выбранного режима; null — период не выбран
+  if(mode==='last')return V.lastClosingRange(L);
+  if(mode==='month'){const r=V.monthRange(month,tz,st,Date.now());return {fromTs:r.fromTs,toTs:r.toTs};}
+  return customFrom&&customTo?{fromTs:customFrom,toTs:customTo}:null;
+}
+
+async function compute(){
+  const my=++seq,r=range();
+  if(!r){out().innerHTML=mode==='last'?'<div class="msg wr">Нужно хотя бы два закрытия (начальный замер и ещё одно). Выберите «Месяц» или «Свой период», чтобы увидеть теорию.</div>':'<p class="hint">Выберите период и нажмите «Показать».</p>';return;}
+  if(!(new Date(r.toTs)>new Date(r.fromTs))){out().innerHTML='<div class="msg er">Конец периода должен быть позже начала.</div>';return;}
+  out().innerHTML='<p class="hint">Считаю…</p>';
+  try{
+    const A=new Date(r.fromTs).getTime(),B=new Date(r.toTs).getTime();
+    const inside=L.filter(c=>{const t=new Date(c.at_ts).getTime();return t>=A&&t<=B;});          // закрытия внутри периода — границы отрезков факта
+    const from=shiftDateOf(r.fromTs,tz,st),to=shiftDateOf(r.toTs,tz,st),back=addDaysISO(from,-60),needFact=inside.length>=2;
+    const [loads,changes,connects,moves,levels,mrows,resRows]=await Promise.all([
+      R('report_loads',{d1:from,d2:to}),
+      needFact?R('report_changes',{d1:back,d2:to}):[],needFact?R('report_connects',{d1:back,d2:to}):[],
+      needFact?R('report_moves',{d1:back,d2:to}).catch(()=>[]):[],needFact?R('report_levels',{d1:back,d2:to}).catch(()=>[]):[],
+      needFact?sb.from('closing_measures').select('closing_id,chemical_id,machine_group,amount_kg').in('closing_id',inside.map(c=>c.id)).then(x=>{if(x.error)throw new Error(x.error.message);return x.data||[];}):[],
+      needFact?R('get_residents',{d1:from,d2:to}).catch(()=>null):null]);
+    let residents=null;if(resRows){residents={};resRows.forEach(x=>residents[x.day]=x.cnt);}
+    const out0=calcCompare(refs,{fromTs:r.fromTs,toTs:r.toTs,tz,st,closings:chainFromRows(inside,mrows),loads,changes,connects,moves,levels,residents,warnPct,tolPct:warnPct});
+    if(my!==seq)return;                                                                           // пока считали, выбрали другой период
+    res=out0;draw();
+  }catch(e){if(my===seq)out().innerHTML=`<div class="msg er">Не удалось посчитать: ${V.esc(e.message)}</div>`;}
+}
+function draw(){if(res)out().innerHTML=V.screenHTML(res,group,tz);}
+
+function drawPick(){
+  const p=document.getElementById('pick');
+  if(mode==='last'){const r=V.lastClosingRange(L);p.innerHTML=r?`<p class="hint">От предыдущего замера до последнего закрытия.</p>`:'';return;}
+  if(mode==='month'){p.innerHTML=`<div class="pick"><label>Месяц<select id="mn">${V.monthOptions(Date.now(),tz,st).map(o=>`<option value="${o.key}"${o.key===month?' selected':''}>${o.label}</option>`).join('')}</select></label></div>`;document.getElementById('mn').onchange=e=>{month=e.target.value;compute();};return;}
+  p.innerHTML=`<div class="pick c"><label>С<input type="datetime-local" id="cf" value="${customFrom?V.toLocalInput(customFrom,tz):''}"></label><label>По<input type="datetime-local" id="ct" value="${customTo?V.toLocalInput(customTo,tz):''}"></label><button class="go" id="cg">Показать</button></div><p class="hint">Время местное. Факт будет посчитан только между закрытиями внутри периода.</p>`;
+  document.getElementById('cg').onclick=()=>{customFrom=V.fromLocalInput(document.getElementById('cf').value,tz);customTo=V.fromLocalInput(document.getElementById('ct').value,tz);compute();};
+}
+
+(async()=>{
+  const ses=await need();if(!ses)return;
+  const [{data:pr},{data:adm}]=await Promise.all([sb.from('profiles').select('role').eq('id',ses.user.id).maybeSingle(),sb.rpc('is_admin')]);
+  if(!adm&&pr?.role!=='superadmin'){out().innerHTML='<p>Сравнение химии доступно админам и суперадмину.</p>';return;}
+  const [s,c,w,rc,cl]=await Promise.all([sb.from('settings').select('*'),sb.from('chemicals').select('*').order('sort'),sb.from('wash_types').select('id,name').order('sort'),sb.from('recipes').select('*'),sb.from('closings').select('id,at_ts,kind').order('at_ts',{ascending:false})]);
+  if(cl.error){out().innerHTML=`<div class="msg er">${V.esc(/closings/.test(cl.error.message)?'Выполните stage15.sql в Supabase.':cl.error.message)}</div>`;return;}
+  const g=k=>{const x=(s.data||[]).find(y=>y.key===k);return x?+x.value:null};
+  tz=g('tz_offset')??5;st=g('shift_start')??6;warnPct=g('close_warn_pct')??25;
+  refs={water:g('water_l')??55,washTypes:w.data||[],chemicals:c.data||[],recipes:rc.data||[]};
+  L=cl.data||[];month=V.monthKeyOf(Date.now(),tz,st);
+  const def=V.lastClosingRange(L)||{fromTs:new Date(Date.now()-7*864e5).toISOString(),toTs:new Date().toISOString()};customFrom=def.fromTs;customTo=def.toTs;
+  document.getElementById('mode').onclick=e=>{const b=e.target.closest('button');if(!b)return;mode=b.dataset.m;document.querySelectorAll('#mode button').forEach(x=>x.classList.toggle('on',x===b));drawPick();compute();};
+  document.getElementById('grp').onclick=e=>{const b=e.target.closest('button');if(!b)return;group=b.dataset.g;document.querySelectorAll('#grp button').forEach(x=>x.classList.toggle('on',x===b));draw();};   // дозаторы переключаются без пересчёта
+  drawPick();await compute();
+})();
+</script>
+<script src="compat.js"></script>
+<script src="idle.js"></script>
+<script src="pwa.js"></script>
+</body></html>
