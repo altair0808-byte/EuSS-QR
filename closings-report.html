@@ -63,7 +63,9 @@ const factTheory=c=>{const a=allRows(c).filter(r=>r.kind==='main');const fs=a.re
 
 function list(){
   if(!L.length) return '<p class="hint">Закрытий ещё нет.</p>';
-  return `<div class="cl">${L.map(c=>{const s=c.snapshot,per=c.period_from&&s?`${periodTxt(c)} · ${dur(c)}`:'точка отсчёта';
+  const nr=L.filter(c=>c.kind!=='start'&&c.needs_recalc).length;
+  const bulk=isSuper&&nr?`<div class="msg er">Изменилось правило учёта подключённого остатка: он только добавляется к дозатору и новую бутыль не заменяет. Закрытий к пересчёту: ${nr}. <button class="btn" id="recalcAll">Пересчитать все закрытия по новому правилу</button></div>`:'';
+  return bulk+`<div class="cl">${L.map(c=>{const s=c.snapshot,per=c.period_from&&s?`${periodTxt(c)} · ${dur(c)}`:'точка отсчёта';
     const r=factTheory(c);
     return `<button data-id="${c.id}"><span><b>${KIND[c.kind]} · ${fmtTs(c.at_ts)}</b>${c.is_etalon?'<span class="tg2 et">эталон</span>':''}${c.needs_recalc?'<span class="tg2 rc">нужен пересчёт</span>':''}${c.late?'<span class="tg2">позднее</span>':''}<br><small>${per}</small></span>
      <small>${s?`${f(s.totals.washes)} стирок · ${f(s.totals.laundry_kg)} кг белья${r!=null?' · факт/теория '+f(r,3):''}`:''}</small></button>`;}).join('')}</div>`;
@@ -138,8 +140,43 @@ function render(id){
   $('#out').innerHTML=c?card(c):view==='months'?months():list();
   $('#out').onclick=e=>{const b=e.target.closest('button');if(!b)return;
     if(b.id==='back')return render();
+    if(b.id==='recalcAll')return recalcAll();
     if(b.dataset.id){render(b.dataset.id);scrollTo(0,0);return;}
     if(b.dataset.a&&c)act(b.dataset.a,c);};
+}
+
+// Пересчёт одного закрытия по ТЕКУЩЕМУ правилу (подключённый остаток только добавляется к дозатору). Ничего не сохраняет, возвращает снимок.
+async function recalcCalc(c){
+  const P=L[L.indexOf(c)+1];if(!P)throw new Error('Нет предыдущего замера');
+  const mm=async id=>{const {data}=await sb.from('closing_measures').select('*').eq('closing_id',id);const o={};(data||[]).forEach(x=>o[x.chemical_id+':'+x.machine_group]=+x.amount_kg);return o;};
+  const fromTs=P.at_ts,toTs=c.at_ts,from=shiftDateOf(fromTs,tz,st),to=shiftDateOf(toTs,tz,st),back=addDaysISO(from,-60),R=async(fn,a)=>{const {data,error}=await sb.rpc(fn,a);if(error)throw new Error(error.message);return data||[];};
+  const [s0,s1,loads,changes,connects,moves,levels]=await Promise.all([mm(P.id),mm(c.id),R('report_loads',{d1:from,d2:to}),R('report_changes',{d1:back,d2:to}),R('report_connects',{d1:back,d2:to}),R('report_moves',{d1:back,d2:to}).catch(()=>[]),R('report_levels',{d1:back,d2:to}).catch(()=>[])]);
+  let residents=null;try{const rr=await R('get_residents',{d1:from,d2:to});residents={};rr.forEach(x=>residents[x.day]=x.cnt);}catch(e){}
+  return calcClosing(refs,{fromTs,toTs,tz,st,startKg:s0,endKg:s1,reserveStart:P.reserve||null,loads,changes,connects,moves,levels,residents,warnPct});
+}
+const sumFact=rows=>{const a=(rows||[]).filter(r=>r.group==='all'&&r.kind==='main');return a.length?a.reduce((x,r)=>x+(+r.fact_kg||0),0):null;};
+// Пересчёт ВСЕХ закрытий по новому правилу подключения остатка (stage22): сначала расчёт и «было → стало», потом одно подтверждение паролем.
+// Каждое закрытие сохраняется через closing_recalc: старый снимок остаётся в closing_log, а копия всех снимков — в closings_backup_stage22 (откат: closings_restore_stage22()).
+async function recalcAll(){
+  const todo=L.filter(c=>c.kind!=='start'&&c.needs_recalc).slice().reverse();   // от старых к новым
+  if(!todo.length)return toast('Нет закрытий, которые нужно пересчитать');
+  try{
+    toast('Считаю '+todo.length+' закрытий…');
+    const out=[],bad=[];
+    for(const c of todo){try{out.push({c,res:await recalcCalc(c)});}catch(e){bad.push(fmtTs(c.at_ts)+': '+e.message);}}
+    if(!out.length)throw new Error(bad.join('; '));
+    const lines=out.map(({c,res})=>{const o=sumFact(c.snapshot?.rows),n=sumFact(res.rows);return `${fmtTs(c.at_ts)}: факт ${o==null?'–':f(o)} → ${n==null?'–':f(n)} кг`+(o!=null&&n!=null&&Math.abs(o-n)<1e-9?' (без изменений)':'');});
+    const txt=`Пересчитать закрытий: ${out.length}. Суммарный факт по основной химии, кг (было → стало):\n`+lines.join('\n')+(bad.length?`\n\nНе удалось посчитать (останутся как есть):\n`+bad.join('\n'):'')+'\n\nСтарые снимки сохранятся в журнале и в резервной копии.';
+    let done=0;const fail=[];
+    const ok=await withPw('Пересчитать все закрытия по новому правилу?',txt,async pw=>{
+      for(const {c,res} of out){
+        const r=await rpcAsk('closing_recalc',{p_id:c.id,p_snapshot:{...res,warn_pct:warnPct,version:2,recalc:true},p_pw:pw});
+        if(!r.ok){if(done===0&&!fail.length)return r;fail.push(fmtTs(c.at_ts)+': '+(r.error||'ошибка'));} else done++;
+      }
+      return {ok:true};
+    });
+    if(ok){toast(fail.length?`Пересчитано ${done} из ${out.length}. Не сохранились: ${fail.join('; ')}`:`Пересчитано закрытий: ${done}`);await load();}
+  }catch(e){toast('Не удалось пересчитать: '+e.message);}
 }
 
 async function act(a,c){
@@ -149,12 +186,7 @@ async function act(a,c){
   if(a==='recalc'){
     try{
       if(!c.needs_recalc)throw new Error('Закрытие зафиксировано: пересчёт возможен только после правки записи внутри периода');
-      const P=L[L.indexOf(c)+1];if(!P)throw new Error('Нет предыдущего замера');
-      const mm=async id=>{const {data}=await sb.from('closing_measures').select('*').eq('closing_id',id);const o={};(data||[]).forEach(x=>o[x.chemical_id+':'+x.machine_group]=+x.amount_kg);return o;};
-      const fromTs=P.at_ts,toTs=c.at_ts,from=shiftDateOf(fromTs,tz,st),to=shiftDateOf(toTs,tz,st),back=addDaysISO(from,-60),R=async(fn,a)=>{const {data,error}=await sb.rpc(fn,a);if(error)throw new Error(error.message);return data||[];};
-      const [s0,s1,loads,changes,connects,moves,levels]=await Promise.all([mm(P.id),mm(c.id),R('report_loads',{d1:from,d2:to}),R('report_changes',{d1:back,d2:to}),R('report_connects',{d1:back,d2:to}),R('report_moves',{d1:back,d2:to}).catch(()=>[]),R('report_levels',{d1:back,d2:to}).catch(()=>[])]);
-      let residents=null;try{const rr=await R('get_residents',{d1:from,d2:to});residents={};rr.forEach(x=>residents[x.day]=x.cnt);}catch(e){}
-      const res=calcClosing(refs,{fromTs,toTs,tz,st,startKg:s0,endKg:s1,reserveStart:P.reserve||null,loads,changes,connects,moves,levels,residents,warnPct});
+      const res=await recalcCalc(c);
       const old=allRows(c),diff=allRows({snapshot:res}).map(r=>{const o=old.find(x=>+x.chemical_id===+r.chemical_id);return `${r.name}: ${o?.fact_kg==null?'–':f(o.fact_kg)} → ${r.fact_kg==null?'–':f(r.fact_kg)} кг`;}).join('\n');
       if(await withPw('Сохранить пересчёт?','Факт, кг (было → стало):\n'+diff,pw=>rpcAsk('closing_recalc',{p_id:c.id,p_snapshot:{...res,warn_pct:warnPct,version:2,recalc:true},p_pw:pw}))){toast('Пересчитано');await load(c.id);}
     }catch(e){toast('Не удалось пересчитать: '+e.message);}

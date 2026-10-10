@@ -117,7 +117,7 @@ function units(r,key){
 }
 function rowCard(r){
   const fl=r.flows,u=r.unit_small;
-  const parts=[['новые бутыли',fl.bottles],['остатки ушли в запас',-fl.leftovers],['подключено остатков',fl.connects],['вместо бутыли при подключении',fl.replacedByConnect],['залито из запаса',fl.pours],['добавлено суперадмином',fl.adds],['забрано',-fl.takes],['поправка по уровню',fl.levelAdj]].filter(x=>Math.abs(x[1])>1e-12);
+  const parts=[['новые бутыли',fl.bottles],['остатки ушли в запас',-fl.leftovers],['подключено остатков',fl.connects],['вместо бутыли при подключении (всегда 0)',fl.replacedByConnect],['залито из запаса',fl.pours],['добавлено суперадмином',fl.adds],['забрано',-fl.takes],['поправка по уровню',fl.levelAdj]].filter(x=>Math.abs(x[1])>1e-12);
   return `<div class="pr"><h3>${r.group==='all'?'Итого по обоим дозаторам':GL[r.group]}</h3>
    <div class="pg">
     <div><span>На начало (с нуля)</span><b>${units(r,'start_kg')}</b></div>
