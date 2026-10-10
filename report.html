@@ -34,7 +34,7 @@
 <body>
 <header class="hd"><div><a class="lg" href="index.html" aria-label="На панель смены"><img src="euss-logo.png" alt="EuSS"><span class="sep"></span><span class="sub">Отчёты</span></a><nav class="nav"><a class="btn s" href="index.html">← Панель</a></nav></div></header>
 <main class="wide">
-<div class="top" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.75rem"><h1>Отчёт по сменам</h1><span><a class="btn" id="tocl" href="closings-report.html" hidden><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v17M7 21h10M4 7h16"/><path d="M4 7l-2.5 6.5a3 3 0 0 0 5 0zM20 7l-2.5 6.5a3 3 0 0 0 5 0z"/></svg> Закрытия</a> <a class="btn" href="journal.html"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg> Журнал изменений</a></span></div>
+<div class="top" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.75rem"><h1>Отчёт по сменам</h1><span><a class="btn" id="tocmp" href="compare.html" hidden>Сравнение химии</a> <a class="btn" id="tocl" href="closings-report.html" hidden><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v17M7 21h10M4 7h16"/><path d="M4 7l-2.5 6.5a3 3 0 0 0 5 0zM20 7l-2.5 6.5a3 3 0 0 0 5 0z"/></svg> Закрытия</a> <a class="btn" href="journal.html"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg> Журнал изменений</a></span></div>
 <div class="box">
   <div class="acc"><label>С даты смены<input type="date" id="d1"></label><label>По дату смены<input type="date" id="d2"></label></div>
   <div class="seg" role="group" aria-label="Период"><button id="t">Сегодня</button><button id="y">Вчера</button><button id="w">7 дней</button><button id="mo">Этот месяц</button><button id="pm">Прошлый месяц</button></div>
@@ -291,7 +291,7 @@ $('#w').onclick=()=>setRange(addDays(shiftToday(),-6),shiftToday());
   const ses=await need();if(!ses)return;
   const {data:pr}=await sb.from('profiles').select('role').eq('id',ses.user.id).maybeSingle();const isSuper=pr?.role==='superadmin';
   const {data:fa}=await sb.from('form_access').select('role').eq('user_id',ses.user.id);
-  canEdit=isSuper||(fa||[]).some(r=>r.role==='admin');const _tocl=document.getElementById('tocl');if(_tocl)_tocl.hidden=!canEdit;
+  canEdit=isSuper||(fa||[]).some(r=>r.role==='admin');const _tocl=document.getElementById('tocl');if(_tocl)_tocl.hidden=!canEdit;const _tocmp=document.getElementById('tocmp');if(_tocmp)_tocmp.hidden=!canEdit;
   const {data:ok}=await sb.rpc('can_report');
   if(!ok){$('#out').innerHTML='<p>Нет доступа к отчёту. Обратитесь к администратору.</p>';return;}
   const [s,c,w,r]=await Promise.all([sb.from('settings').select('*'),sb.from('chemicals').select('*').order('sort'),sb.from('wash_types').select('id,name').order('sort'),sb.from('recipes').select('*')]);
