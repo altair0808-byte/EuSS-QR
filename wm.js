@@ -1,6 +1,6 @@
 // Рисунок стиральной машины: квадратный корпус, ручка и кнопки сверху, экранчик с цифрами остатка времени, круглый люк.
 // Одинаково выглядит на главной (index.html) и в загрузке белья (form.html). Только CSS и разметка, без картинок.
-// WM.html({ n: номер машины, on: идёт стирка, left: минут осталось, scr: текст на экранчике вместо времени })
+// WM.html({ n: номер машины, on: идёт стирка, left: минут осталось, scr: текст на экранчике вместо времени, ph: WM.phase(...) - этап: заполнение / стирка / сушка })
 const WM = (() => {
   const A = 'var(--pri,var(--ac,#2aa3b5))';
   const css = `
@@ -43,6 +43,20 @@ const WM = (() => {
 @keyframes wmup{0%{transform:translateY(0) scale(.6);opacity:0}15%{opacity:.95}70%{opacity:.8}100%{transform:translateY(-46px) scale(1.15);opacity:0}}
 @keyframes wmdr{0%{transform:translateY(-8px);opacity:0}6%{opacity:1}22%{transform:translateY(34px);opacity:1}26%,100%{transform:translateY(34px);opacity:0}}
 @supports(color:color-mix(in oklab,red,blue)){.wm-d .wm-hl{stroke:color-mix(in oklab,${A} 35%,#fff)}.wm.on{box-shadow:inset 0 -3px 0 rgb(0 0 0/.06),0 3px 10px color-mix(in oklab,${A} 35%,transparent)}.wm.on .wm-r{border-color:color-mix(in oklab,${A} 70%,transparent)}}
+.wm-d .wm-lv{display:none}.wm.fill .wm-lv{display:inline;animation-name:wmlv;animation-timing-function:linear;animation-fill-mode:forwards;animation-iteration-count:1}
+.wm-d .wm-fi,.wm-d .wm-hw,.wm-d .wm-st{display:none}
+.wm.fill .wm-fi{display:inline;fill:#4fc3e8;opacity:0;animation:wmfi .8s ease-in infinite}
+.wm.fill .wm-d,.wm.fill .wm-dm,.wm.fill .wm-fz{animation:none}.wm.fill .wm-fz{display:none}
+.wm.dry .wm-dw,.wm.dry .wm-fz{display:none}
+.wm.dry .wm-d{background:radial-gradient(circle at 34% 28%,#fff 0 10%,#fbe6d2 38%,#f3c9a3)}
+.wm.dry .wm-dm{animation-duration:1.5s}
+.wm.dry .wm-hw{display:inline;fill:none;stroke:#f08a3c;stroke-width:2.6;stroke-linecap:round;opacity:0;animation:wmht 2.2s ease-in infinite}
+.wm.dry .wm-st{display:inline;fill:#fff;opacity:0;animation:wmst 2.8s ease-out infinite}
+@keyframes wmlv{from{transform:translateY(56px)}to{transform:translateY(0)}}
+@keyframes wmfi{0%{transform:translateY(0);opacity:0}12%{opacity:.95}85%{opacity:.9}100%{transform:translateY(30px);opacity:0}}
+@keyframes wmht{0%{transform:translateY(8px);opacity:0}25%{opacity:.85}100%{transform:translateY(-34px);opacity:0}}
+@keyframes wmst{0%{transform:translateY(6px) scale(.5);opacity:0}20%{opacity:.8}100%{transform:translateY(-40px) scale(1.5);opacity:0}}
+@media(prefers-reduced-motion:reduce){.wm.fill .wm-lv,.wm.fill .wm-fi,.wm.dry .wm-dm,.wm.dry .wm-hw,.wm.dry .wm-st{animation:none}.wm.fill .wm-fi,.wm.dry .wm-hw,.wm.dry .wm-st{opacity:.5}}
 @media(prefers-reduced-motion:reduce){.wm.on .wm-d{animation:none}}`;
   function mount() { if (document.getElementById('wm-css')) return; const s = document.createElement('style'); s.id = 'wm-css'; s.textContent = css; document.head.appendChild(s); }
   const time = m => m == null ? '--' : m >= 60 ? Math.floor(m / 60) + ':' + String(m % 60).padStart(2, '0') : String(m);
@@ -56,8 +70,49 @@ const WM = (() => {
   const FOAM = [[14, 40, 5.5, 1.6], [25, 37, 6.5, 1.3], [37, 40, 5, 1.8], [49, 36, 7, 1.5], [61, 40, 5.5, 1.2], [72, 37, 6.5, 1.7], [84, 40, 5, 1.4], [31, 34, 4, 1.9], [56, 33, 4.5, 1.1], [78, 33, 3.8, 1.6]];
   // пузырьки химии со дна: x, y старт, радиус, период, сдвиг
   const BUB = [[22, 92, 2.6, 2.4, 0], [34, 96, 1.8, 2.1, .7], [45, 93, 3.1, 2.7, 1.4], [57, 97, 2, 2.2, .3], [68, 92, 2.8, 2.5, 1.9], [79, 95, 1.7, 2, 1.1], [39, 90, 1.5, 1.9, 2.2], [63, 94, 2.3, 2.6, .5]];
-  function door(on, n) {
+
+  // ---- этапы стирки: заполнение, стирка, сушка (минуты из wash_types: fill_min, wash_min, dry_min; minutes = сумма) ----
+  // Если этапы не заданы (старые данные), всё время считается стиркой: поведение как раньше.
+  const mins = w => {
+    const f = +(w && w.fill_min) || 0, d = +(w && w.dry_min) || 0, tot = +(w && w.minutes) || 0;
+    const wa = w && w.wash_min != null ? +w.wash_min || 0 : Math.max(0, tot - f - d);
+    return { fill: f, wash: wa, dry: d, total: f + wa + d || tot };
+  };
+  const PH = { fill: 'Заполнение', wash: 'Стирка', dry: 'Сушка' };
+  // где сейчас машина: phase, сколько секунд прошло внутри этапа (el) и его длина (len), всего осталось минут
+  function phase(w, t0, now) {
+    const m = mins(w), el = Math.max(0, ((now == null ? Date.now() : now) - t0) / 1000);
+    const f = m.fill * 60, wa = m.wash * 60;
+    let phase = 'wash', st = f, len = wa;
+    if (el < f) { phase = 'fill'; st = 0; len = f; }
+    else if (el >= f + wa && m.dry > 0) { phase = 'dry'; st = f + wa; len = m.dry * 60; }
+    else if (m.fill === 0 && m.dry === 0) { st = 0; len = m.total * 60; }
+    return { phase, el: Math.max(0, el - st), len, label: PH[phase], multi: m.fill > 0 || m.dry > 0 };
+  }
+  const bub = (x, y, r, p, d) => `<circle class="wm-st" style="animation-duration:${p}s;animation-delay:${(-(((Date.now() / 1000) + off + d) % p)).toFixed(2)}s" cx="${x}" cy="${y}" r="${r}"/>`;
+  // заполнение: вода поднимается за время этапа (фаза по часам, перерисовка её не сбрасывает), сверху капает вода
+  function fillDoor(z) {
+    const dur = Math.max(5, z.len), dl = -Math.min(z.el, dur).toFixed(1);
+    const drops = [[30, 0], [44, .27], [56, .55], [68, .14], [37, .41], [62, .68]].map(d => `<circle class="wm-fi" style="animation-delay:${(-(((Date.now() / 1000) + off + d[1]) % .8)).toFixed(2)}s" cx="${d[0]}" cy="10" r="2.2"/>`).join('');
+    return `<svg viewBox="0 0 100 100" aria-hidden="true">
+<g class="wm-lv" style="animation-duration:${dur}s;animation-delay:${dl}s"><path class="wm-wa wm-dw" style="${ph(1.9)}" d="${wave(44)}"/><path class="wm-wb wm-dw" style="${ph(1.3)}" d="${wave(47)}"/></g>
+<g class="wm-dm" style="${ph(3.4)}"><circle class="wm-hl" cx="50" cy="50" r="31"/>
+<ellipse class="wm-c1" cx="36" cy="60" rx="11" ry="7" transform="rotate(-25 36 60)"/><circle class="wm-c2" cx="63" cy="43" r="8"/><rect class="wm-c3" x="46" y="66" width="17" height="10" rx="4" transform="rotate(20 54 71)"/></g>
+${drops}<path class="wm-sh" d="M24 36a30 30 0 0 1 16-14"/></svg>`;
+  }
+  // сушка: барабан крутится быстрее, снизу поднимается тёплый воздух и пар, воды нет
+  function dryDoor() {
+    const hw = [[34, 1], [50, 1.5], [66, .5]].map(h => `<path class="wm-hw" style="animation-delay:${(-(((Date.now() / 1000) + off + h[1]) % 2.2)).toFixed(2)}s" d="M${h[0]} 88q-4-5 0-10t0-10"/>`).join('');
+    return `<svg viewBox="0 0 100 100" aria-hidden="true">
+<g class="wm-dm" style="${ph(1.5)}"><circle class="wm-hl" cx="50" cy="50" r="31"/>
+<ellipse class="wm-c1" cx="36" cy="60" rx="11" ry="7" transform="rotate(-25 36 60)"/><circle class="wm-c2" cx="63" cy="43" r="8"/><rect class="wm-c3" x="46" y="66" width="17" height="10" rx="4" transform="rotate(20 54 71)"/></g>
+${hw}${bub(40, 84, 3, 2.8, 0)}${bub(55, 86, 2.4, 2.4, .9)}${bub(66, 82, 3.4, 3, 1.7)}${bub(47, 88, 2, 2.2, 2.1)}
+<path class="wm-sh" d="M24 36a30 30 0 0 1 16-14"/></svg>`;
+  }
+  function door(on, n, pz) {
     if (!on) return `<svg viewBox="0 0 100 100" aria-hidden="true"><circle class="wm-hl" cx="50" cy="50" r="30"/><path class="wm-sh" d="M24 36a30 30 0 0 1 16-14"/></svg>`;
+    if (pz && pz.phase === 'fill') return fillDoor(pz);
+    if (pz && pz.phase === 'dry') return dryDoor(pz);
     return `<svg viewBox="0 0 100 100" aria-hidden="true">
 <path class="wm-wa wm-dw" style="${ph(1.9)}" d="${wave(44)}"/><path class="wm-wb wm-dw" style="${ph(1.3)}" d="${wave(47)}"/>
 <g class="wm-dm" style="${ph(3.4)}"><circle class="wm-hl" cx="50" cy="50" r="31"/>
@@ -72,8 +127,9 @@ ${FOAM.map(f => `<circle class="wm-fo wm-fz" style="animation-delay:${(-((Date.n
     const on = !!o.on, n = String(o.n).padStart(2, '0');
     off = (+o.n || 0) * 0.37;
     const scr = o.scr != null ? o.scr : on ? time(o.left) : '--';
-    return `<span class="wm ${on ? 'on' : ''} ${o.set ? 'set' : ''}" aria-hidden="true"><span class="wm-t"><span class="wm-k"></span>${drop}${wavei}<span class="wm-s">${scr}</span></span>` +
-      `<span class="wm-d">${door(on, n)}<span class="wm-r"></span><b>${n}</b></span></span>`;
+    const pz = on && o.ph && o.ph.multi ? o.ph : null, pc = pz && pz.phase !== 'wash' ? ' ' + pz.phase : '';
+    return `<span class="wm ${on ? 'on' : ''}${pc} ${o.set ? 'set' : ''}" aria-hidden="true"><span class="wm-t"><span class="wm-k"></span>${drop}${wavei}<span class="wm-s">${scr}</span></span>` +
+      `<span class="wm-d">${door(on, n, pz)}<span class="wm-r"></span><b>${n}</b></span></span>`;
   }
-  return { html, mount };
+  return { html, mount, mins, phase, PH };
 })();

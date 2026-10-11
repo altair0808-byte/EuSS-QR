@@ -39,7 +39,9 @@
 <div class="box">
   <h2>Новый вид стирки</h2>
   <label>Название<input id="wn"></label>
-  <label>Минуты<input id="wm" type="number" min="0" inputmode="numeric"></label>
+  <div class="acc"><label>Заполнение, мин<input id="wf" type="number" min="0" inputmode="numeric" value="0"></label>
+  <label>Стирка, мин<input id="wm" type="number" min="0" inputmode="numeric"></label>
+  <label>Сушка, мин<input id="wd" type="number" min="0" inputmode="numeric" value="0"></label></div>
   <button class="go" id="wa">Добавить</button>
 </div>
 
@@ -92,13 +94,19 @@ async function load() {
   imgFallback($('#chem'));
 
   const mains = chems.filter(c => c.kind === 'main');
-  $('#wt').innerHTML = wts.map(x => `<details class="box" data-w="${x.id}"><summary><b>${esc(x.name)}</b> <small>${x.minutes ?? '–'} мин</small></summary>
+  $('#wt').innerHTML = wts.map(x => `<details class="box" data-w="${x.id}"><summary><b>${esc(x.name)}</b> <small>${x.minutes ?? '–'} мин${x.hidden ? ' · скрыт' : ''}</small></summary>
     <label>Название<input data-wf="name" value="${esc(x.name)}"></label>
-    <label>Минуты<input data-wf="minutes" type="number" min="0" value="${x.minutes ?? ''}"></label>
+    <h3>Этапы, минут</h3>
+    <div class="acc"><label>Заполнение<input data-wf="fill_min" type="number" min="0" inputmode="numeric" value="${x.fill_min ?? 0}"></label>
+    <label>Стирка<input data-wf="wash_min" type="number" min="0" inputmode="numeric" value="${x.wash_min ?? x.minutes ?? 0}"></label>
+    <label>Сушка<input data-wf="dry_min" type="number" min="0" inputmode="numeric" value="${x.dry_min ?? 0}"></label></div>
+    <p class="hint">Всего: <b data-tot>${(+(x.fill_min ?? 0)) + (+(x.wash_min ?? x.minutes ?? 0)) + (+(x.dry_min ?? 0))}</b> мин (сумма этапов; по ней считается «осталось» и бланк)</p>
     <h3>Химия, мл на литр воды</h3>
     ${mains.map(c => { const r = rec.find(y => y.wash_type_id === x.id && y.chemical_id === c.id);
       return `<label>${esc(c.name)}<input type="number" min="0" step="any" data-r="${c.id}" value="${r ? r.ml_per_l : 0}"></label>`; }).join('')}
-    <button class="go" data-act="sw">Сохранить</button></details>`).join('');
+    <button class="go" data-act="sw">Сохранить</button>
+    <button class="mini" data-act="hid">${x.hidden ? 'Показать в выборе стирки' : 'Скрыть из выбора стирки'}</button>
+    <p class="hint">${x.hidden ? 'Сейчас скрыт: сотрудники его не выбирают, старые записи и отчёты его по-прежнему показывают.' : 'Скрытый вид не пропадает из старых записей и отчётов, только убирается из выбора при загрузке.'}</p></details>`).join('');
 
   $('#fm').innerHTML = (fm || []).map(x => `<div class="box" data-fid="${x.id}"><b>${esc(x.name)}</b> <small>${esc(x.slug)}${x.archived ? ' · в архиве' : ''}</small>
     <div class="row"><button class="mini" data-act="fr">Переименовать</button><button class="mini" data-act="fz">${x.archived ? 'Вернуть' : 'В архив'}</button></div></div>`).join('');
@@ -126,12 +134,25 @@ $('#chem').onclick = async e => {
   done(err);
 };
 
+const stageMin = d => ['fill_min', 'wash_min', 'dry_min'].map(k => Math.max(0, Math.round(+d.querySelector(`[data-wf="${k}"]`).value || 0)));
+$('#wt').oninput = e => {
+  if (!e.target.matches('[data-wf="fill_min"],[data-wf="wash_min"],[data-wf="dry_min"]')) return;
+  const d = e.target.closest('[data-w]'); d.querySelector('[data-tot]').textContent = stageMin(d).reduce((a, b) => a + b, 0);
+};
 $('#wt').onclick = async e => {
+  const hb = e.target.closest('[data-act="hid"]');
+  if (hb) {
+    const hid = +hb.closest('[data-w]').dataset.w, wt0 = wts.find(x => x.id === hid);
+    if (done((await sb.from('wash_types').update({ hidden: !wt0.hidden }).eq('id', hid)).error)) load();
+    return;
+  }
   const b = e.target.closest('[data-act="sw"]'); if (!b) return;
   const d = b.closest('[data-w]'), id = +d.dataset.w;
   const name = d.querySelector('[data-wf="name"]').value.trim();
   if (!name) { toast('Укажите название'); return; }
-  let { error } = await sb.from('wash_types').update({ name, minutes: num(d.querySelector('[data-wf="minutes"]').value) }).eq('id', id);
+  const [fill_min, wash_min, dry_min] = stageMin(d);
+  if (fill_min + wash_min + dry_min <= 0) { toast('Укажите минуты хотя бы для одного этапа'); return; }
+  let { error } = await sb.from('wash_types').update({ name, fill_min, wash_min, dry_min, minutes: fill_min + wash_min + dry_min }).eq('id', id);
   if (!error) ({ error } = await sb.from('recipes').upsert([...d.querySelectorAll('[data-r]')].map(i => ({ wash_type_id: id, chemical_id: +i.dataset.r, ml_per_l: +i.value || 0 }))));
   if (done(error)) load();
 };
@@ -152,10 +173,12 @@ $('#ca').onclick = async () => {
 
 $('#wa').onclick = async () => {
   const name = $('#wn').value.trim(); if (!name) { toast('Укажите название'); return; }
-  const { data, error } = await sb.from('wash_types').insert({ name, minutes: num($('#wm').value), sort: Math.max(0, ...wts.map(x => x.sort || 0)) + 1 }).select('id').single();
+  const fm = Math.max(0, Math.round(+$('#wf').value || 0)), wm = Math.max(0, Math.round(+$('#wm').value || 0)), dm = Math.max(0, Math.round(+$('#wd').value || 0));
+  if (fm + wm + dm <= 0) { toast('Укажите минуты хотя бы для одного этапа'); return; }
+  const { data, error } = await sb.from('wash_types').insert({ name, fill_min: fm, wash_min: wm, dry_min: dm, minutes: fm + wm + dm, sort: Math.max(0, ...wts.map(x => x.sort || 0)) + 1 }).select('id').single();
   if (error) { done(error); return; }
   await sb.from('recipes').insert(chems.filter(c => c.kind === 'main').map(c => ({ wash_type_id: data.id, chemical_id: c.id, ml_per_l: 0 })));
-  $('#wn').value = $('#wm').value = ''; toast('Добавлено, задайте рецепт'); load();
+  $('#wn').value = $('#wm').value = ''; $('#wf').value = $('#wd').value = 0; toast('Добавлено, задайте рецепт'); load();
 };
 
 $('#fm').onclick = async e => {
