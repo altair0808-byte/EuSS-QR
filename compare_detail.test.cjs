@@ -83,10 +83,10 @@ console.log('2. Светофор: жёлтые условия и зелёный'
   t('зелёный: замеры есть, остатки внесены, расход ≥ 0, проживающие введены, граница в 06:00, расход близок к теории', () => {
     const a = loc('2026-10-08', 6), b = loc('2026-10-09', 6), loads = [];
     for (let i = 0; i < 20; i++) loads.push({ id: 'g' + i, ts: loc('2026-10-08', 8 + (i % 9), 10 + i), machine: (i % 12) + 1, weight_kg: 25, wash_type_id: 1 });
-    const f1 = 1.5, f2 = 1.8;                                                            // теория 3,63 кг на оба дозатора (по стиркам 10 : 10 → 1,815 + 1,815)
+    const f1 = 3.3, f2 = 0.4;                                                            // теория 3,63 кг: машины 1–10 — 18 стирок (3,267 кг), машины 11–12 — 2 стирки (0,363 кг)
     const r = calcCompare(refs, { ...base, loads, fromTs: a, toTs: b, closings: [cl('a', a, 10, 6, 'start'), cl('b', b, 10 - f1, 6 - f2)],
       moves: [take('1_10', 10, a, 'a', 'z1'), take('11_12', 6, a, 'a', 'z2'), pour('1_10', 10, loc('2026-10-08', 6, 5), 'z3'), pour('11_12', 6, loc('2026-10-08', 6, 5), 'z4'), take('1_10', 10 - f1, b, 'b', 'z5'), take('11_12', 6 - f2, b, 'b', 'z6')] });
-    const tr = D.trust(r, { isAdmin: true }); assert.deepStrictEqual(tr.items.map(i => i.level), ['green', 'green'], JSON.stringify(tr.items.map(i => i.reasons.map(x => x.code))));
+    const tr = D.trust(r, { isAdmin: true }); assert.deepStrictEqual([...tr.items.map(i => i.level)], ['green', 'green'], JSON.stringify(tr.items.map(i => i.reasons.map(x => x.code))));
     assert.strictEqual(tr.worst, 'green'); assert.ok(/Можно ли верить цифрам/.test(D.trustHTML(r, 'all', { isAdmin: true })));
   });
 }

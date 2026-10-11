@@ -33,15 +33,15 @@ const base={report_changes:[{id:'A',ts:'2026-10-06T10:00:00Z',shift_date:'2026-1
 async function panel(extra){
   const ctx={sb:mkSb({...base,...extra}),document:{head:{insertAdjacentHTML(){}}},requestAnimationFrame(){},setInterval(){return 0},clearInterval(){},Date,Math,String,Promise,Object,Array,JSON};
   const el={querySelector:()=>null,querySelectorAll:()=>[],isConnected:true};
-  vm.createContext(ctx);vm.runInContext(fs.readFileSync(path.join(__dirname,'../storage-anim.js'),'utf8')+';this.SA=StorageAnim;',ctx);
+  vm.createContext(ctx);vm.runInContext(fs.readFileSync(path.join(__dirname,'../num.js'),'utf8'),ctx);vm.runInContext(fs.readFileSync(path.join(__dirname,'../storage-anim.js'),'utf8')+';this.SA=StorageAnim;',ctx);
   await ctx.SA.mount(el,{refs:{water:55,chemicals:chems,recipes:[{wash_type_id:1,chemical_id:1,ml_per_l:3}]},date:'2026-10-07',st:6,tz:5,can:true});
   return el.innerHTML.replace(/<[^>]+>/g,'|').replace(/\|+/g,'|');
 }
 (async()=>{
   const a=await panel({});
-  t('без уточнения: 20 − 10 стирок × 0,165 = 18,35 л (в сотых)',()=>assert.ok(a.includes('18,35 л'),a.slice(0,400)));
+  t('без уточнения: 20 − 10 стирок × 0,165 = 18,35 л',()=>assert.ok(a.includes('18,35 л'),a.slice(0,400)));
   const b=await panel({report_levels:[{id:'L',ts:'2026-10-06T10:00:00Z',shift_date:'2026-10-06',chemical_id:1,machine_group:'1_10',amount_l:12,amount_kg:13.2}]});
-  t('в дозаторе было 12 л: 12 − 1,65 = 10,35 л, стирки вычтены сами',()=>assert.ok(b.includes('10,35 л · 11,39 кг'),b.slice(0,500)));
+  t('в дозаторе было 12 л: 12 − 1,65 = 10,35 л, стирки вычтены сами',()=>assert.ok(b.includes('10,35 л · 11,385 кг'),b.slice(0,500)));
   t('кнопка «Указать реальный уровень» есть',()=>assert.ok(b.includes('Указать реальный уровень')));
   const c=await panel({report_levels:[{id:'L',ts:'2026-10-06T10:00:00Z',shift_date:'2026-10-06',chemical_id:1,machine_group:'11_12',amount_l:5}]});
   t('уровень второго дозатора первый не трогает',()=>assert.ok(c.includes('18,35 л')));
