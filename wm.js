@@ -57,6 +57,8 @@ const WM = (() => {
 @keyframes wmht{0%{transform:translateY(8px);opacity:0}25%{opacity:.85}100%{transform:translateY(-34px);opacity:0}}
 @keyframes wmst{0%{transform:translateY(6px) scale(.5);opacity:0}20%{opacity:.8}100%{transform:translateY(-40px) scale(1.5);opacity:0}}
 @media(prefers-reduced-motion:reduce){.wm.fill .wm-lv,.wm.fill .wm-fi,.wm.dry .wm-dm,.wm.dry .wm-hw,.wm.dry .wm-st{animation:none}.wm.fill .wm-fi,.wm.dry .wm-hw,.wm.dry .wm-st{opacity:.5}}
+.wk{display:inline-grid;place-items:center;flex:none;width:1.5em;height:1.5em;margin-right:.35rem;border-radius:.45rem;background:#90a4ae;background:var(--k,#90a4ae);font-size:.88em;line-height:1;vertical-align:middle;box-shadow:0 1px 2px rgb(0 0 0/.22)}
+button[data-v][style*="--k"]{border-left:.32rem solid #90a4ae;border-left-color:var(--k)}
 @media(prefers-reduced-motion:reduce){.wm.on .wm-d{animation:none}}`;
   function mount() { if (document.getElementById('wm-css')) return; const s = document.createElement('style'); s.id = 'wm-css'; s.textContent = css; document.head.appendChild(s); }
   const time = m => m == null ? '--' : m >= 60 ? Math.floor(m / 60) + ':' + String(m % 60).padStart(2, '0') : String(m);
@@ -89,6 +91,19 @@ const WM = (() => {
     else if (m.fill === 0 && m.dry === 0) { st = 0; len = m.total * 60; }
     return { phase, el: Math.max(0, el - st), len, label: PH[phase], multi: m.fill > 0 || m.dry > 0 };
   }
+
+  // ---- цвет и значок режима стирки: чтобы режимы не путались. Заданные в настройках (color, icon) главнее; иначе по названию ----
+  const KD = [[/постел/i, '#4f86f7', '🛏️'], [/махр/i, '#17a99a', '🛁'], [/униформ.*бел|бел.*униформ/i, '#7d8da1', '🥼'], [/униформ|т[её]мн/i, '#455a64', '👔'],
+    [/синтет/i, '#a35bd6', '🧵'], [/деликат/i, '#ec5f9b', '🌸'], [/спец/i, '#f08a3c', '🦺']];
+  const PAL = ['#e5645a', '#3aa86b', '#c9a227', '#2f9ec7', '#8a6fd1', '#d9693f'];
+  const hexOk = c => /^#[0-9a-f]{6}$/i.test(String(c || ''));
+  const eh = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  function kind(w) {
+    w = w || {};
+    const r = KD.find(k => k[0].test(String(w.name || '')));
+    return { color: hexOk(w.color) ? w.color : r ? r[1] : PAL[(+w.id || 0) % PAL.length], icon: w.icon && String(w.icon).trim() ? [...String(w.icon).trim()].slice(0, 2).join('') : r ? r[2] : '🧺' };
+  }
+  function chip(w) { if (!w) return ''; mount(); const k = kind(w); return `<span class="wk" style="--k:${k.color}" aria-hidden="true">${eh(k.icon)}</span>`; }
   const bub = (x, y, r, p, d) => `<circle class="wm-st" style="animation-duration:${p}s;animation-delay:${(-(((Date.now() / 1000) + off + d) % p)).toFixed(2)}s" cx="${x}" cy="${y}" r="${r}"/>`;
   // заполнение: вода поднимается за время этапа (фаза по часам, перерисовка её не сбрасывает), сверху капает вода
   function fillDoor(z) {
@@ -131,5 +146,5 @@ ${FOAM.map(f => `<circle class="wm-fo wm-fz" style="animation-delay:${(-((Date.n
     return `<span class="wm ${on ? 'on' : ''}${pc} ${o.set ? 'set' : ''}" aria-hidden="true"><span class="wm-t"><span class="wm-k"></span>${drop}${wavei}<span class="wm-s">${scr}</span></span>` +
       `<span class="wm-d">${door(on, n, pz)}<span class="wm-r"></span><b>${n}</b></span></span>`;
   }
-  return { html, mount, mins, phase, PH };
+  return { html, mount, mins, phase, PH, kind, chip };
 })();
