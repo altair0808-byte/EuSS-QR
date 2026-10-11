@@ -55,6 +55,7 @@
   <button class="go" id="fa">Добавить</button>
 </div>
 </main>
+<script src="wm.js"></script>
 <script src="lite.js"></script>
 <script src="kiosk.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
@@ -94,8 +95,12 @@ async function load() {
   imgFallback($('#chem'));
 
   const mains = chems.filter(c => c.kind === 'main');
-  $('#wt').innerHTML = wts.map(x => `<details class="box" data-w="${x.id}"><summary><b>${esc(x.name)}</b> <small>${x.minutes ?? '–'} мин${x.hidden ? ' · скрыт' : ''}</small></summary>
+  $('#wt').innerHTML = wts.map(x => `<details class="box" data-w="${x.id}"><summary><span class="wk" style="--k:${esc(wkind(x).color)}">${esc(wkind(x).icon)}</span><b>${esc(x.name)}</b> <small>${x.minutes ?? '–'} мин${x.hidden ? ' · скрыт' : ''}</small></summary>
     <label>Название<input data-wf="name" value="${esc(x.name)}"></label>
+    ${'color' in x ? `<h3>Цвет и значок режима</h3>
+    <div class="acc"><label>Цвет<input type="color" data-wf="color" value="${esc(wkind(x).color)}" style="height:2.6rem;padding:.15rem"></label>
+    <label>Значок (один эмодзи)<input data-wf="icon" maxlength="4" value="${esc(wkind(x).icon)}" autocomplete="off"></label></div>
+    <p class="hint">Цвет и значок видны в списке, на плитке машины и в окне, чтобы режимы не путались.</p>` : '<p class="hint">Чтобы задать цвет и значок, выполните stage25.sql.</p>'}
     <h3>Этапы, минут</h3>
     <div class="acc"><label>Заполнение<input data-wf="fill_min" type="number" min="0" inputmode="numeric" value="${x.fill_min ?? 0}"></label>
     <label>Стирка<input data-wf="wash_min" type="number" min="0" inputmode="numeric" value="${x.wash_min ?? x.minutes ?? 0}"></label>
@@ -134,6 +139,7 @@ $('#chem').onclick = async e => {
   done(err);
 };
 
+const wkind = x => WM.kind(x);
 const stageMin = d => ['fill_min', 'wash_min', 'dry_min'].map(k => Math.max(0, Math.round(+d.querySelector(`[data-wf="${k}"]`).value || 0)));
 $('#wt').oninput = e => {
   if (!e.target.matches('[data-wf="fill_min"],[data-wf="wash_min"],[data-wf="dry_min"]')) return;
@@ -152,7 +158,10 @@ $('#wt').onclick = async e => {
   if (!name) { toast('Укажите название'); return; }
   const [fill_min, wash_min, dry_min] = stageMin(d);
   if (fill_min + wash_min + dry_min <= 0) { toast('Укажите минуты хотя бы для одного этапа'); return; }
-  let { error } = await sb.from('wash_types').update({ name, fill_min, wash_min, dry_min, minutes: fill_min + wash_min + dry_min }).eq('id', id);
+  const row = { name, fill_min, wash_min, dry_min, minutes: fill_min + wash_min + dry_min };
+  const ci = d.querySelector('[data-wf="color"]'), ii = d.querySelector('[data-wf="icon"]');
+  if (ci) { row.color = ci.value; row.icon = ii.value.trim() || null; }
+  let { error } = await sb.from('wash_types').update(row).eq('id', id);
   if (!error) ({ error } = await sb.from('recipes').upsert([...d.querySelectorAll('[data-r]')].map(i => ({ wash_type_id: id, chemical_id: +i.dataset.r, ml_per_l: +i.value || 0 }))));
   if (done(error)) load();
 };
