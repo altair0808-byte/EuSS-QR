@@ -100,7 +100,7 @@ async function load() {
     ${'color' in x ? `<h3>Цвет и значок режима</h3>
     <div class="acc"><label>Цвет<input type="color" data-wf="color" value="${esc(wkind(x).color)}" style="height:2.6rem;padding:.15rem"></label>
     <label>Значок (один эмодзи)<input data-wf="icon" maxlength="4" value="${esc(wkind(x).icon)}" autocomplete="off"></label></div>
-    <p class="hint">Цвет и значок видны в списке, на плитке машины и в окне, чтобы режимы не путались.</p>` : '<p class="hint">Чтобы задать цвет и значок, выполните stage25.sql.</p>'}
+    <p class="hint">Цвет и значок видны в списке, на плитке машины и в окне, чтобы режимы не путались.</p>` : '<p class="hint">Чтобы задать цвет и значок, выполните stage26.sql.</p>'}
     <h3>Этапы, минут</h3>
     <div class="acc"><label>Заполнение<input data-wf="fill_min" type="number" min="0" inputmode="numeric" value="${x.fill_min ?? 0}"></label>
     <label>Стирка<input data-wf="wash_min" type="number" min="0" inputmode="numeric" value="${x.wash_min ?? x.minutes ?? 0}"></label>
@@ -109,6 +109,9 @@ async function load() {
     <h3>Химия, мл на литр воды</h3>
     ${mains.map(c => { const r = rec.find(y => y.wash_type_id === x.id && y.chemical_id === c.id);
       return `<label>${esc(c.name)}<input type="number" min="0" step="any" data-r="${c.id}" value="${r ? r.ml_per_l : 0}"></label>`; }).join('')}
+    ${'auto_extras' in x ? `<h3>Доп химия по умолчанию, шт</h3>
+    ${chems.filter(c => c.kind === 'extra').map(c => `<label>${esc(c.name)}<input type="number" min="0" max="99" step="1" inputmode="numeric" data-ae="${c.id}" value="${+((x.auto_extras || {})[c.id]) || 0}"></label>`).join('')}
+    <p class="hint">Если здесь есть числа больше 0, при выборе этого режима на главном экране и в бланке доп химия подставится сама (остальные 0), потом её можно поправить кнопками − и +. Все нули: режим ничего не подставляет.</p>` : '<p class="hint">Чтобы настроить автоподстановку доп химии, выполните stage26.sql.</p>'}
     <button class="go" data-act="sw">Сохранить</button>
     <button class="mini" data-act="hid">${x.hidden ? 'Показать в выборе стирки' : 'Скрыть из выбора стирки'}</button>
     <p class="hint">${x.hidden ? 'Сейчас скрыт: сотрудники его не выбирают, старые записи и отчёты его по-прежнему показывают.' : 'Скрытый вид не пропадает из старых записей и отчётов, только убирается из выбора при загрузке.'}</p></details>`).join('');
@@ -161,6 +164,7 @@ $('#wt').onclick = async e => {
   const row = { name, fill_min, wash_min, dry_min, minutes: fill_min + wash_min + dry_min };
   const ci = d.querySelector('[data-wf="color"]'), ii = d.querySelector('[data-wf="icon"]');
   if (ci) { row.color = ci.value; row.icon = ii.value.trim() || null; }
+  const aes = [...d.querySelectorAll('[data-ae]')]; if (aes.length) { row.auto_extras = {}; aes.forEach(i => { const n = Math.max(0, Math.min(99, Math.round(+i.value || 0))); if (n > 0) row.auto_extras[i.dataset.ae] = n; }); }
   let { error } = await sb.from('wash_types').update(row).eq('id', id);
   if (!error) ({ error } = await sb.from('recipes').upsert([...d.querySelectorAll('[data-r]')].map(i => ({ wash_type_id: id, chemical_id: +i.dataset.r, ml_per_l: +i.value || 0 }))));
   if (done(error)) load();
