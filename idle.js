@@ -11,8 +11,8 @@
   const wr = t => { try { localStorage.setItem(KEY, String(t)); } catch (e) {} };
 
   // время последнего действия считываем СРАЗУ, до того как этот заход на страницу сам что-то обновит
-  const lastAtLoad = rd() || Date.now();
-  let last = lastAtLoad, exempt = null, active = false, tick = null, banner = null, leaving = false, seq = 0, uidNow = '';
+  let lastAtLoad = rd() || Date.now();
+  let justSignedIn = false, last = lastAtLoad, exempt = null, active = false, tick = null, banner = null, leaving = false, seq = 0, uidNow = '';
 
   function touch() {
     const n = Date.now();
@@ -79,6 +79,7 @@
     exempt = adm;                                  // true админ; false сотрудник; null не удалось узнать: ничего не делаем
     if (exempt !== false) { stop(); return; }
     active = true;
+    if (justSignedIn) { lastAtLoad = last = Date.now(); wr(last); justSignedIn = false; }   // свежий вход (в т.ч. по QR) считается действием
     if (Date.now() - lastAtLoad >= LIMIT) { leave(); return; }   // вернулись в приложение после долгого перерыва
     if (!tick) tick = setInterval(check, 2000);
     check();
@@ -91,7 +92,7 @@
 
   sb.auth.onAuthStateChange((ev) => {
     if (ev === 'SIGNED_OUT') { seq++; stop(); exempt = null; }
-    else if (ev === 'SIGNED_IN') setTimeout(init, 0);
+    else if (ev === 'SIGNED_IN') { justSignedIn = true; setTimeout(init, 0); }
   });
   init();
 })();
